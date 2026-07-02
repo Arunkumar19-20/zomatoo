@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/scale_tap.dart';
+import '../Services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -32,9 +33,35 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Widget _buildSocialButton(String label, IconData icon, Color iconColor) {
+  void _handleGoogleSignIn() async {
+    setState(() {
+      _isLoading = true;
+    });
+    try {
+      final result = await AuthService.instance.loginWithGoogle(context);
+      if (result != null) {
+        if (mounted) {
+          Navigator.of(context).pushReplacementNamed('/intro');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Google Sign-In failed: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Widget _buildSocialButton(String label, IconData icon, Color iconColor, {VoidCallback? onTap}) {
     return ScaleTap(
-      onTap: () {},
+      onTap: onTap ?? () {},
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -256,7 +283,12 @@ class _LoginScreenState extends State<LoginScreen> {
                         children: [
                           _buildSocialButton("Facebook", Icons.facebook, Colors.blue.shade800),
                           const SizedBox(width: 10),
-                          _buildSocialButton("Google", Icons.g_mobiledata_rounded, Colors.red.shade600),
+                          _buildSocialButton(
+                            "Google",
+                            Icons.g_mobiledata_rounded,
+                            Colors.red.shade600,
+                            onTap: _handleGoogleSignIn,
+                          ),
                           const SizedBox(width: 10),
                           _buildSocialButton("Apple", Icons.apple, Colors.black),
                         ],
