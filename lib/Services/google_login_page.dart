@@ -18,7 +18,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
-import '../core/api_client.dart';
+import 'api_client.dart';
 
 class GoogleLoginResult {
   final String token;

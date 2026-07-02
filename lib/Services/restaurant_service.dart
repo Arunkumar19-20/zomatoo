@@ -2,7 +2,7 @@
 // Mirrors: com.example.zomato.controller.RestaurantController (/restaurants)
 
 import 'package:dio/dio.dart';
-import '../core/api_client.dart';
+import 'api_client.dart';
 import '../models/models.dart';
 
 class RestaurantService {

@@ -6,7 +6,7 @@
 // endpoint additionally requires the token's role to be CUSTOMER.
 
 import 'package:dio/dio.dart';
-import '../core/api_client.dart';
+import 'api_client.dart';
 import '../models/models.dart';
 
 class UserService {

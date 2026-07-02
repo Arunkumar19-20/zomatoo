@@ -2,7 +2,7 @@
 // Mirrors: LocationController (/locations)
 
 import 'package:dio/dio.dart';
-import '../core/api_client.dart';
+import 'api_client.dart';
 import '../models/models.dart';
 
 class LocationService {

@@ -4,7 +4,7 @@
 // client to actually confirm/collect the card payment with that secret.
 
 import 'package:dio/dio.dart';
-import '../core/api_client.dart';
+import 'api_client.dart';
 
 class PaymentService {
   final Dio _dio = ApiClient.instance.dio;

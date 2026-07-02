@@ -6,8 +6,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../core/api_client.dart';
-import '../screens/google_login_page.dart';
+import 'api_client.dart';
+import 'google_login_page.dart';
 
 class AuthService {
   AuthService._();

@@ -2,7 +2,7 @@
 // Mirrors: MenuCategoryController (/categories) and MenuItemController (/menu-items)
 
 import 'package:dio/dio.dart';
-import '../core/api_client.dart';
+import 'api_client.dart';
 import '../models/models.dart';
 
 class MenuService {
