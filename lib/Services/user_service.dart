@@ -8,7 +8,6 @@
 import 'package:dio/dio.dart';
 import 'api_client.dart';
 import '../models/models.dart';
-
 class UserService {
   final Dio _dio = ApiClient.instance.dio;
 
