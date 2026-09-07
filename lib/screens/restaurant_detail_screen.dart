@@ -7,6 +7,8 @@ import '../widgets/scale_tap.dart';
 import '../widgets/fade_in_wrapper.dart';
 import '../widgets/shimmer_placeholder.dart';
 import '../widgets/reviews_dialog.dart';
+import '../Services/menu_service.dart';
+import '../Services/session_provider.dart';
 
 class RestaurantDetailScreen extends StatefulWidget {
   const RestaurantDetailScreen({super.key});
@@ -25,6 +27,49 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
   final TextEditingController _menuSearchController = TextEditingController();
   bool _isBookmarked = false;
 
+  // Backend menu loading
+  List<FoodItem> _apiMenuItems = [];
+  bool _menuLoading = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final restaurant =
+        ModalRoute.of(context)?.settings.arguments as Restaurant?;
+    if (restaurant?.backendId != null && _apiMenuItems.isEmpty && !_menuLoading) {
+      _loadMenuFromBackend(restaurant!.backendId!);
+    }
+  }
+
+  Future<void> _loadMenuFromBackend(int restaurantId) async {
+    setState(() => _menuLoading = true);
+    try {
+      final items = await MenuService().getAllItems();
+      // Filter items that belong to this restaurant's categories
+      // (backend MenuItem has a category field; we show all available items)
+      if (mounted) {
+        setState(() {
+          _apiMenuItems = items
+              .where((i) => i.isAvailable != false)
+              .map((i) => FoodItem(
+                    id: 'api_${i.id}',
+                    name: i.name,
+                    description: i.description ?? '',
+                    price: i.price.toDouble(),
+                    imageUrl: i.imageUrl ??
+                        'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&auto=format&fit=crop&q=60',
+                    category: i.isVeg == true ? 'Veg' : 'Non-Veg',
+                    rating: 4.0,
+                  ))
+              .toList();
+          _menuLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _menuLoading = false);
+    }
+  }
+
   @override
   void dispose() {
     _menuSearchController.dispose();
@@ -33,11 +78,17 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final Restaurant restaurant = (ModalRoute.of(context)?.settings.arguments as Restaurant?) ?? mockRestaurants[0];
+    final Restaurant restaurant =
+        (ModalRoute.of(context)?.settings.arguments as Restaurant?) ??
+            mockRestaurants[0];
+
+    // Use API menu if available, else fall back to mock menu on the restaurant
+    final effectiveMenu =
+        _apiMenuItems.isNotEmpty ? _apiMenuItems : restaurant.menu;
 
     // Group menu by category
     final Map<String, List<FoodItem>> groupedMenu = {};
-    for (var item in restaurant.menu) {
+    for (var item in effectiveMenu) {
       if (!groupedMenu.containsKey(item.category)) {
         groupedMenu[item.category] = [];
       }
@@ -977,12 +1028,29 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
   }
 
   void _showProfileDialog(BuildContext context) {
+    final session = context.read<SessionProvider>();
+    final name  = session.user?.name  ?? session.user?.email?.split('@').first ?? 'User';
+    final email = session.user?.email ?? 'Not signed in';
+    final role  = session.user?.role  ?? '';
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text("Profile"),
-        content: const Text("Alex Mercer\nalex.mercer@gmail.com"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(name,  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            const SizedBox(height: 4),
+            Text(email, style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+            if (role.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(role, style: TextStyle(color: Colors.orange.shade600, fontSize: 12, fontWeight: FontWeight.w600)),
+            ],
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),

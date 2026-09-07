@@ -3,6 +3,8 @@ import '../theme/app_theme.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/scale_tap.dart';
 import '../Services/auth_service.dart';
+import '../Services/session_provider.dart';
+import 'package:provider/provider.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -17,19 +19,10 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _isLoading = false;
 
+  /// The backend uses Google OAuth only — this redirects there.
   void _handleSignIn() {
     if (_formKey.currentState!.validate()) {
-      setState(() {
-        _isLoading = true;
-      });
-      Future.delayed(const Duration(milliseconds: 1200), () {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
-          Navigator.of(context).pushReplacementNamed('/intro');
-        }
-      });
+      _handleGoogleSignIn();
     }
   }
 
@@ -39,7 +32,13 @@ class _LoginScreenState extends State<LoginScreen> {
     });
     try {
       final result = await AuthService.instance.loginWithGoogle(context);
-      if (result != null) {
+      if (result != null && mounted) {
+        // Store session in the provider so all screens can access it.
+        await context.read<SessionProvider>().login(
+              result.token,
+              result.email,
+              result.role,
+            );
         if (mounted) {
           Navigator.of(context).pushReplacementNamed('/intro');
         }

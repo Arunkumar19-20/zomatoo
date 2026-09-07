@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Sign-in Complete</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      background: #fff;
+      color: #333;
+    }
+    .check { font-size: 48px; }
+    h2 { margin: 12px 0 8px; color: #E95322; }
+    p { color: #888; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="check">✓</div>
+  <h2>Signed in successfully!</h2>
+  <p>Returning to the app…</p>
+
+  <script>
+    (function () {
+      // Parse token from URL query params (e.g. /auth.html?token=xxx&email=yyy&role=zzz)
+      var params = new URLSearchParams(window.location.search);
+      var token = params.get('token');
+      var email = params.get('email') || '';
+      var role  = params.get('role')  || '';
+
+      if (!token) {
+        // Try hash fragment (#token=xxx)
+        var hash = new URLSearchParams(window.location.hash.replace('#', '?'));
+        token = hash.get('token');
+        email = hash.get('email') || '';
+        role  = hash.get('role')  || '';
+      }
+
+      if (token) {
+        var payload = JSON.stringify({ token: token, email: email, role: role });
+
+        if (window.opener && !window.opener.closed) {
+          // Popup flow: send postMessage back to the Flutter app window.
+          try {
+            window.opener.postMessage(payload, window.location.origin);
+          } catch (e) {}
+          window.close();
+        } else {
+          // Direct-tab flow: write to localStorage so the Flutter app can poll for it.
+          try {
+            localStorage.setItem('oauth_token', payload);
+          } catch (e) {}
+          // Redirect back to the Flutter app root after a short delay.
+          setTimeout(function () {
+            window.location.replace('/');
+          }, 800);
+        }
+      }
+    })();
+  </script>
+</body>
+</html>

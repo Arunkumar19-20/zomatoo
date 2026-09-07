@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
+import '../Services/session_provider.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -34,7 +36,11 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     _controller.forward();
 
     _timer = Timer(const Duration(milliseconds: 2800), () {
-      Navigator.of(context).pushReplacementNamed('/onboarding');
+      if (!mounted) return;
+      final isLoggedIn = context.read<SessionProvider>().isLoggedIn;
+      Navigator.of(context).pushReplacementNamed(
+        isLoggedIn ? '/home' : '/onboarding',
+      );
     });
   }
 

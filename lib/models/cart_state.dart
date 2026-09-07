@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'food_item.dart';
+import '../Services/order_service.dart';
 
 class CartItem {
   final FoodItem foodItem;
@@ -19,11 +20,15 @@ enum OrderStatus { preparing, onTheWay, delivered }
 class CartState extends ChangeNotifier {
   final List<CartItem> _items = [];
   Restaurant? _activeRestaurant;
-  
+
   // Checkout Details
   String _deliveryAddress = "123 Foodie Lane, Gourmet City";
-  String _paymentMethod = "Credit Card"; // "Credit Card", "Cash on Delivery", "Cravey Wallet"
-  
+  String _paymentMethod = "Credit Card";
+
+  // Backend IDs (set after login + checkout)
+  int? _backendCartId;
+  int? _backendOrderId;
+
   // Tracking Simulation
   OrderStatus _currentStatus = OrderStatus.preparing;
   Timer? _statusTimer;
@@ -37,13 +42,21 @@ class CartState extends ChangeNotifier {
   double _recentOrderServiceFee = 0.0;
   double _recentOrderTotal = 0.0;
 
+  // Checkout state
+  bool _isPlacingOrder = false;
+  String? _orderError;
+
   List<CartItem> get items => List.unmodifiable(_items);
   Restaurant? get activeRestaurant => _activeRestaurant;
-  
+
   String get deliveryAddress => _deliveryAddress;
   String get paymentMethod => _paymentMethod;
   OrderStatus get currentStatus => _currentStatus;
   int get simulationSecondsRemaining => _simulationSecondsRemaining;
+  int? get backendCartId => _backendCartId;
+  int? get backendOrderId => _backendOrderId;
+  bool get isPlacingOrder => _isPlacingOrder;
+  String? get orderError => _orderError;
 
   List<CartItem> get recentOrderItems => List.unmodifiable(_recentOrderItems);
   Restaurant? get recentOrderRestaurant => _recentOrderRestaurant;
@@ -63,11 +76,17 @@ class CartState extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setBackendCartId(int id) {
+    _backendCartId = id;
+    notifyListeners();
+  }
+
   // Cart Operations
   void addItem(FoodItem item, Restaurant restaurant) {
-    // If adding item from a different restaurant, clear the cart first (standard food app logic)
+    // If adding item from a different restaurant, clear the cart first
     if (_activeRestaurant != null && _activeRestaurant!.id != restaurant.id) {
       _items.clear();
+      _backendCartId = null;
     }
     _activeRestaurant = restaurant;
 
@@ -106,6 +125,7 @@ class CartState extends ChangeNotifier {
   void clearCart() {
     _items.clear();
     _activeRestaurant = null;
+    _backendCartId = null;
     notifyListeners();
   }
 
@@ -131,7 +151,7 @@ class CartState extends ChangeNotifier {
   double get serviceFee {
     if (_items.isEmpty) return 0.0;
     if (_activeRestaurant?.id == "rest1") return 567.99;
-    return 25.00; // default service fee
+    return 25.00;
   }
 
   double get total {
@@ -139,7 +159,15 @@ class CartState extends ChangeNotifier {
     return subtotal + deliveryFee + serviceFee;
   }
 
-  void placeOrder() {
+  /// Places the order — calls backend if customerId is available,
+  /// otherwise falls back to local simulation.
+  Future<bool> placeOrder({int? customerId, int? restaurantId}) async {
+    // Always reset the tracking state for the new order first.
+    _statusTimer?.cancel();
+    _currentStatus = OrderStatus.preparing;
+    _simulationSecondsRemaining = 25;
+    _backendOrderId = null;
+
     _recentOrderItems.clear();
     _recentOrderItems.addAll(_items);
     _recentOrderRestaurant = _activeRestaurant;
@@ -148,8 +176,36 @@ class CartState extends ChangeNotifier {
     _recentOrderServiceFee = serviceFee;
     _recentOrderTotal = total;
 
+    // Try backend checkout if we have all required IDs
+    if (customerId != null && _backendCartId != null && restaurantId != null) {
+      _isPlacingOrder = true;
+      _orderError = null;
+      notifyListeners();
+
+      try {
+        final order = await OrderService().checkout(
+          cartId: _backendCartId!,
+          customerId: customerId,
+          restaurantId: restaurantId,
+        );
+        _backendOrderId = order.orderId;
+        _isPlacingOrder = false;
+        startOrderSimulation();
+        clearCart();
+        notifyListeners();
+        return true;
+      } catch (e) {
+        _orderError = e.toString();
+        _isPlacingOrder = false;
+        notifyListeners();
+        return false;
+      }
+    }
+
+    // Fallback: local simulation (no auth / guest mode)
     startOrderSimulation();
     clearCart();
+    return true;
   }
 
   // Tracking Simulation
