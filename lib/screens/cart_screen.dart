@@ -6,6 +6,7 @@ import '../widgets/primary_button.dart';
 import '../widgets/citrus_header.dart';
 import '../widgets/fade_in_wrapper.dart';
 import '../widgets/shimmer_placeholder.dart';
+import '../Services/session_provider.dart';
 
 class CartScreen extends StatelessWidget {
   const CartScreen({super.key});
@@ -354,12 +355,29 @@ class CartScreen extends StatelessWidget {
   }
 
   void _showProfileDialog(BuildContext context) {
+    final session = context.read<SessionProvider>();
+    final name  = session.user?.name  ?? session.user?.email?.split('@').first ?? 'User';
+    final email = session.user?.email ?? 'Not signed in';
+    final role  = session.user?.role  ?? '';
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text("Profile"),
-        content: const Text("Alex Mercer\nalex.mercer@gmail.com"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(name,  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            const SizedBox(height: 4),
+            Text(email, style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+            if (role.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(role, style: TextStyle(color: Colors.orange.shade600, fontSize: 12, fontWeight: FontWeight.w600)),
+            ],
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),

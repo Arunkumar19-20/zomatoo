@@ -34,7 +34,8 @@ class Restaurant {
         locationId: j['locationId'],
         ownerId: j['ownerId'],
         rating: (j['rating'] as num?)?.toDouble(),
-        isOpen: j['isOpen'],
+        // Backend serialises as "open" due to @JsonProperty("open")
+        isOpen: j['open'] ?? j['isOpen'],
         openingHours: j['openingHours'],
         deliveryTime: j['deliveryTime'] ?? 0,
       );
@@ -46,7 +47,7 @@ class Restaurant {
         'locationId': locationId,
         'ownerId': ownerId,
         'rating': rating,
-        'isOpen': isOpen,
+        'open': isOpen,
         'openingHours': openingHours,
         'deliveryTime': deliveryTime,
       };
@@ -170,17 +171,22 @@ class CartItemModel {
 class OrderModel {
   final int? orderId;
   final double totalAmount;
+  final String? status;
+  final String? orderDate;
 
-  OrderModel({this.orderId, required this.totalAmount});
+  OrderModel({this.orderId, required this.totalAmount, this.status, this.orderDate});
 
   factory OrderModel.fromJson(Map<String, dynamic> j) => OrderModel(
         orderId: j['orderId'],
         totalAmount: (j['totalAmount'] as num?)?.toDouble() ?? 0,
+        status: j['status'],
+        orderDate: j['orderDate']?.toString(),
       );
 
   Map<String, dynamic> toJson() => {
         if (orderId != null) 'orderId': orderId,
         'totalAmount': totalAmount,
+        'status': status,
       };
 }
 

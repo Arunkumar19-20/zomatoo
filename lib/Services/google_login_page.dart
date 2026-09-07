@@ -1,24 +1,22 @@
 // lib/screens/google_login_page.dart
 //
-// This is the actual "redirect page" for your backend's login flow.
-//
-// Backend flow recap:
+// Backend flow:
 //   1. GET /google-login?role=CUSTOMER  -> stores role in session, then
-//      does `redirect:/oauth2/authorization/google`
-//   2. Google handles auth, redirects back into Spring Security's OAuth2
-//      callback endpoint
-//   3. CustomOAuth2SuccessHandler writes a raw JSON body to the response:
-//        { "token": "...", "email": "...", "role": "..." }
+//      redirects to `/oauth2/authorization/google`
+//   2. Google handles auth, redirects back via Spring Security's OAuth2 callback
+//   3. CustomOAuth2SuccessHandler writes raw JSON: { "token": "...", "email": "...", "role": "..." }
 //
-// Because step 3 is not a normal `myapp://redirect` deep link — it's a
-// plain JSON page rendered inside the browser flow — the cleanest way to
-// consume it from Flutter is to run the whole flow inside a WebView and
-// read the final page's body once it looks like JSON.
+// On mobile (Android/iOS) we run this in a WebViewWidget and read the final body.
+// On web, webview_flutter is NOT supported, so we launch the URL in the browser tab.
 
-import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:webview_flutter/webview_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'api_client.dart';
+
+// webview_flutter is mobile-only — conditional import
+import 'google_login_page_mobile.dart'
+    if (dart.library.html) 'google_login_page_web.dart';
 
 class GoogleLoginResult {
   final String token;
@@ -39,97 +37,74 @@ class GoogleLoginPage extends StatefulWidget {
 }
 
 class _GoogleLoginPageState extends State<GoogleLoginPage> {
-  late final WebViewController _controller;
-  bool _resolved = false;
-  bool _loading = true;
+  bool _loading = false;
+
+  String get _loginUrl =>
+      '${ApiClient.baseUrl}/google-login?role=${Uri.encodeComponent(widget.role)}';
 
   @override
   void initState() {
     super.initState();
-
-    final loginUrl =
-        '${ApiClient.baseUrl}/google-login?role=${Uri.encodeComponent(widget.role)}';
-
-    _controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setUserAgent('Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.79 Mobile Safari/537.36')
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onPageStarted: (_) => setState(() => _loading = true),
-          onPageFinished: (url) async {
-            setState(() => _loading = false);
-            await _tryExtractResult();
-          },
-          onWebResourceError: (error) {
-            if (!_resolved) {
-              _finish(error: 'Failed to load login page: ${error.description}');
-            }
-          },
-        ),
-      )
-      ..loadRequest(Uri.parse(loginUrl));
-  }
-
-  /// After every page load, check whether the body is now the raw JSON
-  /// written by CustomOAuth2SuccessHandler. If so, parse it and return.
-  Future<void> _tryExtractResult() async {
-    if (_resolved) return;
-
-    try {
-      final raw = await _controller.runJavaScriptReturningResult(
-        'document.body.innerText',
-      );
-
-      // runJavaScriptReturningResult returns a JSON-encoded string on most
-      // platforms (quoted). Strip surrounding quotes/escapes if present.
-      String bodyText = raw.toString();
-      if (bodyText.startsWith('"') && bodyText.endsWith('"')) {
-        bodyText = jsonDecode(bodyText) as String;
-      }
-
-      if (bodyText.contains('"token"') && bodyText.contains('"email"')) {
-        final decoded = jsonDecode(bodyText) as Map<String, dynamic>;
-        if (decoded['token'] != null) {
-          _finish(
-            result: GoogleLoginResult(
-              token: decoded['token'],
-              email: decoded['email'] ?? '',
-              role: decoded['role'] ?? widget.role,
-            ),
-          );
-        }
-      } else if (bodyText.startsWith('ERROR:')) {
-        _finish(error: bodyText);
-      }
-    } catch (_) {
-      // Page not ready / not JSON yet (still mid-OAuth-redirect) — ignore
-      // and wait for the next onPageFinished call.
+    if (kIsWeb) {
+      // On web: open in browser, show a waiting UI
+      _openInBrowser();
     }
   }
 
-  void _finish({GoogleLoginResult? result, String? error}) {
-    if (_resolved) return;
-    _resolved = true;
-    if (result != null) {
-      Navigator.of(context).pop(result);
+  Future<void> _openInBrowser() async {
+    setState(() => _loading = true);
+    final uri = Uri.parse(_loginUrl);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     } else {
-      Navigator.of(context).pop(null);
-      if (error != null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open browser for Google Sign-In')),
+        );
+        Navigator.of(context).pop(null);
       }
     }
+    setState(() => _loading = false);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Sign in with Google')),
-      body: Stack(
-        children: [
-          WebViewWidget(controller: _controller),
-          if (_loading) const LinearProgressIndicator(),
-        ],
-      ),
-    );
+    if (kIsWeb) {
+      // Web: show a simple waiting screen — auth happens in the browser tab
+      return Scaffold(
+        appBar: AppBar(title: const Text('Sign in with Google')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_loading) const CircularProgressIndicator(),
+                const SizedBox(height: 24),
+                const Text(
+                  'A browser window has been opened for Google Sign-In.\n\nComplete sign-in there and return to the app.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 16),
+                ),
+                const SizedBox(height: 32),
+                ElevatedButton.icon(
+                  onPressed: _openInBrowser,
+                  icon: const Icon(Icons.open_in_browser),
+                  label: const Text('Re-open Sign-In'),
+                ),
+                const SizedBox(height: 16),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(null),
+                  child: const Text('Cancel'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Mobile: use the native WebView implementation
+    return buildMobileWebView(context, _loginUrl, widget.role);
   }
 }

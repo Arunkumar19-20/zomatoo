@@ -28,6 +28,8 @@ class Restaurant {
   final List<String> cuisineTags;
   final List<FoodItem> menu;
   final String? discountText;
+  /// The real database id from the backend (null for mock restaurants)
+  final int? backendId;
 
   Restaurant({
     required this.id,
@@ -39,6 +41,7 @@ class Restaurant {
     required this.cuisineTags,
     required this.menu,
     this.discountText,
+    this.backendId,
   });
 }
 

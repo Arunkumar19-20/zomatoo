@@ -93,30 +93,38 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTi
     final hasActiveSimulation = cart.recentOrderRestaurant != null;
 
     final restaurantName = hasActiveSimulation ? cart.recentOrderRestaurant!.name : "Cravey Kitchen";
-    
+    final orderIdText = cart.backendOrderId != null
+        ? "Order #${cart.backendOrderId}"
+        : "Order #${DateTime.now().millisecondsSinceEpoch % 100000}";
+
     // Status calculations
     final status = cart.currentStatus;
     final isPreparing = status == OrderStatus.preparing;
     final isOnTheWay = status == OrderStatus.onTheWay;
     final isDelivered = status == OrderStatus.delivered;
 
-    String timeText = "25 mins";
-    String headingText = "Preparing your order";
-    String descriptionText = "$restaurantName is busy preparing your delicious food!";
-    
-    if (isOnTheWay) {
+    String timeText;
+    String headingText;
+    String descriptionText;
+
+    if (isDelivered) {
+      timeText = "Delivered!";
+      headingText = "Order Delivered 🎉";
+      descriptionText = "Enjoy your food! Your order has been successfully delivered.";
+    } else if (isOnTheWay) {
       timeText = "12 mins";
       headingText = "Order on the way";
       descriptionText = "Our delivery partner is speeding towards your location.";
-    } else if (isDelivered) {
-      timeText = "0 mins";
-      headingText = "Order Delivered";
-      descriptionText = "Enjoy your food! Your order has been successfully delivered.";
+    } else {
+      // preparing (default initial state)
+      timeText = "25 mins";
+      headingText = "Preparing your order";
+      descriptionText = "$restaurantName is busy preparing your delicious food!";
     }
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Track Order", style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(orderIdText, style: const TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.white,
         elevation: 0,
         scrolledUnderElevation: 0,
@@ -142,7 +150,9 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTi
             right: 0,
             bottom: 0,
             child: Container(
-              height: 380,
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.55,
+              ),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: const BorderRadius.only(
@@ -158,6 +168,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTi
                 ],
               ),
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   // Pull handler decorator
                   Container(
@@ -232,7 +243,10 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTi
                   const SizedBox(height: 16),
 
                   // Stepper Details
-                  Expanded(
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.of(context).size.height * 0.25,
+                    ),
                     child: SingleChildScrollView(
                       padding: const EdgeInsets.symmetric(horizontal: 20.0),
                       child: Column(
@@ -276,7 +290,12 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTi
 
                   // Bottom Order summary button
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
+                    padding: EdgeInsets.only(
+                      left: 20,
+                      right: 20,
+                      top: 8,
+                      bottom: MediaQuery.of(context).padding.bottom + 12,
+                    ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
