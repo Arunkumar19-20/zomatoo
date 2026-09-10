@@ -50,5 +50,7 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>This app needs access to your location to show your position on the map during delivery tracking.</string>
 </dict>
 </plist>

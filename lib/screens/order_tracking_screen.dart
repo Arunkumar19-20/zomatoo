@@ -1,5 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import '../models/cart_state.dart';
 import '../theme/app_theme.dart';
@@ -14,20 +16,220 @@ class OrderTrackingScreen extends StatefulWidget {
 
 class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTickerProviderStateMixin {
   late AnimationController _bikeController;
+  late final MapController _mapController;
+
+  // Demo coordinates (Chennai area — restaurant & user)
+  static final LatLng _restaurantLocation = const LatLng(13.0524, 80.2508); // T. Nagar
+  static final LatLng _userLocation = const LatLng(13.0410, 80.2338);       // Saidapet
+
+  // Route waypoints for a realistic-looking delivery path
+  static final List<LatLng> _routePoints = [
+    _restaurantLocation,
+    const LatLng(13.0510, 80.2485),
+    const LatLng(13.0492, 80.2460),
+    const LatLng(13.0475, 80.2435),
+    const LatLng(13.0460, 80.2410),
+    const LatLng(13.0445, 80.2390),
+    const LatLng(13.0430, 80.2370),
+    const LatLng(13.0420, 80.2355),
+    _userLocation,
+  ];
+
+  // Map center (midpoint of restaurant & user)
+  static final LatLng _mapCenter = LatLng(
+    (_restaurantLocation.latitude + _userLocation.latitude) / 2,
+    (_restaurantLocation.longitude + _userLocation.longitude) / 2,
+  );
 
   @override
   void initState() {
     super.initState();
+    _mapController = MapController();
     _bikeController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 15),
     )..repeat();
+
+    _bikeController.addListener(() {
+      if (mounted) setState(() {}); // Rebuild to update courier marker position
+    });
   }
 
   @override
   void dispose() {
     _bikeController.dispose();
+    _mapController.dispose();
     super.dispose();
+  }
+
+  /// Interpolate a position along the route polyline based on a 0..1 progress value.
+  LatLng _interpolateRoute(double progress) {
+    if (progress <= 0) return _routePoints.first;
+    if (progress >= 1) return _routePoints.last;
+
+    final totalSegments = _routePoints.length - 1;
+    final segmentProgress = progress * totalSegments;
+    final segmentIndex = segmentProgress.floor().clamp(0, totalSegments - 1);
+    final t = segmentProgress - segmentIndex;
+
+    final start = _routePoints[segmentIndex];
+    final end = _routePoints[segmentIndex + 1];
+
+    return LatLng(
+      start.latitude + (end.latitude - start.latitude) * t,
+      start.longitude + (end.longitude - start.longitude) * t,
+    );
+  }
+
+  /// Get courier position based on order status.
+  LatLng _getCourierPosition(OrderStatus status) {
+    double progress;
+    if (status == OrderStatus.preparing) {
+      progress = 0.02 + 0.02 * sin(_bikeController.value * 2 * pi);
+    } else if (status == OrderStatus.onTheWay) {
+      progress = 0.05 + 0.90 * _bikeController.value;
+    } else {
+      progress = 1.0;
+    }
+    return _interpolateRoute(progress);
+  }
+
+  /// Build the real map widget using OpenStreetMap.
+  Widget _buildMap(OrderStatus status) {
+    final courierPos = _getCourierPosition(status);
+
+    return FlutterMap(
+      mapController: _mapController,
+      options: MapOptions(
+        initialCenter: _mapCenter,
+        initialZoom: 14.5,
+        interactionOptions: const InteractionOptions(
+          flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+        ),
+      ),
+      children: [
+        // OpenStreetMap tile layer (free, no API key)
+        TileLayer(
+          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          userAgentPackageName: 'com.example.tomatoo',
+          maxZoom: 19,
+        ),
+
+        // Delivery route polyline
+        PolylineLayer(
+          polylines: [
+            Polyline(
+              points: _routePoints,
+              color: AppTheme.primaryColor,
+              strokeWidth: 4.0,
+              pattern: StrokePattern.dashed(segments: [10, 6]),
+            ),
+          ],
+        ),
+
+        // Markers: restaurant, user, courier
+        MarkerLayer(
+          markers: [
+            // Restaurant marker
+            Marker(
+              point: _restaurantLocation,
+              width: 44,
+              height: 44,
+              child: _buildMapPin(
+                Icons.store_rounded,
+                AppTheme.primaryColor,
+                'Restaurant',
+              ),
+            ),
+
+            // User / destination marker
+            Marker(
+              point: _userLocation,
+              width: 44,
+              height: 44,
+              child: _buildMapPin(
+                Icons.home_rounded,
+                Colors.blueAccent,
+                'You',
+              ),
+            ),
+
+            // Courier / delivery partner marker (animated)
+            Marker(
+              point: courierPos,
+              width: 40,
+              height: 40,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: const Center(
+                  child: Icon(
+                    Icons.delivery_dining_rounded,
+                    color: AppTheme.primaryColor,
+                    size: 22,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// Helper to build a styled map pin marker.
+  Widget _buildMapPin(IconData icon, Color color, String label) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: color.withOpacity(0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Icon(icon, color: Colors.white, size: 18),
+        ),
+        const SizedBox(height: 2),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(4),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 2,
+              ),
+            ],
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 8,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildStep(BuildContext context, String title, String subtitle, bool isCompleted, bool isActive, IconData icon) {
@@ -116,7 +318,6 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTi
       headingText = "Order on the way";
       descriptionText = "Our delivery partner is speeding towards your location.";
     } else {
-      // preparing (default initial state)
       timeText = "25 mins";
       headingText = "Preparing your order";
       descriptionText = "$restaurantName is busy preparing your delicious food!";
@@ -130,7 +331,6 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTi
         scrolledUnderElevation: 0,
         leading: ScaleTap(
           onTap: () {
-            // Take back to home screen
             Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
           },
           child: const Icon(Icons.close_rounded, color: AppTheme.textDark),
@@ -138,10 +338,10 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTi
       ),
       body: Stack(
         children: [
-          // Map view
+          // Real OpenStreetMap view
           Positioned.fill(
-            bottom: 280, // Leave space for status card
-            child: _buildMapSimulator(status),
+            bottom: 280,
+            child: _buildMap(status),
           ),
 
           // Status Stepper & Summary Card pinned at bottom
@@ -149,269 +349,157 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTi
             left: 0,
             right: 0,
             bottom: 0,
-            child: Container(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.55,
+            child: ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(24),
+                topRight: Radius.circular(24),
               ),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(24),
-                  topRight: Radius.circular(24),
+              child: Container(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.6,
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.06),
-                    blurRadius: 15,
-                    offset: const Offset(0, -4),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(24),
+                    topRight: Radius.circular(24),
                   ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Pull handler decorator
-                  Container(
-                    margin: const EdgeInsets.only(top: 10, bottom: 16),
-                    width: 40,
-                    height: 5,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
-                      borderRadius: BorderRadius.circular(3),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.06),
+                      blurRadius: 15,
+                      offset: const Offset(0, -4),
                     ),
-                  ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Pull handler
+                    Container(
+                      margin: const EdgeInsets.only(top: 10, bottom: 12),
+                      width: 40,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                    ),
 
-                  // Order quick info
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              headingText,
-                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 18,
-                                  ),
-                            ),
-                            const SizedBox(height: 4),
-                            SizedBox(
-                              width: MediaQuery.of(context).size.width * 0.6,
-                              child: Text(
-                                descriptionText,
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: Colors.grey.shade500,
-                                    ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                        // Timer display
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: AppTheme.primaryColor.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Column(
-                            children: [
-                              Text(
-                                timeText,
-                                style: const TextStyle(
-                                  color: AppTheme.primaryColor,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                              const Text(
-                                "Est. Time",
-                                style: TextStyle(color: AppTheme.primaryColor, fontSize: 10, fontWeight: FontWeight.bold),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Divider(color: AppTheme.dividerColor, height: 1),
-                  const SizedBox(height: 16),
-
-                  // Stepper Details
-                  ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxHeight: MediaQuery.of(context).size.height * 0.25,
-                    ),
-                    child: SingleChildScrollView(
+                    // Order quick info
+                    Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                      child: Column(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildStep(
-                            context,
-                            "Order Placed",
-                            "We've received your order and details",
-                            true,
-                            false,
-                            Icons.check_rounded,
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  headingText,
+                                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 18,
+                                      ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  descriptionText,
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                        color: Colors.grey.shade500,
+                                      ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
                           ),
-                          _buildStep(
-                            context,
-                            "Preparing Food",
-                            "The kitchen is cooking your food",
-                            isPreparing || isOnTheWay || isDelivered,
-                            isPreparing,
-                            Icons.cookie_outlined,
-                          ),
-                          _buildStep(
-                            context,
-                            "On The Way",
-                            "Delivery driver has picked up your food",
-                            isOnTheWay || isDelivered,
-                            isOnTheWay,
-                            Icons.delivery_dining_rounded,
-                          ),
-                          _buildStep(
-                            context,
-                            "Delivered",
-                            "Enjoy your meal!",
-                            isDelivered,
-                            isDelivered,
-                            Icons.home_rounded,
+                          const SizedBox(width: 12),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryColor.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Column(
+                              children: [
+                                Text(
+                                  timeText,
+                                  style: const TextStyle(
+                                    color: AppTheme.primaryColor,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                const Text(
+                                  "Est. Time",
+                                  style: TextStyle(color: AppTheme.primaryColor, fontSize: 10, fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
                     ),
-                  ),
+                    const SizedBox(height: 12),
+                    const Divider(color: AppTheme.dividerColor, height: 1),
+                    const SizedBox(height: 12),
 
-                  // Bottom Order summary button
-                  Padding(
-                    padding: EdgeInsets.only(
-                      left: 20,
-                      right: 20,
-                      top: 8,
-                      bottom: MediaQuery.of(context).padding.bottom + 12,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        ScaleTap(
-                          onTap: () {
-                            _showOrderItemsSummary(context, cart);
-                          },
-                          child: Row(
-                            children: [
-                              const Icon(Icons.receipt_long_rounded, color: AppTheme.primaryColor, size: 20),
-                              const SizedBox(width: 8),
-                              Text(
-                                "Order Details",
-                                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                      color: AppTheme.primaryColor,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                              ),
-                            ],
-                          ),
+                    // Stepper
+                    Flexible(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                        child: Column(
+                          children: [
+                            _buildStep(context, "Order Placed", "We've received your order and details", true, false, Icons.check_rounded),
+                            _buildStep(context, "Preparing Food", "The kitchen is cooking your food", isPreparing || isOnTheWay || isDelivered, isPreparing, Icons.cookie_outlined),
+                            _buildStep(context, "On The Way", "Delivery driver has picked up your food", isOnTheWay || isDelivered, isOnTheWay, Icons.delivery_dining_rounded),
+                            _buildStep(context, "Delivered", "Enjoy your meal!", isDelivered, isDelivered, Icons.home_rounded),
+                          ],
                         ),
-                        ScaleTap(
-                          onTap: () {
-                            Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
-                          },
-                          child: Container(
-                            height: 40,
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade100,
-                              borderRadius: BorderRadius.circular(20),
+                      ),
+                    ),
+
+                    // Bottom buttons
+                    Padding(
+                      padding: EdgeInsets.only(
+                        left: 20, right: 20, top: 8,
+                        bottom: MediaQuery.of(context).padding.bottom + 12,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          ScaleTap(
+                            onTap: () => _showOrderItemsSummary(context, cart),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.receipt_long_rounded, color: AppTheme.primaryColor, size: 20),
+                                const SizedBox(width: 8),
+                                Text("Order Details", style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: AppTheme.primaryColor, fontWeight: FontWeight.bold)),
+                              ],
                             ),
-                            child: Center(
-                              child: Text(
-                                "Back to Home",
-                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                          ),
+                          ScaleTap(
+                            onTap: () => Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false),
+                            child: Container(
+                              height: 40,
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(20)),
+                              child: Center(
+                                child: Text("Back to Home", style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
                               ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           )
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMapSimulator(OrderStatus status) {
-    return Container(
-      color: const Color(0xFFE5E9F0),
-      child: Stack(
-        children: [
-          // Schematic Custom Painting for Map
-          AnimatedBuilder(
-            animation: _bikeController,
-            builder: (context, child) {
-              return CustomPaint(
-                painter: MapPainter(
-                  status: status,
-                  animationValue: _bikeController.value,
-                ),
-                child: Container(),
-              );
-            },
-          ),
-          
-          // Map Labels
-          Positioned(
-            top: 40,
-            left: 20,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 6),
-                ],
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.store_rounded, color: AppTheme.primaryColor, size: 16),
-                  SizedBox(width: 4),
-                  Text("Dhaba", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-                ],
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: 300,
-            right: 20,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 6),
-                ],
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.home_rounded, color: Colors.blueAccent, size: 16),
-                  SizedBox(width: 4),
-                  Text("You", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-                ],
-              ),
-            ),
-          ),
         ],
       ),
     );
@@ -427,10 +515,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTi
       context: context,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(24),
-          topRight: Radius.circular(24),
-        ),
+        borderRadius: BorderRadius.only(topLeft: Radius.circular(24), topRight: Radius.circular(24)),
       ),
       builder: (context) => Container(
         padding: const EdgeInsets.all(24),
@@ -438,13 +523,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTi
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              "Recent Order Items",
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
-            ),
+            Text("Recent Order Items", style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, fontSize: 18)),
             const SizedBox(height: 16),
             Flexible(
               child: ListView.builder(
@@ -457,20 +536,8 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTi
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          "${item.quantity}x ${item.foodItem.name}",
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: AppTheme.textDark,
-                                fontWeight: FontWeight.w500,
-                              ),
-                        ),
-                        Text(
-                          "₹${item.totalPrice.toStringAsFixed(2)}",
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: AppTheme.textDark,
-                                fontWeight: FontWeight.bold,
-                              ),
-                        ),
+                        Text("${item.quantity}x ${item.foodItem.name}", style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppTheme.textDark, fontWeight: FontWeight.w500)),
+                        Text("₹${item.totalPrice.toStringAsFixed(2)}", style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppTheme.textDark, fontWeight: FontWeight.bold)),
                       ],
                     ),
                   );
@@ -494,13 +561,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTi
                 Text("Delivery Address", style: TextStyle(color: Colors.grey.shade500, fontSize: 13, fontWeight: FontWeight.w600)),
                 SizedBox(
                   width: MediaQuery.of(context).size.width * 0.5,
-                  child: Text(
-                    address,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.textDark),
-                    textAlign: TextAlign.end,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  child: Text(address, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.textDark), textAlign: TextAlign.end, maxLines: 1, overflow: TextOverflow.ellipsis),
                 ),
               ],
             ),
@@ -508,19 +569,8 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTi
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  "Grand Total",
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                ),
-                Text(
-                  "₹${total.toStringAsFixed(2)}",
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.primaryColor,
-                      ),
-                ),
+                Text("Grand Total", style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold)),
+                Text("₹${total.toStringAsFixed(2)}", style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: AppTheme.primaryColor)),
               ],
             ),
             const SizedBox(height: 20),
@@ -528,119 +578,5 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTi
         ),
       ),
     );
-  }
-}
-
-// Map painter to simulate tracking
-class MapPainter extends CustomPainter {
-  final OrderStatus status;
-  final double animationValue;
-
-  MapPainter({required this.status, required this.animationValue});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paintRoad = Paint()
-      ..color = Colors.white
-      ..strokeWidth = 14
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-
-    final paintBorder = Paint()
-      ..color = Colors.grey.shade300
-      ..strokeWidth = 18
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-
-    final paintRoute = Paint()
-      ..color = AppTheme.primaryColor.withOpacity(0.3)
-      ..strokeWidth = 6
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-
-    // Define coordinates
-    // Restaurant at Top-Left
-    final startPt = Offset(size.width * 0.15, size.height * 0.15);
-    // User home at Bottom-Right
-    final endPt = Offset(size.width * 0.85, size.height * 0.7);
-
-    // Draw some background street grid lines
-    canvas.drawLine(Offset(0, size.height * 0.3), Offset(size.width, size.height * 0.3), paintBorder);
-    canvas.drawLine(Offset(0, size.height * 0.3), Offset(size.width, size.height * 0.3), paintRoad);
-    
-    canvas.drawLine(Offset(size.width * 0.5, 0), Offset(size.width * 0.5, size.height), paintBorder);
-    canvas.drawLine(Offset(size.width * 0.5, 0), Offset(size.width * 0.5, size.height), paintRoad);
-
-    // Delivery path: A curved path using cubic bezier curves
-    final path = Path();
-    path.moveTo(startPt.dx, startPt.dy);
-    
-    // Control points for a curved path
-    final ctrl1 = Offset(size.width * 0.1, size.height * 0.5);
-    final ctrl2 = Offset(size.width * 0.9, size.height * 0.3);
-    path.cubicTo(ctrl1.dx, ctrl1.dy, ctrl2.dx, ctrl2.dy, endPt.dx, endPt.dy);
-
-    // Draw main delivery road
-    canvas.drawPath(path, paintBorder);
-    canvas.drawPath(path, paintRoad);
-    canvas.drawPath(path, paintRoute);
-
-    // Calculate courier position on path
-    double progress = 0.0;
-    if (status == OrderStatus.preparing) {
-      progress = 0.05 + 0.03 * sin(animationValue * 2 * pi); // Small vibration at restaurant
-    } else if (status == OrderStatus.onTheWay) {
-      // Moves back and forth along path
-      progress = 0.1 + 0.8 * animationValue;
-    } else if (status == OrderStatus.delivered) {
-      progress = 1.0;
-    }
-
-    // Get position metrics from path
-    final pathMetrics = path.computeMetrics();
-    if (pathMetrics.isNotEmpty) {
-      final metric = pathMetrics.first;
-      final tangent = metric.getTangentForOffset(metric.length * progress);
-      if (tangent != null) {
-        final pos = tangent.position;
-        
-        // Draw courier shadow
-        canvas.drawCircle(
-          pos,
-          18,
-          Paint()..color = Colors.black.withOpacity(0.15)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
-        );
-        // Draw courier indicator circle
-        canvas.drawCircle(
-          pos,
-          14,
-          Paint()..color = Colors.white,
-        );
-        canvas.drawCircle(
-          pos,
-          11,
-          Paint()..color = AppTheme.primaryColor,
-        );
-        // Inner white core
-        canvas.drawCircle(
-          pos,
-          4,
-          Paint()..color = Colors.white,
-        );
-      }
-    }
-
-    // Draw Restaurant Pin Marker
-    canvas.drawCircle(startPt, 16, Paint()..color = AppTheme.primaryColor);
-    canvas.drawCircle(startPt, 6, Paint()..color = Colors.white);
-
-    // Draw User Pin Marker
-    canvas.drawCircle(endPt, 16, Paint()..color = Colors.blueAccent);
-    canvas.drawCircle(endPt, 6, Paint()..color = Colors.white);
-  }
-
-  @override
-  bool shouldRepaint(covariant MapPainter oldDelegate) {
-    return oldDelegate.status != status || oldDelegate.animationValue != animationValue;
   }
 }
