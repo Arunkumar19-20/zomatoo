@@ -114,23 +114,21 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           children: [
             CitrusHeader(
-              height: 120,
+              height: 140,
               title: "Cravey",
               showBackButton: false,
             ),
 
-            // Main body panel overlapping
-            Transform.translate(
-              offset: const Offset(0, -16),
-              child: Container(
-                decoration: const BoxDecoration(
-                  color: AppTheme.scaffoldBackground,
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(24),
-                    topRight: Radius.circular(24),
-                  ),
+            // Main body panel
+            Container(
+              decoration: const BoxDecoration(
+                color: AppTheme.scaffoldBackground,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(24),
+                  topRight: Radius.circular(24),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -470,7 +468,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               ),
-            ),
           ],
         ),
       ),
