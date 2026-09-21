@@ -53,4 +53,34 @@ class OrderService {
       throw ApiException.fromDioException(e);
     }
   }
+
+  /// GET /orders/customer/{customerId} -> list of past orders for the customer
+  Future<List<OrderModel>> getOrdersByCustomer(int customerId) async {
+    try {
+      final res = await _dio.get('/orders/customer/$customerId');
+      return (res.data as List).map((e) => OrderModel.fromJson(e)).toList();
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
+  /// GET /orders -> all orders (admin only)
+  Future<List<OrderModel>> getAllOrders() async {
+    try {
+      final res = await _dio.get('/orders');
+      return (res.data as List).map((e) => OrderModel.fromJson(e)).toList();
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
+  /// GET /orders/restaurant/{restaurantId} -> orders for a specific restaurant
+  Future<List<OrderModel>> getOrdersByRestaurant(int restaurantId) async {
+    try {
+      final res = await _dio.get('/orders/restaurant/$restaurantId');
+      return (res.data as List).map((e) => OrderModel.fromJson(e)).toList();
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
 }

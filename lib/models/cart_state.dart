@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'food_item.dart';
 import '../Services/order_service.dart';
+import '../Services/cart_service.dart';
+import 'models.dart' as api;
 
 class CartItem {
   final FoodItem foodItem;
@@ -28,6 +30,8 @@ class CartState extends ChangeNotifier {
   // Backend IDs (set after login + checkout)
   int? _backendCartId;
   int? _backendOrderId;
+  int? _backendRestaurantId;
+  bool _isSyncingCart = false;
 
   // Tracking Simulation
   OrderStatus _currentStatus = OrderStatus.preparing;
@@ -55,7 +59,9 @@ class CartState extends ChangeNotifier {
   int get simulationSecondsRemaining => _simulationSecondsRemaining;
   int? get backendCartId => _backendCartId;
   int? get backendOrderId => _backendOrderId;
+  int? get backendRestaurantId => _backendRestaurantId;
   bool get isPlacingOrder => _isPlacingOrder;
+  bool get isSyncingCart => _isSyncingCart;
   String? get orderError => _orderError;
 
   List<CartItem> get recentOrderItems => List.unmodifiable(_recentOrderItems);
@@ -79,6 +85,49 @@ class CartState extends ChangeNotifier {
   void setBackendCartId(int id) {
     _backendCartId = id;
     notifyListeners();
+  }
+
+  /// Syncs the current local cart with the backend.
+  /// Creates a new cart record and adds every item in it.
+  /// Stores the returned cartId so [placeOrder] can use it.
+  Future<void> syncCartWithBackend({
+    required int customerId,
+    required int restaurantId,
+  }) async {
+    if (_items.isEmpty) return;
+    _isSyncingCart = true;
+    _backendRestaurantId = restaurantId;
+    notifyListeners();
+    try {
+      final svc = CartService();
+
+      // 1. Create the cart in the backend
+      final cartModel = await svc.createCart(api.CartModel(
+        customerId: customerId,
+        restaurantId: restaurantId,
+        totalAmount: subtotal,
+      ));
+      _backendCartId = cartModel.id;
+
+      // 2. Add each item to the backend cart
+      for (final ci in _items) {
+        // Parse numeric menu-item id from 'api_<id>' or direct int string
+        final rawId = ci.foodItem.id.replaceFirst('api_', '');
+        final itemId = int.tryParse(rawId);
+        if (itemId == null) continue;
+        await svc.addItemViaCart(api.CartItemModel(
+          cartId: _backendCartId!,
+          itemId: itemId,
+          price: ci.foodItem.price,
+          quantity: ci.quantity,
+        ));
+      }
+    } catch (_) {
+      // Non-fatal — will fall back to local simulation in placeOrder
+    } finally {
+      _isSyncingCart = false;
+      notifyListeners();
+    }
   }
 
   // Cart Operations
@@ -150,7 +199,6 @@ class CartState extends ChangeNotifier {
 
   double get serviceFee {
     if (_items.isEmpty) return 0.0;
-    if (_activeRestaurant?.id == "rest1") return 567.99;
     return 25.00;
   }
 
@@ -159,7 +207,7 @@ class CartState extends ChangeNotifier {
     return subtotal + deliveryFee + serviceFee;
   }
 
-  /// Places the order — calls backend if customerId is available,
+  /// Places the order — calls backend if customerId + backendCartId are available,
   /// otherwise falls back to local simulation.
   Future<bool> placeOrder({int? customerId, int? restaurantId}) async {
     // Always reset the tracking state for the new order first.
@@ -176,8 +224,10 @@ class CartState extends ChangeNotifier {
     _recentOrderServiceFee = serviceFee;
     _recentOrderTotal = total;
 
+    final effectiveRestaurantId = restaurantId ?? _backendRestaurantId;
+
     // Try backend checkout if we have all required IDs
-    if (customerId != null && _backendCartId != null && restaurantId != null) {
+    if (customerId != null && _backendCartId != null && effectiveRestaurantId != null) {
       _isPlacingOrder = true;
       _orderError = null;
       notifyListeners();
@@ -186,7 +236,7 @@ class CartState extends ChangeNotifier {
         final order = await OrderService().checkout(
           cartId: _backendCartId!,
           customerId: customerId,
-          restaurantId: restaurantId,
+          restaurantId: effectiveRestaurantId,
         );
         _backendOrderId = order.orderId;
         _isPlacingOrder = false;

@@ -6,6 +6,7 @@ class CitrusHeader extends StatelessWidget {
   final double height;
   final String? title;
   final bool showBackButton;
+  final Widget? trailing;
   final Widget? child;
 
   const CitrusHeader({
@@ -13,6 +14,7 @@ class CitrusHeader extends StatelessWidget {
     this.height = 200,
     this.title,
     this.showBackButton = false,
+    this.trailing,
     this.child,
   });
 
@@ -60,6 +62,8 @@ class CitrusHeader extends StatelessWidget {
                               ),
                         ),
                       ],
+                      const Spacer(),
+                      if (trailing != null) trailing!,
                     ],
                   ),
                   if (child != null) ...[

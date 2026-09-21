@@ -97,11 +97,32 @@ class FoodCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
+                  if (restaurant.address != null && restaurant.address!.isNotEmpty) ...[
+                    Row(
+                      children: [
+                        const Icon(Icons.location_on_outlined, size: 13, color: AppTheme.primaryColor),
+                        const SizedBox(width: 3),
+                        Expanded(
+                          child: Text(
+                            restaurant.address!,
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                  ],
                   Text(
                     restaurant.cuisineTags.join(" • "),
                     style: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontSize: 12,
+                      color: Colors.grey.shade500,
+                      fontSize: 11,
                       fontWeight: FontWeight.normal,
                     ),
                     maxLines: 1,

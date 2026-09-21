@@ -39,4 +39,24 @@ class UserService {
       throw ApiException.fromDioException(e);
     }
   }
+
+  /// POST /user — registers a new user account
+  Future<AppUser> register({
+    required String name,
+    required String email,
+    required String password,
+    String role = 'CUSTOMER',
+  }) async {
+    try {
+      final res = await _dio.post('/user', data: {
+        'name': name,
+        'email': email,
+        'password': password,
+        'role': role,
+      });
+      return AppUser.fromJson(res.data);
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
 }

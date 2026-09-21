@@ -9,24 +9,68 @@ import '../widgets/citrus_header.dart';
 import '../widgets/scale_tap.dart';
 import '../widgets/fade_in_wrapper.dart';
 import '../widgets/shimmer_placeholder.dart';
+import '../widgets/role_switcher_dialog.dart';
 import '../Services/restaurant_service.dart';
+import '../Services/menu_service.dart';
+import '../Services/session_provider.dart';
 
-// Adapts a backend api.Restaurant to the local mock.Restaurant used by the UI widgets.
-// Maps what we can; imageUrl and cuisineTags are not in backend yet so we use defaults.
-mock.Restaurant _adaptRestaurant(api.Restaurant r) {
-  return mock.Restaurant(
-    id: 'api_${r.id}',
-    name: r.name,
-    imageUrl:
-        'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=500&auto=format&fit=crop&q=60',
-    rating: r.rating?.toDouble() ?? 4.0,
-    deliveryTime: r.deliveryTime > 0 ? '${r.deliveryTime} min' : '30-40 min',
-    deliveryFee: 29.0,
-    cuisineTags: const ['Indian', 'Pizza', 'Sushi', 'Burger'],
-    discountText: r.isOpen == true ? null : 'Closed',
-    menu: const [], // Menu loaded separately in RestaurantDetailScreen
-    backendId: r.id,
-  );
+String _restaurantImage(int? id, String name) {
+  final n = name.toLowerCase();
+  if (n.contains('spice') || n.contains('curry') || n.contains('bistro')) {
+    return 'https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=600&auto=format&fit=crop&q=80';
+  }
+  if (n.contains('biryani')) {
+    return 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=600&auto=format&fit=crop&q=80';
+  }
+  if (n.contains('pizza') || n.contains('napoli')) {
+    return 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=600&auto=format&fit=crop&q=80';
+  }
+  if (n.contains('ramen') || n.contains('sushi') || n.contains('tokyo')) {
+    return 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=600&auto=format&fit=crop&q=80';
+  }
+  return 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=600&auto=format&fit=crop&q=80';
+}
+
+List<String> _restaurantCuisines(String name, List<mock.FoodItem> menu) {
+  final n = name.toLowerCase();
+  if (n.contains('spice') || n.contains('bistro')) return ['North Indian', 'Curry', 'Tandoori'];
+  if (n.contains('biryani')) return ['Biryani', 'Kebabs', 'Mughlai'];
+  if (n.contains('pizza') || n.contains('napoli')) return ['Italian', 'Wood Fired Pizza', 'Pasta'];
+  if (n.contains('ramen') || n.contains('sushi') || n.contains('tokyo')) return ['Japanese', 'Ramen', 'Sushi'];
+  if (menu.isNotEmpty) {
+    return menu.map((m) => m.category).toSet().take(3).toList();
+  }
+  return ['Multi-Cuisine', 'Fast Food'];
+}
+
+String? _restaurantDiscount(int? id) {
+  switch (id) {
+    case 1:
+      return 'SAVE10';
+    case 2:
+      return 'BIRYANI30';
+    case 3:
+      return 'FOOD20';
+    case 4:
+      return 'WELCOME50';
+    default:
+      return null;
+  }
+}
+
+String _iconForCategory(String name) {
+  final n = name.toLowerCase();
+  if (n.contains('biryani')) return '🥘';
+  if (n.contains('pizza')) return '🍕';
+  if (n.contains('ramen') || n.contains('noodle')) return '🍜';
+  if (n.contains('kebab') || n.contains('starter') || n.contains('tikka')) return '🍢';
+  if (n.contains('bread') || n.contains('rice') || n.contains('naan')) return '🍚';
+  if (n.contains('pasta')) return '🍝';
+  if (n.contains('dessert') || n.contains('drink') || n.contains('sweet')) return '🍨';
+  if (n.contains('course') || n.contains('main') || n.contains('curry')) return '🍛';
+  if (n.contains('burger')) return '🍔';
+  if (n.contains('sushi')) return '🍣';
+  return '🍽️';
 }
 
 class HomeScreen extends StatefulWidget {
@@ -42,8 +86,9 @@ class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _searchController = TextEditingController();
   int _navBarIndex = 0;
 
-  // Backend data
+  // Database / backend data
   List<mock.Restaurant> _apiRestaurants = [];
+  List<Map<String, String>> _categories = mock.mockCategories;
   bool _loading = true;
   String? _error;
 
@@ -65,11 +110,71 @@ class _HomeScreenState extends State<HomeScreen> {
       _error = null;
     });
     try {
-      final svc = RestaurantService();
-      final results = await svc.getAll();
+      final restFuture = RestaurantService().getAll();
+      final itemsFuture = MenuService().getAllItems();
+      final catsFuture = MenuService().getAllCategories();
+
+      final results = await Future.wait([restFuture, itemsFuture, catsFuture]);
+      final rawRestaurants = results[0] as List<api.Restaurant>;
+      final rawItems = results[1] as List<api.MenuItem>;
+      final rawCategories = results[2] as List<api.MenuCategory>;
+
+      // Group menu items by restaurantId
+      final Map<int, List<mock.FoodItem>> itemsByRest = {};
+      for (var it in rawItems) {
+        final rId = it.restaurantId;
+        if (rId != null) {
+          itemsByRest.putIfAbsent(rId, () => []).add(mock.FoodItem(
+            id: 'api_${it.id}',
+            name: it.name,
+            description: it.description ?? '',
+            price: it.price,
+            imageUrl: it.imageUrl ?? _restaurantImage(rId, it.name),
+            category: it.categoryName ?? (it.isVeg == true ? 'Veg' : 'Non-Veg'),
+            rating: 4.8,
+            isVeg: it.isVeg,
+          ));
+        }
+      }
+
+      // Build categories list from real database categories
+      final catList = <Map<String, String>>[];
+      final seenCatNames = <String>{};
+      for (var c in rawCategories) {
+        if (c.name.isNotEmpty && !seenCatNames.contains(c.name)) {
+          seenCatNames.add(c.name);
+          catList.add({
+            'name': c.name,
+            'icon': _iconForCategory(c.name),
+          });
+        }
+      }
+
+      final adapted = rawRestaurants.map((r) {
+        final restMenu = itemsByRest[r.id] ??
+            mock.mockRestaurants.firstWhere(
+              (m) => m.backendId == r.id,
+              orElse: () => mock.mockRestaurants[0],
+            ).menu;
+        return mock.Restaurant(
+          id: 'api_${r.id}',
+          name: r.name,
+          address: r.address,
+          imageUrl: _restaurantImage(r.id, r.name),
+          rating: r.rating?.toDouble() ?? 4.8,
+          deliveryTime: r.deliveryTime > 0 ? '${r.deliveryTime} min' : '30 min',
+          deliveryFee: 29.0,
+          cuisineTags: _restaurantCuisines(r.name, restMenu),
+          discountText: r.isOpen == false ? 'Closed' : _restaurantDiscount(r.id),
+          menu: restMenu,
+          backendId: r.id,
+        );
+      }).toList();
+
       if (mounted) {
         setState(() {
-          _apiRestaurants = results.map(_adaptRestaurant).toList();
+          _apiRestaurants = adapted;
+          if (catList.isNotEmpty) _categories = catList;
           _loading = false;
         });
       }
@@ -78,27 +183,28 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           _error = e.toString();
           _loading = false;
-          // Fall back to mock data so the UI isn't empty
           _apiRestaurants = mock.mockRestaurants;
+          _categories = mock.mockCategories;
         });
       }
     }
   }
 
   List<mock.Restaurant> get _displayRestaurants {
-    // Use API results if available, otherwise fall back to mocks
-    final source = _apiRestaurants.isNotEmpty ? _apiRestaurants : mock.mockRestaurants;
-    return source.where((restaurant) {
+    return _apiRestaurants.where((restaurant) {
       bool matchesCategory = true;
       if (_selectedCategory.isNotEmpty) {
-        matchesCategory = restaurant.cuisineTags.contains(_selectedCategory) ||
-            restaurant.menu.any((item) => item.category == _selectedCategory);
+        final catLower = _selectedCategory.toLowerCase();
+        matchesCategory = restaurant.cuisineTags.any((tag) => tag.toLowerCase().contains(catLower)) ||
+            restaurant.menu.any((item) => item.category.toLowerCase().contains(catLower));
       }
       bool matchesSearch = true;
       if (_searchQuery.isNotEmpty) {
         final query = _searchQuery.toLowerCase();
         matchesSearch = restaurant.name.toLowerCase().contains(query) ||
-            restaurant.cuisineTags.any((tag) => tag.toLowerCase().contains(query));
+            (restaurant.address != null && restaurant.address!.toLowerCase().contains(query)) ||
+            restaurant.cuisineTags.any((tag) => tag.toLowerCase().contains(query)) ||
+            restaurant.menu.any((item) => item.name.toLowerCase().contains(query));
       }
       return matchesCategory && matchesSearch;
     }).toList();
@@ -117,6 +223,32 @@ class _HomeScreenState extends State<HomeScreen> {
               height: 140,
               title: "Cravey",
               showBackButton: false,
+              trailing: ScaleTap(
+                onTap: () => RoleSwitcherDialog.show(context),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.25),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.4)),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.swap_horiz_rounded, color: Colors.white, size: 16),
+                      SizedBox(width: 4),
+                      Text(
+                        "Role",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
 
             // Main body panel
@@ -208,9 +340,9 @@ class _HomeScreenState extends State<HomeScreen> {
                           Expanded(
                             child: ListView.builder(
                               scrollDirection: Axis.horizontal,
-                              itemCount: mock.mockCategories.length,
+                              itemCount: _categories.length,
                               itemBuilder: (context, index) {
-                                final category = mock.mockCategories[index];
+                                final category = _categories[index];
                                 final isSelected =
                                     _selectedCategory == category["name"];
                                 return ScaleTap(
@@ -485,11 +617,9 @@ class _HomeScreenState extends State<HomeScreen> {
           if (index == 1) {
             Navigator.of(context).pushNamed('/cart');
           } else if (index == 2) {
-            Navigator.of(context).pushNamed('/tracking');
+            _showProfileSheet(context);
           } else {
-            setState(() {
-              _navBarIndex = index;
-            });
+            setState(() => _navBarIndex = 0);
           }
         },
         items: [
@@ -542,4 +672,93 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+
+  void _showProfileSheet(BuildContext context) {
+    final session = context.read<SessionProvider>();
+    final name  = session.user?.name  ?? session.user?.email?.split('@').first ?? 'User';
+    final email = session.user?.email ?? '';
+    final role  = session.user?.role  ?? session.selectedRole;
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : 'U';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(28), topRight: Radius.circular(28),
+          ),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40, height: 4,
+              decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+            ),
+            const SizedBox(height: 24),
+            Container(
+              width: 80, height: 80,
+              decoration: BoxDecoration(
+                gradient: AppTheme.primaryGradient,
+                shape: BoxShape.circle,
+                boxShadow: [BoxShadow(color: AppTheme.primaryColor.withValues(alpha: 0.3), blurRadius: 16, offset: const Offset(0, 6))],
+              ),
+              child: Center(child: Text(initial, style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold))),
+            ),
+            const SizedBox(height: 16),
+            Text(name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.textDark)),
+            const SizedBox(height: 4),
+            Text(email, style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(role.replaceAll('_', ' '), style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 12)),
+            ),
+            const SizedBox(height: 24),
+            const Divider(),
+            const SizedBox(height: 8),
+            _profileItem(ctx, Icons.receipt_long_rounded, 'My Orders', Colors.orange.shade600, () {
+              Navigator.of(ctx).pop();
+              Navigator.of(context).pushNamed('/orders-history');
+            }),
+            const SizedBox(height: 4),
+            _profileItem(ctx, Icons.swap_horiz_rounded, 'Switch Role', Colors.blue.shade600, () {
+              Navigator.of(ctx).pop();
+              Navigator.of(context).pushNamedAndRemoveUntil('/role-selection', (r) => false);
+            }),
+            const SizedBox(height: 4),
+            _profileItem(ctx, Icons.logout_rounded, 'Logout', Colors.red.shade600, () async {
+              Navigator.of(ctx).pop();
+              await context.read<SessionProvider>().logout();
+              if (context.mounted) Navigator.of(context).pushNamedAndRemoveUntil('/role-selection', (r) => false);
+            }, isDestructive: true),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _profileItem(BuildContext ctx, IconData icon, String label, Color color, VoidCallback onTap, {bool isDestructive = false}) {
+    return ListTile(
+      onTap: onTap,
+      leading: Container(
+        width: 42, height: 42,
+        decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+        child: Icon(icon, color: color, size: 22),
+      ),
+      title: Text(label, style: TextStyle(fontWeight: FontWeight.w600, color: isDestructive ? Colors.red.shade600 : AppTheme.textDark)),
+      trailing: Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 0, vertical: 2),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    );
+  }
 }
+

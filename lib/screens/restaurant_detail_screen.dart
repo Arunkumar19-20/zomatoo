@@ -45,12 +45,12 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
     setState(() => _menuLoading = true);
     try {
       final items = await MenuService().getAllItems();
-      // Filter items that belong to this restaurant's categories
-      // (backend MenuItem has a category field; we show all available items)
       if (mounted) {
         setState(() {
           _apiMenuItems = items
-              .where((i) => i.isAvailable != false)
+              .where((i) =>
+                  (i.restaurantId == null || i.restaurantId == restaurantId) &&
+                  i.isAvailable != false)
               .map((i) => FoodItem(
                     id: 'api_${i.id}',
                     name: i.name,
@@ -58,8 +58,9 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
                     price: i.price.toDouble(),
                     imageUrl: i.imageUrl ??
                         'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&auto=format&fit=crop&q=60',
-                    category: i.isVeg == true ? 'Veg' : 'Non-Veg',
-                    rating: 4.0,
+                    category: i.categoryName ?? (i.isVeg == true ? 'Veg' : 'Non-Veg'),
+                    rating: 4.8,
+                    isVeg: i.isVeg,
                   ))
               .toList();
           _menuLoading = false;
@@ -265,7 +266,9 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
                             const Icon(Icons.location_on_rounded, color: AppTheme.primaryColor, size: 14),
                             const SizedBox(width: 4),
                             Text(
-                              "4.5 km | Express Avenue, Coimbatore",
+                              restaurant.address != null && restaurant.address!.isNotEmpty
+                                  ? restaurant.address!
+                                  : "Bangalore, Karnataka",
                               style: TextStyle(color: Colors.grey.shade600, fontSize: 11, fontWeight: FontWeight.w500),
                             ),
                           ],
