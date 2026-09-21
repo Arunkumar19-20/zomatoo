@@ -37,10 +37,12 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
     _timer = Timer(const Duration(milliseconds: 2800), () {
       if (!mounted) return;
-      final isLoggedIn = context.read<SessionProvider>().isLoggedIn;
-      Navigator.of(context).pushReplacementNamed(
-        isLoggedIn ? '/home' : '/onboarding',
-      );
+      final session = context.read<SessionProvider>();
+      final isLoggedIn = session.isLoggedIn;
+      final destination = isLoggedIn
+          ? SessionProvider.routeForRole(session.effectiveRole)
+          : '/onboarding';
+      Navigator.of(context).pushReplacementNamed(destination);
     });
   }
 

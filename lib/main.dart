@@ -14,6 +14,11 @@ import 'screens/restaurant_detail_screen.dart';
 import 'screens/cart_screen.dart';
 import 'screens/checkout_screen.dart';
 import 'screens/order_tracking_screen.dart';
+import 'screens/role_selection_screen.dart';
+import 'screens/restaurant_dashboard_screen.dart';
+import 'screens/delivery_dashboard_screen.dart';
+import 'screens/admin_dashboard_screen.dart';
+import 'screens/order_history_screen.dart';
 import 'theme/app_theme.dart';
 import 'Services/web_oauth_storage_stub.dart'
     if (dart.library.html) 'Services/web_oauth_storage_web.dart';
@@ -68,6 +73,7 @@ class MyApp extends StatelessWidget {
       routes: {
         '/splash': (context) => const SplashScreen(),
         '/onboarding': (context) => const OnboardingScreen(),
+        '/role-selection': (context) => const RoleSelectionScreen(),
         '/login': (context) => const LoginScreen(),
         '/signup': (context) => const CreateAccountScreen(),
         '/intro': (context) => const DeliveryIntroScreen(),
@@ -76,6 +82,10 @@ class MyApp extends StatelessWidget {
         '/cart': (context) => const CartScreen(),
         '/checkout': (context) => const CheckoutScreen(),
         '/tracking': (context) => const OrderTrackingScreen(),
+        '/restaurant-dashboard': (context) => const RestaurantDashboardScreen(),
+        '/delivery-dashboard': (context) => const DeliveryDashboardScreen(),
+        '/admin-dashboard': (context) => const AdminDashboardScreen(),
+        '/orders-history': (context) => const OrderHistoryScreen(),
       },
     );
   }

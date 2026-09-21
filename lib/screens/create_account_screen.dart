@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/scale_tap.dart';
+import '../Services/user_service.dart';
+import '../Services/session_provider.dart';
 
 class CreateAccountScreen extends StatefulWidget {
   const CreateAccountScreen({super.key});
@@ -22,21 +25,41 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
   bool _obscureConfirmPassword = true;
   bool _isLoading = false;
 
-  void _handleSignUp() {
+  void _handleSignUp() async {
     if (_formKey.currentState!.validate()) {
-      setState(() {
-        _isLoading = true;
-      });
-      // Simulate API call
-      Future.delayed(const Duration(milliseconds: 1500), () {
+      setState(() => _isLoading = true);
+      try {
+        final session = context.read<SessionProvider>();
+        final role = session.selectedRole;
+        // Register the user via backend
+        await UserService().register(
+          name: _nameController.text.trim(),
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+          role: role,
+        );
+        // Auto-login with the new account
+        await session.loginAsDemo(
+          role,
+          email: _emailController.text.trim(),
+          name: _nameController.text.trim(),
+        );
         if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
-          // After sign up, show delivery feature screen
-          Navigator.of(context).pushReplacementNamed('/intro');
+          setState(() => _isLoading = false);
+          final dest = SessionProvider.routeForRole(role);
+          Navigator.of(context).pushNamedAndRemoveUntil(dest, (r) => false);
         }
-      });
+      } catch (e) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Registration failed: ${e.toString().replaceAll('ApiException', '').trim()}'),
+              backgroundColor: Colors.red.shade600,
+            ),
+          );
+        }
+      }
     }
   }
 

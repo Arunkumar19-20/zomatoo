@@ -16,23 +16,113 @@ import 'api_client.dart';
 import 'user_service.dart';
 import '../models/models.dart';
 
+import 'jwt_helper.dart';
+
 class SessionProvider extends ChangeNotifier {
   AppUser? _user;
   Customer? _customer;
   bool _loadingProfile = false;
+  String _selectedRole = 'CUSTOMER'; // Default role before login
 
   AppUser? get user => _user;
   Customer? get customer => _customer;
-  bool get isLoggedIn => ApiClient.instance.isLoggedIn;
+  bool get isLoggedIn => ApiClient.instance.isLoggedIn || _user != null;
   bool get loadingProfile => _loadingProfile;
+  String get selectedRole => _selectedRole;
+  String get effectiveRole => _user?.role ?? _selectedRole;
+
+  void setSelectedRole(String role) {
+    _selectedRole = role;
+    notifyListeners();
+  }
+
+  /// Default email mapping to real users present in the PostgreSQL database.
+  static String defaultEmailForRole(String role) {
+    switch (role.toUpperCase()) {
+      case 'OWNER':
+      case 'RESTAURANT':
+        return 'arunkumar2006.d@gmail.com';
+      case 'DELIVERY':
+      case 'DELIVERY_PARTNER':
+        return 'rahul.singh@gmail.com';
+      case 'ADMIN':
+        return 'admin1@zomato.com';
+      case 'CUSTOMER':
+      default:
+        return 'aarav.sharma@gmail.com';
+    }
+  }
+
+  static String defaultNameForRole(String role) {
+    switch (role.toUpperCase()) {
+      case 'OWNER':
+      case 'RESTAURANT':
+        return 'Arun Kumar';
+      case 'DELIVERY':
+      case 'DELIVERY_PARTNER':
+        return 'Rahul Singh';
+      case 'ADMIN':
+        return 'Admin One';
+      case 'CUSTOMER':
+      default:
+        return 'Aarav Sharma';
+    }
+  }
+
+  /// Returns the appropriate dashboard route for a given user role.
+  static String routeForRole(String? role) {
+    switch (role?.toUpperCase()) {
+      case 'OWNER':
+      case 'RESTAURANT':
+        return '/restaurant-dashboard';
+      case 'DELIVERY':
+      case 'DELIVERY_PARTNER':
+        return '/delivery-dashboard';
+      case 'ADMIN':
+        return '/admin-dashboard';
+      case 'CUSTOMER':
+      default:
+        return '/home';
+    }
+  }
 
   /// The customer id stored in the backend Customer table — required for checkout.
   int? get customerId => _customer?.customerId;
+
+  /// Sign-in using real backend HS256 tokens matching the PostgreSQL database users.
+  Future<void> loginAsDemo(String role, {String? email, String? name}) async {
+    final resolvedRole = role.toUpperCase();
+    final resolvedEmail = email ?? defaultEmailForRole(resolvedRole);
+    final resolvedName = name ?? defaultNameForRole(resolvedRole);
+    final realToken = JwtHelper.generateBackendToken(resolvedEmail, resolvedRole);
+
+    ApiClient.instance.setToken(realToken);
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('auth_token', realToken);
+    await prefs.setString('auth_email', resolvedEmail);
+    await prefs.setString('auth_role', resolvedRole);
+
+    _selectedRole = resolvedRole;
+    _user = AppUser(
+      name: resolvedName,
+      email: resolvedEmail,
+      role: resolvedRole,
+    );
+    notifyListeners();
+
+    // Fetch real profile details from the database
+    await Future.wait([
+      _fetchUserProfile(),
+      _fetchCustomerProfile(),
+    ]);
+  }
 
   /// Called after a successful Google OAuth login.
   Future<void> login(String token, String email, String role) async {
     ApiClient.instance.setToken(token);
 
+    _selectedRole = role;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('auth_token', token);
     await prefs.setString('auth_email', email);
@@ -58,6 +148,7 @@ class SessionProvider extends ChangeNotifier {
 
     if (token != null && token.isNotEmpty) {
       ApiClient.instance.setToken(token);
+      if (role != null) _selectedRole = role;
       _user = AppUser(email: email, role: role);
       notifyListeners();
       await Future.wait([
