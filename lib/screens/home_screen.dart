@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/food_item.dart' as mock;
@@ -10,6 +11,7 @@ import '../widgets/scale_tap.dart';
 import '../widgets/fade_in_wrapper.dart';
 import '../widgets/shimmer_placeholder.dart';
 import '../Services/restaurant_service.dart';
+import '../Services/session_provider.dart';
 
 // Adapts a backend api.Restaurant to the local mock.Restaurant used by the UI widgets.
 // Maps what we can; imageUrl and cuisineTags are not in backend yet so we use defaults.
@@ -40,36 +42,72 @@ class _HomeScreenState extends State<HomeScreen> {
   String _selectedCategory = "";
   String _searchQuery = "";
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+  Timer? _debounceTimer;
   int _navBarIndex = 0;
 
-  // Backend data
+  // Backend data & pagination
   List<mock.Restaurant> _apiRestaurants = [];
   bool _loading = true;
+  bool _loadingMore = false;
+  int _currentPage = 0;
+  bool _hasMore = true;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _loadRestaurants();
+    _scrollController.addListener(_onScroll);
+    _loadRestaurants(reset: true);
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _scrollController.dispose();
+    _debounceTimer?.cancel();
     super.dispose();
   }
 
-  Future<void> _loadRestaurants() async {
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200 &&
+        !_loading &&
+        !_loadingMore &&
+        _hasMore) {
+      _loadMoreRestaurants();
+    }
+  }
+
+  void _onSearchChanged(String value) {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+      setState(() {
+        _searchQuery = value;
+      });
+      _loadRestaurants(reset: true);
+    });
+  }
+
+  Future<void> _loadRestaurants({bool reset = false}) async {
+    if (reset) {
+      _currentPage = 0;
+      _hasMore = true;
+    }
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
       final svc = RestaurantService();
-      final results = await svc.getAll();
+      final results = await svc.getAll(
+        page: _currentPage,
+        size: 10,
+        search: _searchQuery.isNotEmpty ? _searchQuery : null,
+      );
       if (mounted) {
         setState(() {
           _apiRestaurants = results.map(_adaptRestaurant).toList();
+          _hasMore = results.length >= 10;
           _loading = false;
         });
       }
@@ -82,6 +120,30 @@ class _HomeScreenState extends State<HomeScreen> {
           _apiRestaurants = mock.mockRestaurants;
         });
       }
+    }
+  }
+
+  Future<void> _loadMoreRestaurants() async {
+    if (_loadingMore || !_hasMore) return;
+    setState(() => _loadingMore = true);
+    try {
+      final nextPage = _currentPage + 1;
+      final svc = RestaurantService();
+      final results = await svc.getAll(
+        page: nextPage,
+        size: 10,
+        search: _searchQuery.isNotEmpty ? _searchQuery : null,
+      );
+      if (mounted) {
+        setState(() {
+          _currentPage = nextPage;
+          _apiRestaurants.addAll(results.map(_adaptRestaurant));
+          _hasMore = results.length >= 10;
+          _loadingMore = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingMore = false);
     }
   }
 
@@ -111,6 +173,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: AppTheme.scaffoldBackground,
       body: SingleChildScrollView(
+        controller: _scrollController,
         child: Column(
           children: [
             CitrusHeader(
@@ -132,6 +195,59 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Email verification banner
+                    Consumer<SessionProvider>(
+                      builder: (context, session, _) {
+                        if (session.isLoggedIn && !session.isEmailVerified) {
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 16),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.shade50,
+                              border: Border.all(color: Colors.amber.shade400),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.warning_amber_rounded, color: Colors.amber.shade800, size: 24),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    'Verify your email to unlock order checkout.',
+                                    style: TextStyle(
+                                      color: Colors.amber.shade900,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: () async {
+                                    try {
+                                      await session.resendVerification();
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('Verification email sent! Check your inbox.')),
+                                        );
+                                      }
+                                    } catch (e) {
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text('Failed to resend: $e')),
+                                        );
+                                      }
+                                    }
+                                  },
+                                  child: const Text('Resend', style: TextStyle(fontWeight: FontWeight.bold)),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+                        return const SizedBox.shrink();
+                      },
+                    ),
+
                     // Search Bar
                     Container(
                       margin: const EdgeInsets.only(bottom: 20),
@@ -148,11 +264,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       child: TextField(
                         controller: _searchController,
-                        onChanged: (value) {
-                          setState(() {
-                            _searchQuery = value;
-                          });
-                        },
+                        onChanged: _onSearchChanged,
                         style: const TextStyle(
                           color: AppTheme.textDark,
                           fontSize: 14,

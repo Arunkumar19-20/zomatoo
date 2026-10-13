@@ -111,7 +111,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTi
         // OpenStreetMap tile layer (free, no API key)
         TileLayer(
           urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'com.example.tomatoo',
+          userAgentPackageName: 'com.example.cravey',
           maxZoom: 19,
         ),
 

@@ -8,6 +8,8 @@ import '../widgets/scale_tap.dart';
 import '../widgets/fade_in_wrapper.dart';
 import '../widgets/shimmer_placeholder.dart';
 import '../Services/session_provider.dart';
+import '../Services/payment_service.dart';
+import '../Services/api_client.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});
@@ -18,11 +20,102 @@ class CheckoutScreen extends StatefulWidget {
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
   final TextEditingController _addressController = TextEditingController();
+  bool _isProcessingPayment = false;
+  String _paymentStatusText = '';
 
   @override
   void dispose() {
     _addressController.dispose();
     super.dispose();
+  }
+
+  void _showPaymentFailedDialog(String message) {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.error_outline, color: Colors.red),
+            SizedBox(width: 8),
+            Text('Payment Failed', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          ],
+        ),
+        content: Text(
+          message,
+          style: const TextStyle(fontSize: 14),
+        ),
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('OK', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showUnverifiedEmailDialog(SessionProvider session) {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.mark_email_unread_outlined, color: AppTheme.primaryColor),
+            SizedBox(width: 8),
+            Text('Verify Your Email', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          ],
+        ),
+        content: const Text(
+          'Please verify your email address before placing an order. A verification link is needed to activate your account.',
+          style: TextStyle(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
+              Navigator.of(ctx).pop();
+              try {
+                await session.resendVerification();
+                if (mounted) {
+                  messenger.showSnackBar(
+                    SnackBar(
+                      content: const Text('Verification link sent! Please check your inbox.'),
+                      backgroundColor: Colors.green.shade700,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  messenger.showSnackBar(
+                    SnackBar(
+                      content: Text('Could not send verification email: $e'),
+                      backgroundColor: Colors.red.shade600,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Resend Verification Email', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showEditAddressDialog(BuildContext context, CartState cart) {
@@ -360,36 +453,101 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
                       // Place Order button
                       PrimaryButton(
-                        text: cart.isPlacingOrder ? "Placing Order..." : "Place Order",
-                        onPressed: cart.isPlacingOrder
+                        text: _isProcessingPayment
+                            ? (_paymentStatusText.isNotEmpty ? _paymentStatusText : "Processing Payment...")
+                            : (cart.isPlacingOrder ? "Placing Order..." : "Place Order"),
+                        onPressed: (_isProcessingPayment || cart.isPlacingOrder)
                             ? () {}
                             : () async {
-                                final session =
-                                    context.read<SessionProvider>();
+                                final session = context.read<SessionProvider>();
                                 final customerId = session.customerId;
-                                final restaurantId =
-                                    cart.activeRestaurant?.backendId;
-                                // Capture navigator/scaffold before the await gap
+                                final restaurantId = cart.activeRestaurant?.backendId;
                                 final nav = Navigator.of(context);
-                                final messenger =
-                                    ScaffoldMessenger.of(context);
+                                final messenger = ScaffoldMessenger.of(context);
+
                                 final success = await cart.placeOrder(
                                   customerId: customerId,
                                   restaurantId: restaurantId,
                                 );
-                                if (mounted) {
-                                  if (success) {
-                                    nav.pushReplacementNamed('/tracking');
+
+                                if (!mounted) return;
+
+                                if (!success) {
+                                  if (cart.isEmailNotVerified) {
+                                    _showUnverifiedEmailDialog(session);
                                   } else {
                                     messenger.showSnackBar(
                                       SnackBar(
                                         content: Text(
-                                          cart.orderError ??
-                                              'Failed to place order. Please try again.',
+                                          cart.orderError ?? 'Failed to place order. Please try again.',
                                         ),
                                         backgroundColor: Colors.red.shade600,
                                       ),
                                     );
+                                  }
+                                  return;
+                                }
+
+                                // If backend order was created, initiate payment:
+                                if (cart.lastCreatedOrder != null && cart.lastCreatedOrder!.orderId != null) {
+                                  final orderId = cart.lastCreatedOrder!.orderId!;
+                                  setState(() {
+                                    _isProcessingPayment = true;
+                                    _paymentStatusText = "Initializing Payment...";
+                                  });
+
+                                  final paymentService = PaymentService();
+                                  try {
+                                    final intentRes = await paymentService.createPaymentIntent(orderId);
+                                    if (intentRes.clientSecret != null && intentRes.clientSecret!.isNotEmpty) {
+                                      if (mounted) setState(() => _paymentStatusText = "Confirming Payment...");
+                                      await paymentService.confirmPaymentWithStripe(
+                                        clientSecret: intentRes.clientSecret!,
+                                        orderId: orderId,
+                                      );
+                                    }
+                                    if (mounted) setState(() => _paymentStatusText = "Verifying Confirmation...");
+                                    final pollResult = await paymentService.pollPaymentStatus(orderId);
+
+                                    if (!mounted) return;
+
+                                    if (pollResult.status == PaymentPollStatus.paid) {
+                                      messenger.showSnackBar(
+                                        SnackBar(
+                                          content: const Text('Payment successful! Your order has been placed.'),
+                                          backgroundColor: Colors.green.shade700,
+                                        ),
+                                      );
+                                      nav.pushReplacementNamed('/tracking');
+                                    } else if (pollResult.status == PaymentPollStatus.processing) {
+                                      messenger.showSnackBar(
+                                        SnackBar(
+                                          content: const Text("Payment processing, we'll confirm shortly."),
+                                          backgroundColor: Colors.orange.shade700,
+                                        ),
+                                      );
+                                      nav.pushReplacementNamed('/tracking');
+                                    } else {
+                                      _showPaymentFailedDialog(
+                                        pollResult.errorMessage ?? 'Payment was not completed. Please retry your payment.',
+                                      );
+                                    }
+                                  } catch (e) {
+                                    debugPrint('[Checkout] Payment flow warning: $e');
+                                    _showPaymentFailedDialog(
+                                      e is ApiException ? e.message : 'Payment error: $e',
+                                    );
+                                  } finally {
+                                    if (mounted) {
+                                      setState(() {
+                                        _isProcessingPayment = false;
+                                        _paymentStatusText = '';
+                                      });
+                                    }
+                                  }
+                                } else {
+                                  if (mounted) {
+                                    nav.pushReplacementNamed('/tracking');
                                   }
                                 }
                               },

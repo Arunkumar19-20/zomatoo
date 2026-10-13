@@ -73,6 +73,74 @@ class MenuCategory {
       };
 }
 
+class MenuItemDTO {
+  final int? itemId;
+  final String name;
+  final String? description;
+  final double price;
+  final bool? isVeg;
+  final bool? isAvailable;
+  final String? imageUrl;
+
+  MenuItemDTO({
+    this.itemId,
+    required this.name,
+    this.description,
+    required this.price,
+    this.isVeg,
+    this.isAvailable,
+    this.imageUrl,
+  });
+
+  factory MenuItemDTO.fromJson(Map<String, dynamic> j) => MenuItemDTO(
+        itemId: j['itemId'] ?? j['id'],
+        name: j['name'] ?? '',
+        description: j['description'],
+        price: (j['price'] as num?)?.toDouble() ?? 0,
+        isVeg: j['veg'] ?? j['isVeg'],
+        isAvailable: j['available'] ?? j['isAvailable'],
+        imageUrl: j['imageUrl'],
+      );
+
+  Map<String, dynamic> toJson() => {
+        if (itemId != null) 'itemId': itemId,
+        'name': name,
+        'description': description,
+        'price': price,
+        'veg': isVeg,
+        'available': isAvailable,
+        'imageUrl': imageUrl,
+      };
+}
+
+class MenuCategoryDTO {
+  final int? categoryId;
+  final String categoryName;
+  final List<MenuItemDTO> items;
+
+  MenuCategoryDTO({
+    this.categoryId,
+    required this.categoryName,
+    this.items = const [],
+  });
+
+  factory MenuCategoryDTO.fromJson(Map<String, dynamic> j) => MenuCategoryDTO(
+        categoryId: j['categoryId'] ?? j['id'],
+        categoryName: j['categoryName'] ?? j['name'] ?? '',
+        items: j['items'] is List
+            ? (j['items'] as List)
+                .map((e) => MenuItemDTO.fromJson(e as Map<String, dynamic>))
+                .toList()
+            : const [],
+      );
+
+  Map<String, dynamic> toJson() => {
+        if (categoryId != null) 'categoryId': categoryId,
+        'categoryName': categoryName,
+        'items': items.map((e) => e.toJson()).toList(),
+      };
+}
+
 class MenuItem {
   final int? id;
   final String name;
@@ -168,25 +236,284 @@ class CartItemModel {
       };
 }
 
+class CartItemDTO {
+  final int? id;
+  final int? itemId;
+  final String? name;
+  final double? price;
+  final int quantity;
+  final double? subtotal;
+  final String? imageUrl;
+  final bool? isVeg;
+
+  CartItemDTO({
+    this.id,
+    this.itemId,
+    this.name,
+    this.price,
+    this.quantity = 1,
+    this.subtotal,
+    this.imageUrl,
+    this.isVeg,
+  });
+
+  factory CartItemDTO.fromJson(Map<String, dynamic> j) => CartItemDTO(
+        id: j['id'],
+        itemId: j['itemId'],
+        name: j['name'],
+        price: (j['price'] as num?)?.toDouble(),
+        quantity: (j['quantity'] as num?)?.toInt() ?? 1,
+        subtotal: (j['subtotal'] as num?)?.toDouble(),
+        imageUrl: j['imageUrl'],
+        isVeg: j['isVeg'] ?? j['veg'],
+      );
+
+  Map<String, dynamic> toJson() => {
+        if (id != null) 'id': id,
+        if (itemId != null) 'itemId': itemId,
+        if (name != null) 'name': name,
+        if (price != null) 'price': price,
+        'quantity': quantity,
+        if (subtotal != null) 'subtotal': subtotal,
+        if (imageUrl != null) 'imageUrl': imageUrl,
+        if (isVeg != null) 'isVeg': isVeg,
+      };
+}
+
+class CartResponseDTO {
+  final int? cartId;
+  final int? customerId;
+  final String? customerEmail;
+  final int? restaurantId;
+  final String? restaurantName;
+  final double totalAmount;
+  final List<CartItemDTO> items;
+
+  CartResponseDTO({
+    this.cartId,
+    this.customerId,
+    this.customerEmail,
+    this.restaurantId,
+    this.restaurantName,
+    this.totalAmount = 0.0,
+    this.items = const [],
+  });
+
+  factory CartResponseDTO.fromJson(Map<String, dynamic> j) => CartResponseDTO(
+        cartId: j['cartId'] ?? j['id'],
+        customerId: j['customerId'],
+        customerEmail: j['customerEmail'],
+        restaurantId: j['restaurantId'],
+        restaurantName: j['restaurantName'],
+        totalAmount: (j['totalAmount'] as num?)?.toDouble() ?? 0.0,
+        items: j['items'] is List
+            ? (j['items'] as List)
+                .map((e) => CartItemDTO.fromJson(e as Map<String, dynamic>))
+                .toList()
+            : const [],
+      );
+
+  Map<String, dynamic> toJson() => {
+        if (cartId != null) 'cartId': cartId,
+        if (customerId != null) 'customerId': customerId,
+        if (customerEmail != null) 'customerEmail': customerEmail,
+        if (restaurantId != null) 'restaurantId': restaurantId,
+        if (restaurantName != null) 'restaurantName': restaurantName,
+        'totalAmount': totalAmount,
+        'items': items.map((e) => e.toJson()).toList(),
+      };
+}
+
+class OrderItemDTO {
+  final int? id;
+  final int? itemId;
+  final String? name;
+  final double? price;
+  final int quantity;
+  final double? subtotal;
+  final String? imageUrl;
+
+  OrderItemDTO({
+    this.id,
+    this.itemId,
+    this.name,
+    this.price,
+    this.quantity = 1,
+    this.subtotal,
+    this.imageUrl,
+  });
+
+  factory OrderItemDTO.fromJson(Map<String, dynamic> j) => OrderItemDTO(
+        id: j['id'],
+        itemId: j['itemId'],
+        name: j['name'],
+        price: (j['price'] as num?)?.toDouble(),
+        quantity: (j['quantity'] as num?)?.toInt() ?? 1,
+        subtotal: (j['subtotal'] as num?)?.toDouble(),
+        imageUrl: j['imageUrl'],
+      );
+
+  Map<String, dynamic> toJson() => {
+        if (id != null) 'id': id,
+        if (itemId != null) 'itemId': itemId,
+        if (name != null) 'name': name,
+        if (price != null) 'price': price,
+        'quantity': quantity,
+        if (subtotal != null) 'subtotal': subtotal,
+        if (imageUrl != null) 'imageUrl': imageUrl,
+      };
+}
+
+class OrderResponseDTO {
+  final int? orderId;
+  final double totalAmount;
+  final String? status;
+  final String? paymentStatus;
+  final String? orderDate;
+  final int? restaurantId;
+  final String? restaurantName;
+  final String? restaurantAddress;
+  final String? restaurantImageUrl;
+  final String? customerName;
+  final String? customerEmail;
+  final List<OrderItemDTO> items;
+
+  OrderResponseDTO({
+    this.orderId,
+    required this.totalAmount,
+    this.status,
+    this.paymentStatus,
+    this.orderDate,
+    this.restaurantId,
+    this.restaurantName,
+    this.restaurantAddress,
+    this.restaurantImageUrl,
+    this.customerName,
+    this.customerEmail,
+    this.items = const [],
+  });
+
+  factory OrderResponseDTO.fromJson(Map<String, dynamic> j) => OrderResponseDTO(
+        orderId: j['orderId'],
+        totalAmount: (j['totalAmount'] as num?)?.toDouble() ?? 0.0,
+        status: j['status'],
+        paymentStatus: j['paymentStatus']?.toString(),
+        orderDate: j['orderDate']?.toString(),
+        restaurantId: j['restaurantId'],
+        restaurantName: j['restaurantName'],
+        restaurantAddress: j['restaurantAddress'],
+        restaurantImageUrl: j['restaurantImageUrl'],
+        customerName: j['customerName'],
+        customerEmail: j['customerEmail'],
+        items: j['items'] is List
+            ? (j['items'] as List)
+                .map((e) => OrderItemDTO.fromJson(e as Map<String, dynamic>))
+                .toList()
+            : const [],
+      );
+
+  Map<String, dynamic> toJson() => {
+        if (orderId != null) 'orderId': orderId,
+        'totalAmount': totalAmount,
+        if (status != null) 'status': status,
+        if (paymentStatus != null) 'paymentStatus': paymentStatus,
+        if (restaurantId != null) 'restaurantId': restaurantId,
+        if (restaurantName != null) 'restaurantName': restaurantName,
+        if (restaurantAddress != null) 'restaurantAddress': restaurantAddress,
+        if (restaurantImageUrl != null) 'restaurantImageUrl': restaurantImageUrl,
+        if (customerName != null) 'customerName': customerName,
+        if (customerEmail != null) 'customerEmail': customerEmail,
+        'items': items.map((e) => e.toJson()).toList(),
+      };
+}
+
+class PaymentResponseDTO {
+  final String? clientSecret;
+  final String? paymentIntentId;
+  final double? amount;
+  final String? currency;
+  final String? status;
+  final int? orderId;
+
+  PaymentResponseDTO({
+    this.clientSecret,
+    this.paymentIntentId,
+    this.amount,
+    this.currency,
+    this.status,
+    this.orderId,
+  });
+
+  factory PaymentResponseDTO.fromJson(Map<String, dynamic> j) => PaymentResponseDTO(
+        clientSecret: j['clientSecret'],
+        paymentIntentId: j['paymentIntentId'],
+        amount: (j['amount'] as num?)?.toDouble(),
+        currency: j['currency'],
+        status: j['status'],
+        orderId: j['orderId'] != null ? (j['orderId'] as num).toInt() : null,
+      );
+
+  Map<String, dynamic> toJson() => {
+        if (clientSecret != null) 'clientSecret': clientSecret,
+        if (paymentIntentId != null) 'paymentIntentId': paymentIntentId,
+        if (amount != null) 'amount': amount,
+        if (currency != null) 'currency': currency,
+        if (status != null) 'status': status,
+        if (orderId != null) 'orderId': orderId,
+      };
+}
+
 class OrderModel {
   final int? orderId;
   final double totalAmount;
   final String? status;
   final String? orderDate;
+  final int? restaurantId;
+  final String? restaurantName;
+  final String? restaurantAddress;
+  final String? restaurantImageUrl;
+  final String? customerName;
+  final String? customerEmail;
+  final List<dynamic>? items;
 
-  OrderModel({this.orderId, required this.totalAmount, this.status, this.orderDate});
+  OrderModel({
+    this.orderId,
+    required this.totalAmount,
+    this.status,
+    this.orderDate,
+    this.restaurantId,
+    this.restaurantName,
+    this.restaurantAddress,
+    this.restaurantImageUrl,
+    this.customerName,
+    this.customerEmail,
+    this.items,
+  });
 
   factory OrderModel.fromJson(Map<String, dynamic> j) => OrderModel(
         orderId: j['orderId'],
         totalAmount: (j['totalAmount'] as num?)?.toDouble() ?? 0,
         status: j['status'],
         orderDate: j['orderDate']?.toString(),
+        restaurantId: j['restaurantId'],
+        restaurantName: j['restaurantName'],
+        restaurantAddress: j['restaurantAddress'],
+        restaurantImageUrl: j['restaurantImageUrl'],
+        customerName: j['customerName'],
+        customerEmail: j['customerEmail'],
+        items: j['items'] as List<dynamic>?,
       );
 
   Map<String, dynamic> toJson() => {
         if (orderId != null) 'orderId': orderId,
         'totalAmount': totalAmount,
         'status': status,
+        if (restaurantId != null) 'restaurantId': restaurantId,
+        if (restaurantName != null) 'restaurantName': restaurantName,
+        if (restaurantAddress != null) 'restaurantAddress': restaurantAddress,
+        if (restaurantImageUrl != null) 'restaurantImageUrl': restaurantImageUrl,
+        if (customerName != null) 'customerName': customerName,
+        if (customerEmail != null) 'customerEmail': customerEmail,
       };
 }
 
@@ -221,14 +548,16 @@ class AppUser {
   final String? name;
   final String? email;
   final String? role; // CUSTOMER, OWNER, DELIVERY
+  final bool emailVerified;
 
-  AppUser({this.userId, this.name, this.email, this.role});
+  AppUser({this.userId, this.name, this.email, this.role, this.emailVerified = false});
 
   factory AppUser.fromJson(Map<String, dynamic> j) => AppUser(
         userId: j['userId'],
         name: j['name'],
         email: j['email'],
         role: j['role'],
+        emailVerified: j['emailVerified'] ?? false,
       );
 }
 

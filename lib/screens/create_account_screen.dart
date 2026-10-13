@@ -3,6 +3,9 @@ import '../theme/app_theme.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/scale_tap.dart';
 
+import '../Services/api_client.dart';
+import '../Services/auth_service.dart';
+
 class CreateAccountScreen extends StatefulWidget {
   const CreateAccountScreen({super.key});
 
@@ -22,21 +25,69 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
   bool _obscureConfirmPassword = true;
   bool _isLoading = false;
 
-  void _handleSignUp() {
-    if (_formKey.currentState!.validate()) {
-      setState(() {
-        _isLoading = true;
-      });
-      // Simulate API call
-      Future.delayed(const Duration(milliseconds: 1500), () {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
-          // After sign up, show delivery feature screen
-          Navigator.of(context).pushReplacementNamed('/intro');
+  Future<void> _handleSignUp() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    if (_passwordController.text != _confirmPasswordController.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Passwords do not match'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
+      await AuthService.instance.register(
+        name: _nameController.text.trim(),
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
+
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Text('Account Created! 🎉'),
+            content: Text(
+              'A verification email has been sent to ${_emailController.text.trim()}.\n\n'
+              'Please verify your email address to unlock checkout and order placement.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  Navigator.of(context).pushReplacementNamed('/login');
+                },
+                child: const Text('Go to Login'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        String msg = 'Failed to create account. Please try again.';
+        if (e is RateLimitException) {
+          msg = 'Too many attempts. Please wait a minute before retrying.';
+        } else if (e is ApiException) {
+          msg = e.message;
         }
-      });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(msg),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 

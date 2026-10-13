@@ -6,6 +6,7 @@ class FoodItem {
   final String imageUrl;
   final String category;
   final double rating;
+  final int? backendItemId;
 
   FoodItem({
     required this.id,
@@ -15,6 +16,7 @@ class FoodItem {
     required this.imageUrl,
     required this.category,
     required this.rating,
+    this.backendItemId,
   });
 }
 

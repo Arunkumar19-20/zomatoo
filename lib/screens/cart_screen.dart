@@ -8,8 +8,25 @@ import '../widgets/fade_in_wrapper.dart';
 import '../widgets/shimmer_placeholder.dart';
 import '../Services/session_provider.dart';
 
-class CartScreen extends StatelessWidget {
+import '../models/food_item.dart';
+
+class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
+
+  @override
+  State<CartScreen> createState() => _CartScreenState();
+}
+
+class _CartScreenState extends State<CartScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<CartState>().syncWithBackend();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -257,9 +274,18 @@ class CartScreen extends StatelessWidget {
                               padding: EdgeInsets.zero,
                               constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                               onPressed: () {
-                                if (cart.activeRestaurant != null) {
-                                  cart.addItem(item.foodItem, cart.activeRestaurant!);
-                                }
+                                final restaurant = cart.activeRestaurant ??
+                                    Restaurant(
+                                      id: 'rest_default',
+                                      name: 'Restaurant',
+                                      imageUrl: '',
+                                      rating: 4.5,
+                                      deliveryTime: '25-35 min',
+                                      deliveryFee: 29.0,
+                                      cuisineTags: [],
+                                      menu: [],
+                                    );
+                                cart.addItem(item.foodItem, restaurant);
                               },
                             ),
                           ],

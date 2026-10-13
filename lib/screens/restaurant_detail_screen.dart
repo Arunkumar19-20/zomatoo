@@ -7,7 +7,7 @@ import '../widgets/scale_tap.dart';
 import '../widgets/fade_in_wrapper.dart';
 import '../widgets/shimmer_placeholder.dart';
 import '../widgets/reviews_dialog.dart';
-import '../Services/menu_service.dart';
+import '../Services/restaurant_service.dart';
 import '../Services/session_provider.dart';
 
 class RestaurantDetailScreen extends StatefulWidget {
@@ -44,24 +44,30 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
   Future<void> _loadMenuFromBackend(int restaurantId) async {
     setState(() => _menuLoading = true);
     try {
-      final items = await MenuService().getAllItems();
-      // Filter items that belong to this restaurant's categories
-      // (backend MenuItem has a category field; we show all available items)
+      final categories = await RestaurantService().getRestaurantMenu(restaurantId);
+      final List<FoodItem> items = [];
+      for (final cat in categories) {
+        for (final item in cat.items) {
+          if (item.isAvailable != false) {
+            items.add(FoodItem(
+              id: 'api_${item.itemId}',
+              name: item.name,
+              description: item.description ?? '',
+              price: item.price,
+              imageUrl: item.imageUrl ??
+                  'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&auto=format&fit=crop&q=60',
+              category: cat.categoryName.isNotEmpty
+                  ? cat.categoryName
+                  : (item.isVeg == true ? 'Veg' : 'Non-Veg'),
+              rating: 4.5,
+              backendItemId: item.itemId,
+            ));
+          }
+        }
+      }
       if (mounted) {
         setState(() {
-          _apiMenuItems = items
-              .where((i) => i.isAvailable != false)
-              .map((i) => FoodItem(
-                    id: 'api_${i.id}',
-                    name: i.name,
-                    description: i.description ?? '',
-                    price: i.price.toDouble(),
-                    imageUrl: i.imageUrl ??
-                        'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&auto=format&fit=crop&q=60',
-                    category: i.isVeg == true ? 'Veg' : 'Non-Veg',
-                    rating: 4.0,
-                  ))
-              .toList();
+          _apiMenuItems = items;
           _menuLoading = false;
         });
       }

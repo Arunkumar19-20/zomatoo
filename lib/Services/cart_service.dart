@@ -8,7 +8,65 @@ import '../models/models.dart';
 class CartService {
   final Dio _dio = ApiClient.instance.dio;
 
-  // ---- /cart ----
+  // ---- Modern Authenticated Endpoints (CartController) ----
+
+  /// GET /cart - Retrieves current user's cart
+  Future<CartResponseDTO> getMyCart() async {
+    try {
+      final res = await _dio.get('/cart');
+      return CartResponseDTO.fromJson(res.data);
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
+  /// POST /cart/items - Adds menu item to cart
+  Future<CartResponseDTO> addItem({required int menuItemId, int quantity = 1}) async {
+    try {
+      final res = await _dio.post('/cart/items', data: {
+        'menuItemId': menuItemId,
+        'quantity': quantity,
+      });
+      return CartResponseDTO.fromJson(res.data);
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
+  /// PUT /cart/items/{cartItemId} - Updates quantity of an existing cart item
+  Future<CartResponseDTO> updateQuantity(int cartItemId, int quantity) async {
+    try {
+      final res = await _dio.put(
+        '/cart/items/$cartItemId',
+        data: {'quantity': quantity},
+      );
+      return CartResponseDTO.fromJson(res.data);
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
+  /// DELETE /cart/items/{cartItemId} - Removes an item from cart
+  Future<CartResponseDTO> removeItem(int cartItemId) async {
+    try {
+      final res = await _dio.delete('/cart/items/$cartItemId');
+      return CartResponseDTO.fromJson(res.data);
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
+  /// DELETE /cart - Clears entire cart for authenticated user
+  Future<CartResponseDTO> clearCart() async {
+    try {
+      final res = await _dio.delete('/cart');
+      return CartResponseDTO.fromJson(res.data);
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
+  // ---- /cart legacy ----
 
   Future<CartModel> createCart(CartModel cart) async {
     try {
@@ -65,7 +123,7 @@ class CartService {
 
   // ---- /cart-items ----
 
-  Future<CartItemModel> addItem(CartItemModel item) async {
+  Future<CartItemModel> addCartItemLegacy(CartItemModel item) async {
     try {
       final res = await _dio.post('/cart-items', data: item.toJson());
       return CartItemModel.fromJson(res.data);
@@ -109,7 +167,7 @@ class CartService {
     }
   }
 
-  Future<void> clearCart(int cartId) async {
+  Future<void> clearCartItemsLegacy(int cartId) async {
     try {
       await _dio.delete('/cart-items/cart/$cartId');
     } on DioException catch (e) {

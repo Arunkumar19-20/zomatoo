@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/scale_tap.dart';
+import '../Services/api_client.dart';
 import '../Services/auth_service.dart';
 import '../Services/session_provider.dart';
 import 'package:provider/provider.dart';
@@ -19,10 +20,40 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _isLoading = false;
 
-  /// The backend uses Google OAuth only — this redirects there.
-  void _handleSignIn() {
-    if (_formKey.currentState!.validate()) {
-      _handleGoogleSignIn();
+  /// Native email/password sign-in against Spring Boot backend.
+  Future<void> _handleSignIn() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+    try {
+      await context.read<SessionProvider>().loginWithCredentials(
+        _emailController.text.trim(),
+        _passwordController.text,
+      );
+      if (mounted) {
+        Navigator.of(context).pushReplacementNamed('/intro');
+      }
+    } catch (e) {
+      if (mounted) {
+        String errorMessage = 'Login failed. Please check your credentials.';
+        if (e is UnauthorizedException) {
+          errorMessage = 'Invalid email or password.';
+        } else if (e is RateLimitException) {
+          errorMessage = 'Too many login attempts. Please wait a minute before retrying.';
+        } else if (e is ApiException) {
+          errorMessage = e.message;
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -33,7 +64,6 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       final result = await AuthService.instance.loginWithGoogle(context);
       if (result != null && mounted) {
-        // Store session in the provider so all screens can access it.
         await context.read<SessionProvider>().login(
               result.token,
               result.email,

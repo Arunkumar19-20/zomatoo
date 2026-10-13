@@ -17,9 +17,11 @@ import 'screens/order_tracking_screen.dart';
 import 'theme/app_theme.dart';
 import 'Services/web_oauth_storage_stub.dart'
     if (dart.library.html) 'Services/web_oauth_storage_web.dart';
+import 'Services/payment_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  PaymentService.initialize();
 
   // Restore any saved JWT session before the UI renders.
   final session = SessionProvider();

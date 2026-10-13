@@ -1,68 +1,101 @@
-// lib/Services/session_provider.dart
-//
-// Holds the currently logged-in user's data so any screen can read:
-//   - Whether there is an active session
-//   - The raw JWT token
-//   - The AppUser (userId, name, email, role)
-//   - The Customer profile (customerId — needed for /orders/checkout)
-//
-// Usage:
-//   context.read<SessionProvider>().login(result);
-//   context.watch<SessionProvider>().customerId
-
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'api_client.dart';
+import 'auth_service.dart';
 import 'user_service.dart';
 import '../models/models.dart';
 
-class SessionProvider extends ChangeNotifier {
+class SessionProvider extends ChangeNotifier with WidgetsBindingObserver {
   AppUser? _user;
   Customer? _customer;
   bool _loadingProfile = false;
 
+  SessionProvider() {
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && isLoggedIn) {
+      // Proactive single-flight token refresh on app resume if near expiry
+      if (AuthService.instance.isTokenExpired(bufferSeconds: 60)) {
+        AuthService.instance.refreshToken().then((_) {
+          notifyListeners();
+        }).catchError((_) {});
+      }
+    }
+  }
+
   AppUser? get user => _user;
   Customer? get customer => _customer;
-  bool get isLoggedIn => ApiClient.instance.isLoggedIn;
+  bool get isLoggedIn => AuthService.instance.isLoggedIn;
   bool get loadingProfile => _loadingProfile;
 
-  /// The customer id stored in the backend Customer table — required for checkout.
+  int? get userId => _user?.userId ?? AuthService.instance.userId;
   int? get customerId => _customer?.customerId;
+  bool get isEmailVerified => _user?.emailVerified ?? AuthService.instance.isEmailVerified;
 
-  /// Called after a successful Google OAuth login.
-  Future<void> login(String token, String email, String role) async {
-    ApiClient.instance.setToken(token);
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('auth_token', token);
-    await prefs.setString('auth_email', email);
-    await prefs.setString('auth_role', role);
-
-    // Set basic user first so the UI can render immediately.
-    _user = AppUser(email: email, role: role);
+  /// Logs in with email and password using the native Spring Boot endpoint.
+  Future<void> loginWithCredentials(String email, String password) async {
+    await AuthService.instance.login(email, password);
+    _user = AppUser(
+      userId: AuthService.instance.userId,
+      name: AuthService.instance.name,
+      email: AuthService.instance.email,
+      role: AuthService.instance.role,
+      emailVerified: AuthService.instance.isEmailVerified,
+    );
     notifyListeners();
 
-    // Fetch full profile (includes name) and customer profile in parallel.
+    await Future.wait([
+      _fetchUserProfile(),
+      if (AuthService.instance.role == 'CUSTOMER') _fetchCustomerProfile(),
+    ]);
+  }
+
+  /// Called after a successful Google OAuth login or legacy redirect.
+  Future<void> login(String token, String email, String role) async {
+    ApiClient.instance.setToken(token);
+    _user = AppUser(
+      email: email,
+      role: role,
+      emailVerified: true,
+    );
+    notifyListeners();
+
     await Future.wait([
       _fetchUserProfile(),
       _fetchCustomerProfile(),
     ]);
   }
 
-  /// Tries to restore a saved session from SharedPreferences.
-  Future<void> restoreSession() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('auth_token');
-    final email = prefs.getString('auth_email');
-    final role = prefs.getString('auth_role');
+  /// Resends account verification email.
+  Future<void> resendVerification() async {
+    await AuthService.instance.resendVerification();
+  }
 
-    if (token != null && token.isNotEmpty) {
-      ApiClient.instance.setToken(token);
-      _user = AppUser(email: email, role: role);
+  /// Restores session on startup from secure storage.
+  Future<void> restoreSession() async {
+    await AuthService.instance.restoreSession();
+
+    if (AuthService.instance.isLoggedIn) {
+      _user = AppUser(
+        userId: AuthService.instance.userId,
+        name: AuthService.instance.name,
+        email: AuthService.instance.email,
+        role: AuthService.instance.role,
+        emailVerified: AuthService.instance.isEmailVerified,
+      );
       notifyListeners();
+
       await Future.wait([
         _fetchUserProfile(),
-        _fetchCustomerProfile(),
+        if (AuthService.instance.role == 'CUSTOMER') _fetchCustomerProfile(),
       ]);
     }
   }
@@ -72,17 +105,17 @@ class SessionProvider extends ChangeNotifier {
     try {
       final svc = UserService();
       final profile = await svc.getUserProfile();
-      // Merge the fetched name/userId into the existing user, keeping
-      // the role and email that came from the JWT token.
       _user = AppUser(
         userId: profile.userId,
         name: profile.name,
-        email: _user?.email ?? profile.email,
-        role: _user?.role ?? profile.role,
+        email: profile.email ?? _user?.email,
+        role: profile.role ?? _user?.role,
+        emailVerified: profile.emailVerified,
       );
+      AuthService.instance.updateEmailVerified(profile.emailVerified);
       notifyListeners();
     } catch (_) {
-      // Not fatal — name will fall back to email prefix in the UI.
+      // Not fatal — name and email fall back to JWT fields
     }
   }
 
@@ -102,13 +135,9 @@ class SessionProvider extends ChangeNotifier {
   }
 
   Future<void> logout() async {
-    ApiClient.instance.setToken(null);
+    await AuthService.instance.logout();
     _user = null;
     _customer = null;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('auth_token');
-    await prefs.remove('auth_email');
-    await prefs.remove('auth_role');
     notifyListeners();
   }
 }

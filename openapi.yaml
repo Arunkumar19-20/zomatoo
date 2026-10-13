@@ -1,0 +1,923 @@
+openapi: 3.1.0
+info:
+  title: Cravey Food Delivery API
+  version: 2.0.0
+  description: >
+    Production REST API specification for the Cravey (formerly Zomatoo) Food Delivery platform.
+    Features JWT Authentication (access + refresh tokens), role-based access control,
+    dynamic restaurant search/filtering with pagination, nested menus, cart management,
+    IDOR-proof checkout, and webhook-driven payment processing.
+servers:
+  - url: http://localhost:8080
+    description: Local Development Server
+
+paths:
+  # ================= AUTHENTICATION =================
+  /api/auth/register:
+    post:
+      summary: Register a new customer or owner account
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '200':
+          description: Registration initiated, verification token generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /api/auth/login:
+    post:
+      summary: Authenticate with email and password
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Successfully authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /api/auth/refresh:
+    post:
+      summary: Rotate refresh token and obtain new access token
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: Tokens refreshed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /api/auth/logout:
+    post:
+      summary: Revoke refresh token and logout
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+      responses:
+        '200':
+          description: Logged out successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Logged out successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/auth/verify-email:
+    get:
+      summary: Verify account email address with raw token
+      tags: [Authentication]
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Email verified successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Email verified successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/auth/resend-verification:
+    post:
+      summary: Resend verification email for authenticated user
+      tags: [Authentication]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Verification token resent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Verification email resent successfully.
+                  email:
+                    type: string
+                    example: user@example.com
+                  emailVerified:
+                    type: boolean
+                    example: false
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /api/auth/forgot-password:
+    post:
+      summary: Request a password reset token
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+      responses:
+        '200':
+          description: Password reset token sent/generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  resetToken:
+                    type: string
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /api/auth/reset-password:
+    post:
+      summary: Reset account password using token
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+      responses:
+        '200':
+          description: Password reset and sessions invalidated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Password reset successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  # ================= RESTAURANTS =================
+  /restaurants:
+    get:
+      summary: Search and filter restaurants with pagination
+      tags: [Restaurants]
+      parameters:
+        - name: cuisine
+          in: query
+          description: Filter by cuisine name (case-insensitive substring)
+          schema:
+            type: string
+        - name: minRating
+          in: query
+          description: Minimum rating threshold
+          schema:
+            type: number
+            format: float
+            example: 4.0
+        - name: isOpen
+          in: query
+          description: Filter by open status
+          schema:
+            type: boolean
+        - name: search
+          in: query
+          description: Search term across restaurant name and cuisine
+          schema:
+            type: string
+        - name: page
+          in: query
+          description: Zero-based page index
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          description: Number of records per page
+          schema:
+            type: integer
+            default: 20
+        - name: sort
+          in: query
+          description: Sorting criteria (e.g. rating,desc or name,asc)
+          schema:
+            type: string
+            default: id,asc
+      responses:
+        '200':
+          description: Page of restaurants
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageRestaurantDTO'
+
+  /restaurants/{id}:
+    get:
+      summary: Get restaurant details by ID
+      tags: [Restaurants]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Restaurant details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RestaurantDTO'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /restaurants/{id}/menu:
+    get:
+      summary: Get full nested menu (categories and items) for a restaurant
+      tags: [Restaurants]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of menu categories with nested menu items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MenuCategoryDTO'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ================= CART =================
+  /cart:
+    get:
+      summary: Get current authenticated user's cart
+      tags: [Cart]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponseDTO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /cart/items:
+    post:
+      summary: Add an item or update quantity in cart
+      tags: [Cart]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [itemId, quantity]
+              properties:
+                itemId:
+                  type: integer
+                quantity:
+                  type: integer
+                  minimum: 1
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponseDTO'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /cart/items/{id}:
+    delete:
+      summary: Remove a specific item from cart
+      tags: [Cart]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponseDTO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /cart/clear:
+    delete:
+      summary: Empty current authenticated user's cart
+      tags: [Cart]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Cart cleared successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ================= ORDERS =================
+  /orders:
+    get:
+      summary: Get authenticated user's order history
+      tags: [Orders]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrderResponseDTO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /orders/my-orders:
+    get:
+      summary: Alias for GET /orders
+      tags: [Orders]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrderResponseDTO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /orders/checkout:
+    post:
+      summary: Place order from current authenticated user's cart
+      tags: [Orders]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: restaurantId
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Order successfully placed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponseDTO'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Forbidden (e.g. Email not verified)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /orders/{id}:
+    get:
+      summary: Get order details by ID (enforces ownership)
+      tags: [Orders]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponseDTO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /orders/{id}/status:
+    put:
+      summary: Update order status (Owner / Delivery Partner / Admin only)
+      tags: [Orders]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: status
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [PLACED, PREPARING, OUT_FOR_DELIVERY, DELIVERED, CANCELLED]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponseDTO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ================= PAYMENT =================
+  /payment/create:
+    post:
+      summary: Create Stripe payment intent for an authenticated order
+      tags: [Payments]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orderId
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponseDTO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /payment/confirm:
+    post:
+      summary: Confirm payment intent
+      tags: [Payments]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [paymentIntentId]
+              properties:
+                paymentIntentId:
+                  type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  paymentId:
+                    type: integer
+
+  /payment/webhook:
+    post:
+      summary: Stripe webhook delivery (Idempotent signature verified)
+      tags: [Payments]
+      parameters:
+        - name: Stripe-Signature
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: string
+      responses:
+        '200':
+          description: Event processed or skipped if duplicate
+        '400':
+          description: Invalid payload or signature
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    BadRequest:
+      description: Bad Request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Resource Not Found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    TooManyRequests:
+      description: Rate Limit Exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [name, email, password]
+      properties:
+        name:
+          type: string
+          example: Jane Doe
+        email:
+          type: string
+          format: email
+          example: jane@example.com
+        password:
+          type: string
+          format: password
+          example: StrongP@ssw0rd!
+        role:
+          type: string
+          enum: [CUSTOMER, OWNER, DELIVERY_PARTNER]
+          default: CUSTOMER
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: jane@example.com
+        password:
+          type: string
+          format: password
+          example: StrongP@ssw0rd!
+
+    RefreshRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+
+    LogoutRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+
+    ResetPasswordRequest:
+      type: object
+      required: [token, newPassword]
+      properties:
+        token:
+          type: string
+        newPassword:
+          type: string
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: Short-lived access JWT token (15 mins)
+        accessToken:
+          type: string
+          description: Alias for token
+        refreshToken:
+          type: string
+          description: Long-lived opaque refresh token (30 days)
+        tokenType:
+          type: string
+          example: Bearer
+        expiresIn:
+          type: integer
+          example: 900
+        email:
+          type: string
+          example: jane@example.com
+        name:
+          type: string
+          example: Jane Doe
+        role:
+          type: string
+          example: CUSTOMER
+        emailVerified:
+          type: boolean
+          example: true
+
+    RestaurantDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        address:
+          type: string
+        rating:
+          type: number
+          format: float
+        open:
+          type: boolean
+        openingHours:
+          type: string
+        deliveryTime:
+          type: integer
+        imageUrl:
+          type: string
+        cuisine:
+          type: string
+        discount:
+          type: string
+        locationId:
+          type: integer
+        locationCity:
+          type: string
+
+    PageRestaurantDTO:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/RestaurantDTO'
+        totalElements:
+          type: integer
+        totalPages:
+          type: integer
+        size:
+          type: integer
+        number:
+          type: integer
+        first:
+          type: boolean
+        last:
+          type: boolean
+        empty:
+          type: boolean
+
+    MenuItemDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+          format: float
+        isVeg:
+          type: boolean
+        isAvailable:
+          type: boolean
+        imageUrl:
+          type: string
+        categoryId:
+          type: integer
+        categoryName:
+          type: string
+        restaurantId:
+          type: integer
+        restaurantName:
+          type: string
+
+    MenuCategoryDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/MenuItemDTO'
+
+    CartItemDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+        cartId:
+          type: integer
+        itemId:
+          type: integer
+        name:
+          type: string
+        price:
+          type: number
+        quantity:
+          type: integer
+        subtotal:
+          type: number
+        imageUrl:
+          type: string
+
+    CartResponseDTO:
+      type: object
+      properties:
+        cartId:
+          type: integer
+        customerId:
+          type: integer
+        customerEmail:
+          type: string
+        restaurantId:
+          type: integer
+        restaurantName:
+          type: string
+        totalAmount:
+          type: number
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CartItemDTO'
+
+    OrderItemDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+        itemId:
+          type: integer
+        name:
+          type: string
+        price:
+          type: number
+        quantity:
+          type: integer
+        subtotal:
+          type: number
+        imageUrl:
+          type: string
+
+    OrderResponseDTO:
+      type: object
+      properties:
+        orderId:
+          type: integer
+        status:
+          type: string
+          example: PLACED
+        paymentStatus:
+          type: string
+          enum: [PENDING, PAID, FAILED]
+          example: PENDING
+        orderDate:
+          type: string
+          format: date-time
+        totalAmount:
+          type: number
+          format: float
+        restaurantId:
+          type: integer
+        restaurantName:
+          type: string
+        restaurantAddress:
+          type: string
+        restaurantImageUrl:
+          type: string
+        customerName:
+          type: string
+        customerEmail:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItemDTO'
+
+    PaymentResponseDTO:
+      type: object
+      properties:
+        clientSecret:
+          type: string
+        paymentIntentId:
+          type: string
+        amount:
+          type: number
+        currency:
+          type: string
+        orderId:
+          type: integer
+
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+          example: 400
+        error:
+          type: string
+          example: Bad Request
+        message:
+          type: string
+          example: An error occurred

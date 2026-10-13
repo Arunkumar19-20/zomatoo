@@ -8,10 +8,44 @@ import '../models/models.dart';
 class RestaurantService {
   final Dio _dio = ApiClient.instance.dio;
 
-  Future<List<Restaurant>> getAll() async {
+  Future<List<Restaurant>> getAll({
+    int page = 0,
+    int size = 20,
+    String? cuisine,
+    double? minRating,
+    bool? isOpen,
+    String? search,
+  }) async {
     try {
-      final res = await _dio.get('/restaurants');
-      return (res.data as List).map((e) => Restaurant.fromJson(e)).toList();
+      final queryParams = <String, dynamic>{
+        'page': page,
+        'size': size,
+      };
+      if (cuisine != null && cuisine.isNotEmpty) queryParams['cuisine'] = cuisine;
+      if (minRating != null) queryParams['minRating'] = minRating;
+      if (isOpen != null) queryParams['isOpen'] = isOpen;
+      if (search != null && search.isNotEmpty) queryParams['search'] = search;
+
+      final res = await _dio.get('/restaurants', queryParameters: queryParams);
+      if (res.data is Map && res.data['content'] != null) {
+        final list = res.data['content'] as List;
+        return list.map((e) => Restaurant.fromJson(e as Map<String, dynamic>)).toList();
+      } else if (res.data is List) {
+        return (res.data as List).map((e) => Restaurant.fromJson(e as Map<String, dynamic>)).toList();
+      }
+      return [];
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
+  Future<List<MenuCategoryDTO>> getRestaurantMenu(int restaurantId) async {
+    try {
+      final res = await _dio.get('/restaurants/$restaurantId/menu');
+      if (res.data is List) {
+        return (res.data as List).map((e) => MenuCategoryDTO.fromJson(e as Map<String, dynamic>)).toList();
+      }
+      return [];
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }
