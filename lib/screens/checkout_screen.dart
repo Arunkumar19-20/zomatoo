@@ -7,9 +7,9 @@ import '../widgets/citrus_header.dart';
 import '../widgets/scale_tap.dart';
 import '../widgets/fade_in_wrapper.dart';
 import '../widgets/shimmer_placeholder.dart';
-import '../Services/session_provider.dart';
-import '../Services/payment_service.dart';
-import '../Services/api_client.dart';
+import '../services/session_provider.dart';
+import '../services/payment_service.dart';
+import '../services/api_client.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});

@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dio/dio.dart';
-import 'package:tomatoo/Services/api_client.dart';
-import 'package:tomatoo/Services/auth_interceptor.dart';
-import 'package:tomatoo/Services/auth_service.dart';
+import 'package:tomatoo/services/api_client.dart';
+import 'package:tomatoo/services/auth_interceptor.dart';
+import 'package:tomatoo/services/auth_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

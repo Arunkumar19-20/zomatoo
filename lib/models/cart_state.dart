@@ -2,10 +2,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'food_item.dart';
 import '../models/models.dart' as models;
-import '../Services/order_service.dart';
-import '../Services/cart_service.dart';
-import '../Services/auth_service.dart';
-import '../Services/api_client.dart';
+import '../services/order_service.dart';
+import '../services/cart_service.dart';
+import '../services/auth_service.dart';
+import '../services/api_client.dart';
 
 class CartItem {
   final FoodItem foodItem;

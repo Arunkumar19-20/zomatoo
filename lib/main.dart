@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'models/cart_state.dart';
-import 'Services/session_provider.dart';
+import 'services/session_provider.dart';
 import 'screens/splash_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/login_screen.dart';
@@ -15,9 +15,9 @@ import 'screens/cart_screen.dart';
 import 'screens/checkout_screen.dart';
 import 'screens/order_tracking_screen.dart';
 import 'theme/app_theme.dart';
-import 'Services/web_oauth_storage_stub.dart'
-    if (dart.library.html) 'Services/web_oauth_storage_web.dart';
-import 'Services/payment_service.dart';
+import 'services/web_oauth_storage_stub.dart'
+    if (dart.library.html) 'services/web_oauth_storage_web.dart';
+import 'services/payment_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

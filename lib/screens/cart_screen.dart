@@ -6,7 +6,7 @@ import '../widgets/primary_button.dart';
 import '../widgets/citrus_header.dart';
 import '../widgets/fade_in_wrapper.dart';
 import '../widgets/shimmer_placeholder.dart';
-import '../Services/session_provider.dart';
+import '../services/session_provider.dart';
 
 import '../models/food_item.dart';
 

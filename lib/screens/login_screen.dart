@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/scale_tap.dart';
-import '../Services/api_client.dart';
-import '../Services/auth_service.dart';
-import '../Services/session_provider.dart';
+import '../services/api_client.dart';
+import '../services/auth_service.dart';
+import '../services/session_provider.dart';
 import 'package:provider/provider.dart';
 
 class LoginScreen extends StatefulWidget {

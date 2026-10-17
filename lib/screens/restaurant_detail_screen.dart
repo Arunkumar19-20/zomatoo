@@ -7,8 +7,8 @@ import '../widgets/scale_tap.dart';
 import '../widgets/fade_in_wrapper.dart';
 import '../widgets/shimmer_placeholder.dart';
 import '../widgets/reviews_dialog.dart';
-import '../Services/restaurant_service.dart';
-import '../Services/session_provider.dart';
+import '../services/restaurant_service.dart';
+import '../services/session_provider.dart';
 
 class RestaurantDetailScreen extends StatefulWidget {
   const RestaurantDetailScreen({super.key});

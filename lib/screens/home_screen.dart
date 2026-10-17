@@ -10,8 +10,8 @@ import '../widgets/citrus_header.dart';
 import '../widgets/scale_tap.dart';
 import '../widgets/fade_in_wrapper.dart';
 import '../widgets/shimmer_placeholder.dart';
-import '../Services/restaurant_service.dart';
-import '../Services/session_provider.dart';
+import '../services/restaurant_service.dart';
+import '../services/session_provider.dart';
 
 // Adapts a backend api.Restaurant to the local mock.Restaurant used by the UI widgets.
 // Maps what we can; imageUrl and cuisineTags are not in backend yet so we use defaults.

@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dio/dio.dart';
-import 'package:tomatoo/Services/payment_service.dart';
-import 'package:tomatoo/Services/order_service.dart';
+import 'package:tomatoo/services/payment_service.dart';
+import 'package:tomatoo/services/order_service.dart';
 import 'package:tomatoo/models/models.dart';
 
 class _FakeOrderService extends OrderService {

@@ -3,8 +3,8 @@ import '../theme/app_theme.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/scale_tap.dart';
 
-import '../Services/api_client.dart';
-import '../Services/auth_service.dart';
+import '../services/api_client.dart';
+import '../services/auth_service.dart';
 
 class CreateAccountScreen extends StatefulWidget {
   const CreateAccountScreen({super.key});
