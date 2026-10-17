@@ -4,10 +4,14 @@
 import 'package:dio/dio.dart';
 import 'api_client.dart';
 import '../models/models.dart';
+import '../repositories/restaurant_repository.dart';
 
-class RestaurantService {
-  final Dio _dio = ApiClient.instance.dio;
+class RestaurantService implements RestaurantRepository {
+  final Dio _dio;
 
+  RestaurantService({Dio? dio}) : _dio = dio ?? ApiClient.instance.dio;
+
+  @override
   Future<List<Restaurant>> getAll({
     int page = 0,
     int size = 20,
@@ -39,6 +43,7 @@ class RestaurantService {
     }
   }
 
+  @override
   Future<List<MenuCategoryDTO>> getRestaurantMenu(int restaurantId) async {
     try {
       final res = await _dio.get('/restaurants/$restaurantId/menu');
@@ -51,6 +56,7 @@ class RestaurantService {
     }
   }
 
+  @override
   Future<Restaurant> getById(int id) async {
     try {
       final res = await _dio.get('/restaurants/$id');
@@ -60,6 +66,7 @@ class RestaurantService {
     }
   }
 
+  @override
   Future<Restaurant> create(Restaurant restaurant) async {
     try {
       final res = await _dio.post('/restaurants', data: restaurant.toJson());
@@ -69,6 +76,7 @@ class RestaurantService {
     }
   }
 
+  @override
   Future<Restaurant> update(int id, Restaurant restaurant) async {
     try {
       final res = await _dio.put('/restaurants/$id', data: restaurant.toJson());
@@ -78,6 +86,7 @@ class RestaurantService {
     }
   }
 
+  @override
   Future<void> delete(int id) async {
     try {
       await _dio.delete('/restaurants/$id');
@@ -86,6 +95,7 @@ class RestaurantService {
     }
   }
 
+  @override
   Future<List<Restaurant>> getByLocation(int locationId) async {
     try {
       final res = await _dio.get('/restaurants/location/$locationId');
@@ -95,6 +105,7 @@ class RestaurantService {
     }
   }
 
+  @override
   Future<List<Restaurant>> getOpenRestaurants() async {
     try {
       final res = await _dio.get('/restaurants/open');
@@ -104,6 +115,7 @@ class RestaurantService {
     }
   }
 
+  @override
   Future<List<Restaurant>> getByRating(double rating) async {
     try {
       final res = await _dio.get('/restaurants/rating/$rating');
@@ -113,6 +125,7 @@ class RestaurantService {
     }
   }
 
+  @override
   Future<void> updateStatus(int id, bool isOpen) async {
     try {
       await _dio.put('/restaurants/$id/status', queryParameters: {'isOpen': isOpen});
@@ -121,6 +134,7 @@ class RestaurantService {
     }
   }
 
+  @override
   Future<void> addMenuItem(MenuItem item) async {
     try {
       await _dio.post('/restaurants/menu-item', data: item.toJson());
@@ -129,6 +143,7 @@ class RestaurantService {
     }
   }
 
+  @override
   Future<void> removeMenuItem(int itemId) async {
     try {
       await _dio.delete('/restaurants/menu-item/$itemId');

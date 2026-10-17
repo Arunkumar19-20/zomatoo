@@ -4,13 +4,15 @@
 import 'package:dio/dio.dart';
 import 'api_client.dart';
 import '../models/models.dart';
+import '../repositories/order_repository.dart';
 
-class OrderService {
+class OrderService implements OrderRepository {
   final Dio _dio;
 
   OrderService({Dio? dio}) : _dio = dio ?? ApiClient.instance.dio;
 
   /// POST /orders/checkout?restaurantId=
+  @override
   Future<OrderResponseDTO> checkout({
     int? restaurantId,
     int? cartId,
@@ -33,6 +35,7 @@ class OrderService {
   }
 
   /// GET /orders - Retrieves user's own order history
+  @override
   Future<List<OrderResponseDTO>> getMyOrders() async {
     try {
       final res = await _dio.get('/orders');
@@ -46,6 +49,7 @@ class OrderService {
   }
 
   /// GET /orders/{id} - Retrieves order details by ID
+  @override
   Future<OrderResponseDTO> getOrderById(int id) async {
     try {
       final res = await _dio.get('/orders/$id');
@@ -57,6 +61,7 @@ class OrderService {
 
   /// PUT /orders/{id}/status?status=
   /// Typical values: PLACED, CONFIRMED, PREPARING, OUT_FOR_DELIVERY, DELIVERED, CANCELLED
+  @override
   Future<OrderResponseDTO> updateStatus(int id, String status) async {
     try {
       final res = await _dio.put(
@@ -70,6 +75,7 @@ class OrderService {
   }
 
   /// DELETE /orders/{id} -> returns "Cancelled" or "Failed"
+  @override
   Future<bool> cancel(int id) async {
     try {
       final res = await _dio.delete('/orders/$id');

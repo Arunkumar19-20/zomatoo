@@ -18,6 +18,13 @@ import 'theme/app_theme.dart';
 import 'services/web_oauth_storage_stub.dart'
     if (dart.library.html) 'services/web_oauth_storage_web.dart';
 import 'services/payment_service.dart';
+import 'services/restaurant_service.dart';
+import 'services/cart_service.dart';
+import 'services/order_service.dart';
+import 'repositories/restaurant_repository.dart';
+import 'repositories/cart_repository.dart';
+import 'repositories/order_repository.dart';
+import 'repositories/payment_repository.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -49,6 +56,10 @@ void main() async {
   runApp(
     MultiProvider(
       providers: [
+        Provider<RestaurantRepository>(create: (_) => RestaurantService()),
+        Provider<CartRepository>(create: (_) => CartService()),
+        Provider<OrderRepository>(create: (_) => OrderService()),
+        Provider<PaymentRepository>(create: (_) => PaymentService()),
         ChangeNotifierProvider.value(value: session),
         ChangeNotifierProvider(create: (_) => CartState()),
       ],

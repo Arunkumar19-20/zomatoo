@@ -9,6 +9,7 @@ import 'package:flutter_stripe/flutter_stripe.dart';
 import 'api_client.dart';
 import 'order_service.dart';
 import '../models/models.dart';
+import '../repositories/payment_repository.dart';
 
 enum PaymentPollStatus {
   paid,
@@ -28,7 +29,7 @@ class PaymentPollResult {
   });
 }
 
-class PaymentService {
+class PaymentService implements PaymentRepository {
   final Dio _dio;
   final OrderService _orderService;
 
@@ -50,6 +51,7 @@ class PaymentService {
   }
 
   /// POST /payment/create?orderId=
+  @override
   Future<PaymentResponseDTO> createPaymentIntent(int orderId) async {
     try {
       final res = await _dio.post(
@@ -63,6 +65,7 @@ class PaymentService {
   }
 
   /// Confirms Stripe payment via PaymentSheet on mobile devices
+  @override
   Future<bool> confirmPaymentWithStripe({
     required String clientSecret,
     required int orderId,
@@ -99,6 +102,7 @@ class PaymentService {
 
   /// Polls GET /orders/{orderId} with backoff until paymentStatus is PAID, FAILED, or timeout.
   /// Bounded duration (45s) prevents infinite loops.
+  @override
   Future<PaymentPollResult> pollPaymentStatus(
     int orderId, {
     Duration timeout = const Duration(seconds: 45),
@@ -155,6 +159,7 @@ class PaymentService {
   }
 
   /// Backward-compatible alias
+  @override
   Future<OrderResponseDTO> pollOrderStatusUntilFinal(
     int orderId, {
     Duration timeout = const Duration(seconds: 45),

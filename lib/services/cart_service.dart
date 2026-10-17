@@ -4,13 +4,17 @@
 import 'package:dio/dio.dart';
 import 'api_client.dart';
 import '../models/models.dart';
+import '../repositories/cart_repository.dart';
 
-class CartService {
-  final Dio _dio = ApiClient.instance.dio;
+class CartService implements CartRepository {
+  final Dio _dio;
+
+  CartService({Dio? dio}) : _dio = dio ?? ApiClient.instance.dio;
 
   // ---- Modern Authenticated Endpoints (CartController) ----
 
   /// GET /cart - Retrieves current user's cart
+  @override
   Future<CartResponseDTO> getMyCart() async {
     try {
       final res = await _dio.get('/cart');
@@ -21,6 +25,7 @@ class CartService {
   }
 
   /// POST /cart/items - Adds menu item to cart
+  @override
   Future<CartResponseDTO> addItem({required int menuItemId, int quantity = 1}) async {
     try {
       final res = await _dio.post('/cart/items', data: {
@@ -34,6 +39,7 @@ class CartService {
   }
 
   /// PUT /cart/items/{cartItemId} - Updates quantity of an existing cart item
+  @override
   Future<CartResponseDTO> updateQuantity(int cartItemId, int quantity) async {
     try {
       final res = await _dio.put(
@@ -47,6 +53,7 @@ class CartService {
   }
 
   /// DELETE /cart/items/{cartItemId} - Removes an item from cart
+  @override
   Future<CartResponseDTO> removeItem(int cartItemId) async {
     try {
       final res = await _dio.delete('/cart/items/$cartItemId');
@@ -57,6 +64,7 @@ class CartService {
   }
 
   /// DELETE /cart - Clears entire cart for authenticated user
+  @override
   Future<CartResponseDTO> clearCart() async {
     try {
       final res = await _dio.delete('/cart');
@@ -68,6 +76,7 @@ class CartService {
 
   // ---- /cart legacy ----
 
+  @override
   Future<CartModel> createCart(CartModel cart) async {
     try {
       final res = await _dio.post('/cart', data: cart.toJson());
@@ -77,6 +86,7 @@ class CartService {
     }
   }
 
+  @override
   Future<CartModel> getCart(int id) async {
     try {
       final res = await _dio.get('/cart/$id');
@@ -87,6 +97,7 @@ class CartService {
   }
 
   /// Convenience endpoint on CartController: POST /cart/add
+  @override
   Future<CartItemModel> addItemViaCart(CartItemModel item) async {
     try {
       final res = await _dio.post('/cart/add', data: item.toJson());
@@ -96,6 +107,7 @@ class CartService {
     }
   }
 
+  @override
   Future<List<CartItemModel>> getItemsForCart(int cartId) async {
     try {
       final res = await _dio.get('/cart/items/$cartId');
@@ -105,6 +117,7 @@ class CartService {
     }
   }
 
+  @override
   Future<void> deleteCartItem(int id) async {
     try {
       await _dio.delete('/cart/item/$id');
@@ -113,6 +126,7 @@ class CartService {
     }
   }
 
+  @override
   Future<void> clearCartViaCart(int cartId) async {
     try {
       await _dio.delete('/cart/clear/$cartId');
@@ -123,6 +137,7 @@ class CartService {
 
   // ---- /cart-items ----
 
+  @override
   Future<CartItemModel> addCartItemLegacy(CartItemModel item) async {
     try {
       final res = await _dio.post('/cart-items', data: item.toJson());
@@ -132,6 +147,7 @@ class CartService {
     }
   }
 
+  @override
   Future<List<CartItemModel>> getItemsByCart(int cartId) async {
     try {
       final res = await _dio.get('/cart-items/cart/$cartId');
