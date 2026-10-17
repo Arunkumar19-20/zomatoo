@@ -1,12 +1,48 @@
 import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/services.dart';
 import 'package:tomatoo/services/api_client.dart';
 import 'package:tomatoo/services/auth_interceptor.dart';
 import 'package:tomatoo/services/auth_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  // Mock flutter_secure_storage method channel to prevent MissingPluginException
+  const MethodChannel secureStorageChannel =
+      MethodChannel('plugins.it_nomads.com/flutter_secure_storage');
+  final Map<String, String> mockStorage = {};
+
+  TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+      .setMockMethodCallHandler(secureStorageChannel, (MethodCall methodCall) async {
+    final Map<dynamic, dynamic>? args = methodCall.arguments as Map<dynamic, dynamic>?;
+    final String? key = args?['key'] as String?;
+    switch (methodCall.method) {
+      case 'read':
+        return mockStorage[key];
+      case 'write':
+        final String? value = args?['value'] as String?;
+        if (key != null && value != null) {
+          mockStorage[key] = value;
+        }
+        return null;
+      case 'delete':
+        if (key != null) {
+          mockStorage.remove(key);
+        }
+        return null;
+      case 'deleteAll':
+        mockStorage.clear();
+        return null;
+      case 'readAll':
+        return Map<String, String>.from(mockStorage);
+      case 'containsKey':
+        return key != null && mockStorage.containsKey(key);
+      default:
+        return null;
+    }
+  });
 
   group('AuthInterceptor Tests', () {
     late Dio testDio;
