@@ -25,6 +25,7 @@ import 'repositories/restaurant_repository.dart';
 import 'repositories/cart_repository.dart';
 import 'repositories/order_repository.dart';
 import 'repositories/payment_repository.dart';
+import 'controllers/checkout_controller.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -62,6 +63,11 @@ void main() async {
         Provider<PaymentRepository>(create: (_) => PaymentService()),
         ChangeNotifierProvider.value(value: session),
         ChangeNotifierProvider(create: (_) => CartState()),
+        ChangeNotifierProvider(
+          create: (ctx) => CheckoutController(
+            paymentRepository: ctx.read<PaymentRepository>(),
+          ),
+        ),
       ],
       child: const MyApp(),
     ),
