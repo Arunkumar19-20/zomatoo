@@ -1,35 +1,32 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'food_item.dart';
+import 'pure_cart.dart';
 import '../models/models.dart' as models;
-import '../services/order_service.dart';
+import '../repositories/cart_repository.dart';
+import '../repositories/order_repository.dart';
 import '../services/cart_service.dart';
+import '../services/order_service.dart';
 import '../services/auth_service.dart';
 import '../services/api_client.dart';
 
-class CartItem {
-  final FoodItem foodItem;
-  int quantity;
-  int? backendCartItemId;
-
-  CartItem({
-    required this.foodItem,
-    this.quantity = 1,
-    this.backendCartItemId,
-  });
-
-  double get totalPrice => foodItem.price * quantity;
-}
+// Re-export CartItem from pure_cart.dart for backward compatibility
+export 'pure_cart.dart' show CartItem;
 
 enum OrderStatus { preparing, onTheWay, delivered }
 
 class CartState extends ChangeNotifier {
-  final List<CartItem> _items = [];
-  Restaurant? _activeRestaurant;
+  final PureCart _pureCart;
+  final CartRepository _cartRepository;
+  final OrderRepository _orderRepository;
 
-  // Services
-  final CartService _cartService = CartService();
-  final OrderService _orderService = OrderService();
+  CartState({
+    PureCart? pureCart,
+    CartRepository? cartRepository,
+    OrderRepository? orderRepository,
+  })  : _pureCart = pureCart ?? PureCart(),
+        _cartRepository = cartRepository ?? CartService(),
+        _orderRepository = orderRepository ?? OrderService();
 
   // Checkout Details
   String _deliveryAddress = "123 Foodie Lane, Gourmet City";
@@ -58,9 +55,17 @@ class CartState extends ChangeNotifier {
   String? _orderError;
   bool _isEmailNotVerified = false;
 
-  List<CartItem> get items => List.unmodifiable(_items);
-  Restaurant? get activeRestaurant => _activeRestaurant;
+  // Pure cart getters delegated to _pureCart
+  List<CartItem> get items => _pureCart.items;
+  Restaurant? get activeRestaurant => _pureCart.activeRestaurant;
+  int get totalItemCount => _pureCart.totalItemCount;
+  double get subtotal => _pureCart.subtotal;
+  double get deliveryFee => _pureCart.deliveryFee;
+  double get serviceFee => _pureCart.serviceFee;
+  double get total => _pureCart.total;
+  int getItemQuantity(FoodItem item) => _pureCart.getItemQuantity(item);
 
+  // Other state getters
   String get deliveryAddress => _deliveryAddress;
   String get paymentMethod => _paymentMethod;
   OrderStatus get currentStatus => _currentStatus;
@@ -99,12 +104,12 @@ class CartState extends ChangeNotifier {
   Future<void> syncWithBackend() async {
     if (!AuthService.instance.isLoggedIn) return;
     try {
-      final cartRes = await _cartService.getMyCart();
+      final cartRes = await _cartRepository.getMyCart();
       _backendCartId = cartRes.cartId;
 
-      _items.clear();
+      final List<CartItem> newItems = [];
       for (final itemDto in cartRes.items) {
-        _items.add(CartItem(
+        newItems.add(CartItem(
           foodItem: FoodItem(
             id: 'item_${itemDto.itemId ?? itemDto.id}',
             name: itemDto.name ?? 'Item',
@@ -121,8 +126,9 @@ class CartState extends ChangeNotifier {
         ));
       }
 
+      Restaurant? newRestaurant;
       if (cartRes.restaurantName != null || cartRes.restaurantId != null) {
-        _activeRestaurant = Restaurant(
+        newRestaurant = Restaurant(
           id: 'rest_${cartRes.restaurantId ?? 0}',
           name: cartRes.restaurantName ?? 'Restaurant',
           imageUrl:
@@ -134,9 +140,9 @@ class CartState extends ChangeNotifier {
           menu: [],
           backendId: cartRes.restaurantId,
         );
-      } else if (_items.isEmpty) {
-        _activeRestaurant = null;
       }
+
+      _pureCart.setItems(newItems, newRestaurant);
       notifyListeners();
     } catch (_) {
       // Retain offline / local state if backend sync fails
@@ -146,22 +152,22 @@ class CartState extends ChangeNotifier {
   // Backend sync helpers
   void _syncClearCart() {
     if (!AuthService.instance.isLoggedIn) return;
-    _cartService.clearCart().then((_) {}, onError: (_) {});
+    _cartRepository.clearCart().then((_) {}, onError: (_) {});
   }
 
   void _syncUpdateQuantity(int cartItemId, int quantity) {
     if (!AuthService.instance.isLoggedIn) return;
-    _cartService.updateQuantity(cartItemId, quantity).then((_) {}, onError: (_) {});
+    _cartRepository.updateQuantity(cartItemId, quantity).then((_) {}, onError: (_) {});
   }
 
   void _syncRemoveItem(int cartItemId) {
     if (!AuthService.instance.isLoggedIn) return;
-    _cartService.removeItem(cartItemId).then((_) {}, onError: (_) {});
+    _cartRepository.removeItem(cartItemId).then((_) {}, onError: (_) {});
   }
 
   void _syncAddItem(CartItem cartItem, int menuItemId) {
     if (!AuthService.instance.isLoggedIn) return;
-    _cartService.addItem(menuItemId: menuItemId, quantity: 1).then((res) {
+    _cartRepository.addItem(menuItemId: menuItemId, quantity: 1).then((res) {
       _backendCartId = res.cartId;
       final match = res.items.firstWhere(
         (i) => i.itemId == menuItemId,
@@ -175,103 +181,54 @@ class CartState extends ChangeNotifier {
 
   // Cart Operations
   void addItem(FoodItem item, Restaurant restaurant) {
-    // If adding item from a different restaurant, clear the cart first
-    if (_activeRestaurant != null && _activeRestaurant!.id != restaurant.id) {
-      _items.clear();
+    final switched = _pureCart.addItem(item, restaurant);
+    if (switched) {
       _backendCartId = null;
       _syncClearCart();
     }
-    _activeRestaurant = restaurant;
 
-    final existingIndex = _items.indexWhere((element) => element.foodItem.id == item.id);
-    if (existingIndex >= 0) {
-      _items[existingIndex].quantity++;
-      final cartItem = _items[existingIndex];
+    final cartItem = _pureCart.items.firstWhere((element) => element.foodItem.id == item.id);
+    if (cartItem.quantity > 1) {
       if (cartItem.backendCartItemId != null) {
         _syncUpdateQuantity(cartItem.backendCartItemId!, cartItem.quantity);
       }
     } else {
-      final newCartItem = CartItem(foodItem: item);
-      _items.add(newCartItem);
       if (item.backendItemId != null) {
-        _syncAddItem(newCartItem, item.backendItemId!);
+        _syncAddItem(cartItem, item.backendItemId!);
       }
     }
     notifyListeners();
   }
 
   void removeItem(FoodItem item) {
-    final existingIndex = _items.indexWhere((element) => element.foodItem.id == item.id);
-    if (existingIndex >= 0) {
-      final cartItem = _items[existingIndex];
-      if (cartItem.quantity > 1) {
-        cartItem.quantity--;
-        if (cartItem.backendCartItemId != null) {
-          _syncUpdateQuantity(cartItem.backendCartItemId!, cartItem.quantity);
+    final result = _pureCart.removeItem(item);
+    if (result.item != null) {
+      if (result.wasRemoved) {
+        if (result.item!.backendCartItemId != null) {
+          _syncRemoveItem(result.item!.backendCartItemId!);
         }
       } else {
-        final removed = _items.removeAt(existingIndex);
-        if (removed.backendCartItemId != null) {
-          _syncRemoveItem(removed.backendCartItemId!);
+        if (result.item!.backendCartItemId != null) {
+          _syncUpdateQuantity(result.item!.backendCartItemId!, result.item!.quantity);
         }
       }
-    }
-    if (_items.isEmpty) {
-      _activeRestaurant = null;
     }
     notifyListeners();
   }
 
   void deleteItem(FoodItem item) {
-    final existingIndex = _items.indexWhere((element) => element.foodItem.id == item.id);
-    if (existingIndex >= 0) {
-      final removed = _items.removeAt(existingIndex);
-      if (removed.backendCartItemId != null) {
-        _syncRemoveItem(removed.backendCartItemId!);
-      }
-    }
-    if (_items.isEmpty) {
-      _activeRestaurant = null;
+    final removed = _pureCart.deleteItem(item);
+    if (removed != null && removed.backendCartItemId != null) {
+      _syncRemoveItem(removed.backendCartItemId!);
     }
     notifyListeners();
   }
 
   void clearCart() {
-    _items.clear();
-    _activeRestaurant = null;
+    _pureCart.clear();
     _backendCartId = null;
     _syncClearCart();
     notifyListeners();
-  }
-
-  int getItemQuantity(FoodItem item) {
-    final index = _items.indexWhere((element) => element.foodItem.id == item.id);
-    return index >= 0 ? _items[index].quantity : 0;
-  }
-
-  int get totalItemCount {
-    return _items.fold(0, (sum, item) => sum + item.quantity);
-  }
-
-  // Calculations
-  double get subtotal {
-    return _items.fold(0.0, (sum, item) => sum + item.totalPrice);
-  }
-
-  double get deliveryFee {
-    if (_activeRestaurant == null) return 0.0;
-    return _activeRestaurant!.deliveryFee;
-  }
-
-  double get serviceFee {
-    if (_items.isEmpty) return 0.0;
-    if (_activeRestaurant?.id == "rest1") return 567.99;
-    return 25.00;
-  }
-
-  double get total {
-    if (_items.isEmpty) return 0.0;
-    return subtotal + deliveryFee + serviceFee;
   }
 
   /// Places the order — calls backend checkout if authenticated,
@@ -287,8 +244,8 @@ class CartState extends ChangeNotifier {
     _isEmailNotVerified = false;
 
     _recentOrderItems.clear();
-    _recentOrderItems.addAll(_items);
-    _recentOrderRestaurant = _activeRestaurant;
+    _recentOrderItems.addAll(items);
+    _recentOrderRestaurant = activeRestaurant;
     _recentOrderSubtotal = subtotal;
     _recentOrderDeliveryFee = deliveryFee;
     _recentOrderServiceFee = serviceFee;
@@ -300,8 +257,8 @@ class CartState extends ChangeNotifier {
       notifyListeners();
 
       try {
-        final order = await _orderService.checkout(
-          restaurantId: restaurantId ?? _activeRestaurant?.backendId,
+        final order = await _orderRepository.checkout(
+          restaurantId: restaurantId ?? activeRestaurant?.backendId,
         );
         _backendOrderId = order.orderId;
         _lastCreatedOrder = order;
