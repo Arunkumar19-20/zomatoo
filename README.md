@@ -82,15 +82,22 @@ The app uses `String.fromEnvironment` for compile-time configuration:
 
 | Variable | Default Value | Description |
 | :--- | :--- | :--- |
+| `API_BASE_URL` | _Empty (uses platform defaults)_ | Custom backend host URL override (e.g. `--dart-define=API_BASE_URL=https://api.cravey.com`) |
 | `STRIPE_PUBLISHABLE_KEY` | `pk_test_placeholder` | Stripe publishable key for payment sheet initialization |
 
 #### Backend Endpoint Configuration
-`ApiClient.baseUrl` resolves the backend host dynamically based on platform:
-- **Web**: `http://localhost:8080`
-- **Android Emulator**: `http://10.0.2.2:8080`
-- **iOS Simulator / Desktop**: `http://localhost:8080`
-- **TODO**: Configure custom backend host override via compile-time environment variable (e.g., `--dart-define=API_BASE_URL=...`) once backend deployment URL is finalized.
-- **TODO**: Document backend repository source code and local Docker Compose / Spring Boot setup instructions.
+`ApiClient.baseUrl` resolves the backend host dynamically:
+- If `API_BASE_URL` is provided via `--dart-define=API_BASE_URL=http://...`, it takes precedence on all platforms.
+- Otherwise, the app falls back to platform defaults:
+  - **Web**: `http://localhost:8080`
+  - **Android Emulator**: `http://10.0.2.2:8080`
+  - **iOS Simulator / Desktop**: `http://localhost:8080`
+
+Example:
+```bash
+flutter run -d chrome --dart-define=API_BASE_URL=http://localhost:8080
+flutter run -d android --dart-define=API_BASE_URL=http://10.0.2.2:8080
+```
 
 #### OAuth 2.0 (Google Login)
 - Handled via backend redirects through `/google-login?role=CUSTOMER` and `/oauth2/authorization/google`.

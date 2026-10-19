@@ -27,8 +27,13 @@ class ApiClient {
 
   static final ApiClient instance = ApiClient._internal();
 
-  /// Dynamic URL configuration resolving localhost correctly based on platform
+  /// Dynamic URL configuration resolving localhost correctly based on platform,
+  /// with support for compile-time environment overrides via API_BASE_URL.
   static String get baseUrl {
+    const envUrl = String.fromEnvironment('API_BASE_URL');
+    if (envUrl.isNotEmpty) {
+      return envUrl;
+    }
     if (kIsWeb) {
       return 'http://localhost:8080';
     }
