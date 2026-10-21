@@ -49,6 +49,9 @@ public class DropContractReconciliationTest {
     private DropReservationRepository reservationRepository;
 
     @Autowired
+    private PaymentRepository paymentRepository;
+
+    @Autowired
     private OrderRepository orderRepository;
 
     @Autowired
@@ -74,6 +77,7 @@ public class DropContractReconciliationTest {
         transactionTemplate = new TransactionTemplate(transactionManager);
 
         transactionTemplate.execute(status -> {
+            paymentRepository.deleteAll();
             reservationRepository.deleteAll();
             dropRepository.deleteAll();
             orderRepository.deleteAll();

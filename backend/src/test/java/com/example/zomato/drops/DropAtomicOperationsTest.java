@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import com.example.zomato.repository.CustomerRepository;
 import com.example.zomato.repository.OrderRepository;
+import com.example.zomato.repository.PaymentRepository;
 import com.example.zomato.repository.UserRepository;
 import com.example.zomato.services.OrderService;
 
@@ -48,6 +49,9 @@ public class DropAtomicOperationsTest {
     private RestaurantRepository restaurantRepository;
 
     @Autowired
+    private PaymentRepository paymentRepository;
+
+    @Autowired
     private OrderRepository orderRepository;
 
     @Autowired
@@ -68,8 +72,9 @@ public class DropAtomicOperationsTest {
     void setUp() {
         transactionTemplate = new org.springframework.transaction.support.TransactionTemplate(transactionManager);
         transactionTemplate.execute(status -> {
-            orderRepository.deleteAll();
+            paymentRepository.deleteAll();
             reservationRepository.deleteAll();
+            orderRepository.deleteAll();
             restaurant = restaurantRepository.findAll().stream().findFirst().orElseGet(() -> {
                 Restaurant r = new Restaurant();
                 r.setName("Atomic Ops Test Kitchen");

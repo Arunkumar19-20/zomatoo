@@ -1,16 +1,35 @@
-name: Backend CI
+name: CI
 
 on:
   push:
-    branches: [ main, master, drops-payments ]
+    branches: [ main, master, drops-payments, drops-hardening ]
   pull_request:
-    branches: [ main, master, drops-payments ]
+    branches: [ main, master, drops-payments, drops-hardening ]
 
 jobs:
-  test:
-    name: Spring Boot Test & Verify
+  changes:
+    name: Path Filters
     runs-on: ubuntu-latest
+    outputs:
+      flutter: ${{ steps.filter.outputs.flutter }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
+      - name: Detect Changed Paths
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            flutter:
+              - 'lib/**'
+              - 'test/**'
+              - 'pubspec.yaml'
+              - 'pubspec.lock'
+
+  backend:
+    name: Backend CI (Fast H2 + Postgres Testcontainers)
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -26,7 +45,7 @@ jobs:
         working-directory: backend
         run: chmod +x mvnw
 
-      - name: Run Maven Clean Verify
+      - name: Run Maven Clean Verify (Fast H2 Suite + Testcontainers Postgres Suite)
         working-directory: backend
         env:
           SPRING_PROFILES_ACTIVE: test
@@ -34,4 +53,28 @@ jobs:
           STRIPE_PUBLIC_KEY: pk_test_mock_public_key
           STRIPE_WEBHOOK_SECRET: whsec_test_mock_secret
           JWT_SECRET: test-jwt-secret-key-that-is-at-least-256-bits-long-for-testing-purposes-123456
-        run: ./mvnw clean verify --batch-mode
+        run: ./mvnw clean verify -Ppostgres --batch-mode
+
+  flutter:
+    name: Flutter CI
+    needs: changes
+    if: ${{ needs.changes.outputs.flutter == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Analyze Dart Code
+        run: dart analyze
+
+      - name: Run Flutter Tests
+        run: flutter test
