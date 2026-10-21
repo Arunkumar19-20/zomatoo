@@ -48,25 +48,36 @@ public class PaymentService {
     private final UserRepository userRepo;
     private final ProcessedWebhookEventRepository processedWebhookEventRepo;
     private final DropService dropService;
+    private final com.example.zomato.gateway.StripeGateway stripeGateway;
 
     @Autowired
     public PaymentService(PaymentRepository paymentRepo,
                           OrderRepository orderRepo,
                           UserRepository userRepo,
                           ProcessedWebhookEventRepository processedWebhookEventRepo,
-                          DropService dropService) {
+                          DropService dropService,
+                          com.example.zomato.gateway.StripeGateway stripeGateway) {
         this.paymentRepo = paymentRepo;
         this.orderRepo = orderRepo;
         this.userRepo = userRepo;
         this.processedWebhookEventRepo = processedWebhookEventRepo;
         this.dropService = dropService;
+        this.stripeGateway = stripeGateway != null ? stripeGateway : new com.example.zomato.gateway.FakeStripeGateway();
+    }
+
+    public PaymentService(PaymentRepository paymentRepo,
+                          OrderRepository orderRepo,
+                          UserRepository userRepo,
+                          ProcessedWebhookEventRepository processedWebhookEventRepo,
+                          DropService dropService) {
+        this(paymentRepo, orderRepo, userRepo, processedWebhookEventRepo, dropService, new com.example.zomato.gateway.FakeStripeGateway());
     }
 
     public PaymentService(PaymentRepository paymentRepo,
                           OrderRepository orderRepo,
                           UserRepository userRepo,
                           ProcessedWebhookEventRepository processedWebhookEventRepo) {
-        this(paymentRepo, orderRepo, userRepo, processedWebhookEventRepo, null);
+        this(paymentRepo, orderRepo, userRepo, processedWebhookEventRepo, null, new com.example.zomato.gateway.FakeStripeGateway());
     }
 
     @Transactional
@@ -158,23 +169,22 @@ public class PaymentService {
     }
 
     public PaymentIntent executeStripeCall(PaymentIntentCreateParams params, RequestOptions requestOptions) throws Exception {
-        return PaymentIntent.create(params, requestOptions);
+        return stripeGateway.createPaymentIntent(params, requestOptions);
     }
 
     public PaymentIntent retrieveStripeIntent(String paymentIntentId) throws Exception {
-        return PaymentIntent.retrieve(paymentIntentId);
+        return stripeGateway.retrievePaymentIntent(paymentIntentId);
     }
 
     public Refund executeStripeRefund(RefundCreateParams params, RequestOptions requestOptions) throws Exception {
-        return Refund.create(params, requestOptions);
+        return stripeGateway.createRefund(params, requestOptions);
     }
 
     public PaymentIntent cancelStripeIntent(String paymentIntentId) throws Exception {
-        PaymentIntent intent = retrieveStripeIntent(paymentIntentId);
-        return intent != null ? intent.cancel() : null;
+        return stripeGateway.cancelPaymentIntent(paymentIntentId);
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = ResponseStatusException.class)
     public boolean processRefund(int orderId, String reason) throws Exception {
         Optional<Payment> paymentOpt = paymentRepo.findByOrder_OrderId(orderId);
         if (paymentOpt.isEmpty()) {
@@ -193,22 +203,25 @@ public class PaymentService {
             return false;
         }
 
-        if (secretKey == null || secretKey.isBlank() || secretKey.startsWith("sk_test_mock") || "mock".equalsIgnoreCase(secretKey)) {
-            logger.warn("Stripe secret key not configured or mock key used; skipping remote refund call for order {}", orderId);
-        } else {
-            Stripe.apiKey = secretKey;
-            RefundCreateParams params = RefundCreateParams.builder()
-                    .setPaymentIntent(payment.getTransactionId())
-                    .putMetadata("orderId", String.valueOf(orderId))
-                    .putMetadata("reason", reason != null ? reason : "Order cancelled")
-                    .build();
+        RefundCreateParams params = RefundCreateParams.builder()
+                .setPaymentIntent(payment.getTransactionId())
+                .putMetadata("orderId", String.valueOf(orderId))
+                .putMetadata("reason", reason != null ? reason : "Order cancelled")
+                .build();
 
-            RequestOptions requestOptions = RequestOptions.builder()
-                    .setIdempotencyKey("refund-order-" + orderId)
-                    .build();
+        RequestOptions requestOptions = RequestOptions.builder()
+                .setIdempotencyKey("refund-order-" + orderId)
+                .build();
 
-            logger.info("Issuing Stripe refund for order {} intent {}", orderId, payment.getTransactionId());
+        logger.info("Issuing Stripe refund for order {} intent {}", orderId, payment.getTransactionId());
+        try {
             executeStripeRefund(params, requestOptions);
+        } catch (Exception e) {
+            logger.error("ALERT: Stripe refund failed for order {} intent {}: {}. Leaving order in retryable state.",
+                    orderId, payment.getTransactionId(), e.getMessage(), e);
+            payment.setStatus("REFUND_FAILED");
+            paymentRepo.save(payment);
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Stripe refund failed: " + e.getMessage(), e);
         }
 
         payment.setStatus("REFUNDED");
