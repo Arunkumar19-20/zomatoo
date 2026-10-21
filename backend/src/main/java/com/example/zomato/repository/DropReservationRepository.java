@@ -63,7 +63,7 @@ public interface DropReservationRepository extends JpaRepository<DropReservation
     /** Atomic transition to CONFIRMED for reservations that lapsed (EXPIRED or CANCELLED) and are re-claiming a slot. */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("update DropReservation r set r.status = com.example.zomato.entity.ReservationStatus.CONFIRMED " +
-           "where r.id = :id and r.status in (com.example.zomato.entity.ReservationStatus.EXPIRED, com.example.zomato.entity.ReservationStatus.CANCELLED, com.example.zomato.entity.ReservationStatus.RELEASED)")
+           "where r.id = :id and r.status in (com.example.zomato.entity.ReservationStatus.EXPIRED, com.example.zomato.entity.ReservationStatus.CANCELLED)")
     int transitionFromLapsedToConfirmed(@Param("id") int id);
 
     /** Backward-compatible alias for transitionFromLapsedToConfirmed. */
@@ -78,6 +78,13 @@ public interface DropReservationRepository extends JpaRepository<DropReservation
     int transitionStatus(@Param("id") int id,
                          @Param("from") ReservationStatus from,
                          @Param("to") ReservationStatus to);
+
+    /** Active reservations for caller (HELD and not expired, or CONFIRMED). */
+    @Query("select r from DropReservation r where lower(r.customerEmail) = lower(:email) " +
+           "and (r.status = com.example.zomato.entity.ReservationStatus.CONFIRMED " +
+           "or (r.status = com.example.zomato.entity.ReservationStatus.HELD and r.expiresAt > :now)) " +
+           "order by r.id desc")
+    List<DropReservation> findActiveByCustomerEmail(@Param("email") String email, @Param("now") LocalDateTime now);
 
     /** Slot accounting invariant queries: count active reservations holding slots. */
     long countByDrop_IdAndStatusIn(int dropId, Collection<ReservationStatus> statuses);

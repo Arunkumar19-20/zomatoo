@@ -4,6 +4,5 @@ public enum ReservationStatus {
     HELD,
     CONFIRMED,
     CANCELLED,
-    EXPIRED,
-    RELEASED // Legacy synonym for CANCELLED
+    EXPIRED
 }

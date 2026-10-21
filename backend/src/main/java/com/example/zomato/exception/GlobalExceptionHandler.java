@@ -43,8 +43,33 @@ public class GlobalExceptionHandler {
         body.put("status", ex.getStatusCode().value());
         body.put("error", ex.getReason());
         body.put("message", ex.getReason());
-        if (ex.getReason() != null && ex.getReason().toLowerCase().contains("verify your email")) {
-            body.put("code", "EMAIL_NOT_VERIFIED");
+
+        if (ex instanceof DropApiException dae) {
+            body.put("code", dae.getCode());
+        } else {
+            String reason = ex.getReason() != null ? ex.getReason() : "";
+            String lower = reason.toLowerCase();
+            if (lower.contains("verify your email")) {
+                body.put("code", "EMAIL_NOT_VERIFIED");
+            } else if (lower.contains("drop not found")) {
+                body.put("code", "DROP_NOT_FOUND");
+            } else if (lower.contains("not started") || lower.contains("already ended") || lower.contains("not live")) {
+                body.put("code", "DROP_NOT_LIVE");
+            } else if (lower.contains("sold out")) {
+                body.put("code", "SOLD_OUT");
+            } else if (lower.contains("already have") || lower.contains("already reserved")) {
+                body.put("code", "ALREADY_RESERVED");
+            } else if (lower.contains("reservation not found")) {
+                body.put("code", "RESERVATION_NOT_FOUND");
+            } else if (lower.contains("not your reservation")) {
+                body.put("code", "NOT_YOUR_RESERVATION");
+            } else if (lower.contains("already used") || lower.contains("already confirmed")) {
+                body.put("code", "RESERVATION_ALREADY_USED");
+            } else if (lower.contains("expired") || lower.contains("not held") || lower.contains("cancelled")) {
+                body.put("code", "HOLD_EXPIRED");
+            } else if (ex.getStatusCode().value() == 429 || lower.contains("rate limit")) {
+                body.put("code", "RATE_LIMIT_EXCEEDED");
+            }
         }
         return ResponseEntity.status(ex.getStatusCode()).body(body);
     }

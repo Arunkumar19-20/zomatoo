@@ -55,11 +55,19 @@ public class DropController {
     @PostMapping("/{id}/reserve")
     public ResponseEntity<ReservationResponseDTO> reserve(@PathVariable int id, Authentication auth) {
         if (!rateLimitingService.tryConsumeReserve(auth.getName())) {
-            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Rate limit exceeded. Please try again later.");
+            throw new com.example.zomato.exception.DropApiException(HttpStatus.TOO_MANY_REQUESTS, "RATE_LIMIT_EXCEEDED", "Rate limit exceeded. Please try again later.");
         }
         DropService.ReserveResult result = service.reserveWithResult(id, auth.getName());
         return ResponseEntity.status(result.created() ? HttpStatus.CREATED : HttpStatus.OK)
                 .body(result.reservation());
+    }
+
+    @GetMapping("/reservations/mine")
+    public List<ReservationResponseDTO> getMyActiveReservations(Authentication auth) {
+        if (auth == null || auth.getName() == null) {
+            throw new com.example.zomato.exception.DropApiException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Authentication required");
+        }
+        return service.getMyActiveReservations(auth.getName());
     }
 
     @DeleteMapping("/reservations/{reservationId}")

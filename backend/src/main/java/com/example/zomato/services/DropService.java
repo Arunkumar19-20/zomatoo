@@ -4,6 +4,7 @@ import com.example.zomato.dto.CreateDropRequestDTO;
 import com.example.zomato.dto.DropResponseDTO;
 import com.example.zomato.dto.ReservationResponseDTO;
 import com.example.zomato.entity.*;
+import com.example.zomato.exception.DropApiException;
 import com.example.zomato.repository.DropRepository;
 import com.example.zomato.repository.DropReservationRepository;
 import com.example.zomato.repository.RestaurantRepository;
@@ -64,14 +65,38 @@ public class DropService {
     @Transactional(readOnly = true)
     public List<DropResponseDTO> listUpcomingAndLive() {
         LocalDateTime now = LocalDateTime.now();
-        return drops.findByEndsAtAfterOrderByStartsAtAsc(now).stream()
-                .map(d -> DropResponseDTO.from(d, now)).toList();
+        List<Drop> dropList = drops.findByEndsAtAfterOrderByStartsAtAsc(now);
+        java.util.Map<Integer, String> restaurantNames = new java.util.HashMap<>();
+        if (restaurantRepo != null) {
+            java.util.Set<Integer> rIds = dropList.stream()
+                    .map(Drop::getRestaurantId)
+                    .filter(java.util.Objects::nonNull)
+                    .collect(java.util.stream.Collectors.toSet());
+            if (!rIds.isEmpty()) {
+                restaurantRepo.findAllById(rIds).forEach(r -> restaurantNames.put(r.getId(), r.getName()));
+            }
+        }
+        return dropList.stream()
+                .map(d -> DropResponseDTO.from(d, now, restaurantNames.get(d.getRestaurantId())))
+                .toList();
     }
 
     @Transactional(readOnly = true)
     public DropResponseDTO get(int id) {
-        Drop d = drops.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Drop not found"));
-        return DropResponseDTO.from(d, LocalDateTime.now());
+        Drop d = drops.findById(id).orElseThrow(() -> new DropApiException(HttpStatus.NOT_FOUND, "DROP_NOT_FOUND", "Drop not found"));
+        String restaurantName = null;
+        if (d.getRestaurantId() != null && restaurantRepo != null) {
+            restaurantName = restaurantRepo.findById(d.getRestaurantId()).map(Restaurant::getName).orElse(null);
+        }
+        return DropResponseDTO.from(d, LocalDateTime.now(), restaurantName);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ReservationResponseDTO> getMyActiveReservations(String email) {
+        LocalDateTime now = LocalDateTime.now();
+        return reservations.findActiveByCustomerEmail(email, now).stream()
+                .map(ReservationResponseDTO::from)
+                .toList();
     }
 
     @Transactional
@@ -95,9 +120,16 @@ public class DropService {
     @Transactional
     public ReserveResult doReserveInternal(int dropId, String email) {
         Drop drop = drops.findById(dropId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Drop not found"));
+                .orElseThrow(() -> new DropApiException(HttpStatus.NOT_FOUND, "DROP_NOT_FOUND", "Drop not found"));
 
         LocalDateTime now = LocalDateTime.now();
+
+        if (drop.getStartsAt() != null && now.isBefore(drop.getStartsAt())) {
+            throw new DropApiException(HttpStatus.CONFLICT, "DROP_NOT_LIVE", "Drop has not started yet");
+        }
+        if (drop.getEndsAt() != null && now.isAfter(drop.getEndsAt())) {
+            throw new DropApiException(HttpStatus.CONFLICT, "DROP_NOT_LIVE", "Drop has already ended");
+        }
 
         // 1. Idempotency & Anti-hoarding check:
         List<DropReservation> active = reservations.findByDrop_IdAndCustomerEmailAndStatusIn(
@@ -107,7 +139,7 @@ public class DropService {
             // If already confirmed: strictly 409 ALREADY_RESERVED
             boolean hasConfirmed = active.stream().anyMatch(r -> r.getStatus() == ReservationStatus.CONFIRMED);
             if (hasConfirmed) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "ALREADY_RESERVED");
+                throw new DropApiException(HttpStatus.CONFLICT, "ALREADY_RESERVED", "You already have a confirmed reservation for this drop");
             }
 
             // If held and not expired: return existing HELD reservation (200 OK)
@@ -131,12 +163,15 @@ public class DropService {
         long activeCount = reservations.countByDrop_IdAndCustomerEmailAndStatusIn(
                 dropId, email, List.of(ReservationStatus.HELD, ReservationStatus.CONFIRMED));
         if (activeCount >= maxPerUser) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "ALREADY_RESERVED");
+            throw new DropApiException(HttpStatus.CONFLICT, "ALREADY_RESERVED", "Maximum reservation limit reached for this drop");
         }
 
         // 2. The single atomic check-and-increment. No read-then-write race.
         if (drops.tryReserveSlot(dropId, now) == 0) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Drop is not live or is sold out");
+            if (drop.getReservedSlots() >= drop.getTotalSlots()) {
+                throw new DropApiException(HttpStatus.CONFLICT, "SOLD_OUT", "Drop is sold out");
+            }
+            throw new DropApiException(HttpStatus.CONFLICT, "DROP_NOT_LIVE", "Drop is not live or is sold out");
         }
 
         // 3. Insert reservation atomically
@@ -159,11 +194,11 @@ public class DropService {
             if (!winningActive.isEmpty()) {
                 DropReservation winning = winningActive.get(0);
                 if (winning.getStatus() == ReservationStatus.CONFIRMED) {
-                    throw new ResponseStatusException(HttpStatus.CONFLICT, "ALREADY_RESERVED");
+                    throw new DropApiException(HttpStatus.CONFLICT, "ALREADY_RESERVED", "You already have a confirmed reservation for this drop");
                 }
                 return new ReserveResult(ReservationResponseDTO.from(winning), false);
             }
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "ALREADY_RESERVED");
+            throw new DropApiException(HttpStatus.CONFLICT, "ALREADY_RESERVED", "Reservation conflict");
         }
     }
 
@@ -195,9 +230,22 @@ public class DropService {
     @Transactional
     public void release(int reservationId, String email) {
         DropReservation r = reservations.findById(reservationId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reservation not found"));
+                .orElseThrow(() -> new DropApiException(HttpStatus.NOT_FOUND, "RESERVATION_NOT_FOUND", "Reservation not found"));
         if (!r.getCustomerEmail().equalsIgnoreCase(email)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your reservation");
+            throw new DropApiException(HttpStatus.FORBIDDEN, "NOT_YOUR_RESERVATION", "Not your reservation");
+        }
+        if (r.getStatus() != ReservationStatus.HELD) {
+            if (r.getStatus() == ReservationStatus.CONFIRMED) {
+                throw new DropApiException(HttpStatus.CONFLICT, "RESERVATION_ALREADY_USED", "Reservation is already confirmed");
+            }
+            if (r.getStatus() == ReservationStatus.EXPIRED) {
+                throw new DropApiException(HttpStatus.CONFLICT, "HOLD_EXPIRED", "Reservation hold has expired");
+            }
+            throw new DropApiException(HttpStatus.CONFLICT, "HOLD_EXPIRED", "Reservation is not currently held");
+        }
+        if (r.getExpiresAt().isBefore(LocalDateTime.now())) {
+            transitionAndFreeSlot(r, ReservationStatus.EXPIRED);
+            throw new DropApiException(HttpStatus.CONFLICT, "HOLD_EXPIRED", "Reservation hold has expired");
         }
         transitionAndFreeSlot(r, ReservationStatus.CANCELLED);
     }
@@ -252,15 +300,18 @@ public class DropService {
 
         // Row was not updated. Inspect current state to throw precise error code
         DropReservation r = reservations.findById(reservationId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reservation not found"));
+                .orElseThrow(() -> new DropApiException(HttpStatus.NOT_FOUND, "RESERVATION_NOT_FOUND", "Reservation not found"));
 
         if (!r.getCustomerEmail().equalsIgnoreCase(email)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your reservation");
+            throw new DropApiException(HttpStatus.FORBIDDEN, "NOT_YOUR_RESERVATION", "Not your reservation");
         }
         if (r.getStatus() != ReservationStatus.HELD || r.getExpiresAt().isBefore(now) || r.getOrderId() != null) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Reservation expired or already used");
+            if (r.getStatus() == ReservationStatus.CONFIRMED || r.getOrderId() != null) {
+                throw new DropApiException(HttpStatus.CONFLICT, "RESERVATION_ALREADY_USED", "Reservation already used or confirmed");
+            }
+            throw new DropApiException(HttpStatus.CONFLICT, "HOLD_EXPIRED", "Reservation expired");
         }
-        throw new ResponseStatusException(HttpStatus.CONFLICT, "Could not attach order to reservation");
+        throw new DropApiException(HttpStatus.CONFLICT, "HOLD_EXPIRED", "Could not attach order to reservation");
     }
 
     /**
@@ -285,10 +336,10 @@ public class DropService {
             return true; // idempotent webhook replay
         }
 
-        // 3. If EXPIRED, CANCELLED, or RELEASED, customer paid after hold lapsed.
+        // 3. If EXPIRED or CANCELLED, customer paid after hold lapsed.
         // The reclaim path must FIRST win an atomic conditional status transition (EXPIRED/CANCELLED -> CONFIRMED)
         // and ONLY THEN tryReserveSlot, or compensate on failure, so two simultaneous webhooks can never double-increment.
-        if (r.getStatus() == ReservationStatus.EXPIRED || r.getStatus() == ReservationStatus.CANCELLED || r.getStatus() == ReservationStatus.RELEASED) {
+        if (r.getStatus() == ReservationStatus.EXPIRED || r.getStatus() == ReservationStatus.CANCELLED) {
             int won = reservations.transitionFromLapsedToConfirmed(id);
             if (won == 1) {
                 // This thread won the status transition! Now try to reserve the slot.
@@ -331,7 +382,7 @@ public class DropService {
             if (reservations.transitionFromHeld(id, ReservationStatus.CANCELLED) == 1) {
                 drops.releaseSlot(dropId);
             }
-            // If already CANCELLED, RELEASED, or EXPIRED, do nothing (never double-release).
+            // If already CANCELLED or EXPIRED, do nothing (never double-release).
         });
     }
 
@@ -354,12 +405,17 @@ public class DropService {
         d.setEndsAt(req.endsAt() != null ? req.endsAt() : LocalDateTime.now().plusHours(2));
         d.setTotalSlots(req.totalSlots());
         d.setReservedSlots(0);
-        return DropResponseDTO.from(drops.save(d), LocalDateTime.now());
+        Drop saved = drops.save(d);
+        String restaurantName = null;
+        if (saved.getRestaurantId() != null && restaurantRepo != null) {
+            restaurantName = restaurantRepo.findById(saved.getRestaurantId()).map(Restaurant::getName).orElse(null);
+        }
+        return DropResponseDTO.from(saved, LocalDateTime.now(), restaurantName);
     }
 
     @Transactional
     public DropResponseDTO updateDrop(int id, CreateDropRequestDTO req) {
-        Drop d = drops.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Drop not found"));
+        Drop d = drops.findById(id).orElseThrow(() -> new DropApiException(HttpStatus.NOT_FOUND, "DROP_NOT_FOUND", "Drop not found"));
         if (req.title() != null) d.setTitle(req.title());
         if (req.description() != null) d.setDescription(req.description());
         if (req.imageUrl() != null) d.setImageUrl(req.imageUrl());
@@ -374,13 +430,18 @@ public class DropService {
         if (req.startsAt() != null) d.setStartsAt(req.startsAt());
         if (req.endsAt() != null) d.setEndsAt(req.endsAt());
         if (req.totalSlots() > 0) d.setTotalSlots(req.totalSlots());
-        return DropResponseDTO.from(drops.save(d), LocalDateTime.now());
+        Drop saved = drops.save(d);
+        String restaurantName = null;
+        if (saved.getRestaurantId() != null && restaurantRepo != null) {
+            restaurantName = restaurantRepo.findById(saved.getRestaurantId()).map(Restaurant::getName).orElse(null);
+        }
+        return DropResponseDTO.from(saved, LocalDateTime.now(), restaurantName);
     }
 
     @Transactional
     public void deleteDrop(int id) {
         if (!drops.existsById(id)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Drop not found");
+            throw new DropApiException(HttpStatus.NOT_FOUND, "DROP_NOT_FOUND", "Drop not found");
         }
         drops.deleteById(id);
     }
