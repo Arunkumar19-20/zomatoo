@@ -439,6 +439,25 @@ paths:
           required: false
           schema:
             type: integer
+        - name: reservationId
+          in: query
+          required: false
+          description: Optional Drop Reservation ID for direct 1-item drop checkout
+          schema:
+            type: integer
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                restaurantId:
+                  type: integer
+                  description: Optional restaurant ID for cart checkout
+                reservationId:
+                  type: integer
+                  description: Optional Drop Reservation ID for direct 1-item drop checkout
       responses:
         '200':
           description: Order successfully placed
@@ -451,7 +470,19 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Forbidden (e.g. Email not verified)
+          description: Forbidden (Not your reservation or email not verified)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Reservation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Reservation expired or already used
           content:
             application/json:
               schema:
@@ -584,6 +615,161 @@ paths:
           description: Event processed or skipped if duplicate
         '400':
           description: Invalid payload or signature
+
+  # ================= DROPS =================
+  /drops:
+    get:
+      summary: List upcoming and live drops
+      tags: [Drops]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DropResponseDTO'
+    post:
+      summary: Create a batch drop (Owner or Admin only)
+      tags: [Drops]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDropRequestDTO'
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DropResponseDTO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /drops/{id}:
+    get:
+      summary: Get drop by ID
+      tags: [Drops]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DropResponseDTO'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      summary: Update a batch drop (Owner or Admin only)
+      tags: [Drops]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDropRequestDTO'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DropResponseDTO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      summary: Delete a batch drop (Owner or Admin only)
+      tags: [Drops]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Drop deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /drops/{id}/reserve:
+    post:
+      summary: Reserve a slot in a live drop
+      tags: [Drops]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '201':
+          description: Slot successfully reserved with 10-minute hold
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservationResponseDTO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Conflict (already reserved or drop sold out/not live)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /drops/reservations/{reservationId}:
+    delete:
+      summary: Release/cancel own reservation hold
+      tags: [Drops]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: reservationId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Reservation released successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
 components:
   securitySchemes:
@@ -921,3 +1107,87 @@ components:
         message:
           type: string
           example: An error occurred
+
+    DropResponseDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        imageUrl:
+          type: string
+        price:
+          type: number
+          format: double
+        restaurantId:
+          type: integer
+          nullable: true
+        menuItemId:
+          type: integer
+          nullable: true
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+        totalSlots:
+          type: integer
+        remainingSlots:
+          type: integer
+        status:
+          type: string
+          enum: [SCHEDULED, LIVE, SOLD_OUT, ENDED]
+          example: LIVE
+        serverTime:
+          type: string
+          format: date-time
+
+    ReservationResponseDTO:
+      type: object
+      properties:
+        reservationId:
+          type: integer
+        dropId:
+          type: integer
+        status:
+          type: string
+          enum: [HELD, CONFIRMED, RELEASED, EXPIRED]
+          example: HELD
+        expiresAt:
+          type: string
+          format: date-time
+        orderId:
+          type: integer
+          nullable: true
+
+    CreateDropRequestDTO:
+      type: object
+      required: [title, price, totalSlots, restaurantId]
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        imageUrl:
+          type: string
+        price:
+          type: number
+          format: double
+        restaurantId:
+          type: integer
+        menuItemId:
+          type: integer
+          nullable: true
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+        totalSlots:
+          type: integer
+

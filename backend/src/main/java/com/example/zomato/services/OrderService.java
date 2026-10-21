@@ -152,7 +152,9 @@ public class OrderService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your reservation");
         }
 
-        if (reservation.getStatus() != ReservationStatus.HELD || reservation.getExpiresAt().isBefore(LocalDateTime.now())) {
+        if (reservation.getStatus() != ReservationStatus.HELD
+                || reservation.getExpiresAt().isBefore(LocalDateTime.now())
+                || reservation.getOrderId() != null) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Reservation expired or already used");
         }
 

@@ -21,8 +21,15 @@ public class OrderController {
     @PostMapping("/checkout")
     public OrderResponseDTO checkout(Authentication authentication,
                                      @RequestParam(required = false) Integer restaurantId,
-                                     @RequestParam(required = false) Integer reservationId) {
+                                     @RequestParam(required = false) Integer reservationId,
+                                     @RequestBody(required = false) java.util.Map<String, Object> body) {
         String email = authentication.getName();
+        if (reservationId == null && body != null && body.get("reservationId") != null) {
+            reservationId = Integer.valueOf(body.get("reservationId").toString());
+        }
+        if (restaurantId == null && body != null && body.get("restaurantId") != null) {
+            restaurantId = Integer.valueOf(body.get("restaurantId").toString());
+        }
         if (reservationId != null) {
             return orderService.checkoutDropDto(email, reservationId);
         }

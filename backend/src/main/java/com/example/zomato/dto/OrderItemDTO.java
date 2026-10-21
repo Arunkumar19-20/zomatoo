@@ -16,12 +16,14 @@ public class OrderItemDTO {
     public OrderItemDTO(OrderItem item) {
         if (item != null) {
             this.id = item.getOrderItemId();
+            if (item.getCustomName() != null && !item.getCustomName().isBlank()) {
+                this.name = item.getCustomName();
+            } else if (item.getItem() != null) {
+                this.name = item.getItem().getName();
+            }
             if (item.getItem() != null) {
                 this.itemId = item.getItem().getId();
-                this.name = item.getItem().getName();
                 this.imageUrl = item.getItem().getImageUrl();
-            } else if (item.getCustomName() != null) {
-                this.name = item.getCustomName();
             }
             this.price = item.getPrice();
             this.quantity = item.getQuantity();
