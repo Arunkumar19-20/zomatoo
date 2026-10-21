@@ -6,6 +6,7 @@ import com.example.zomato.dto.ReservationResponseDTO;
 import com.example.zomato.entity.*;
 import com.example.zomato.repository.DropRepository;
 import com.example.zomato.repository.DropReservationRepository;
+import com.example.zomato.repository.RestaurantRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,10 +28,17 @@ public class DropService {
 
     private final DropRepository drops;
     private final DropReservationRepository reservations;
+    private final RestaurantRepository restaurantRepo;
 
-    public DropService(DropRepository drops, DropReservationRepository reservations) {
+    @org.springframework.beans.factory.annotation.Autowired
+    public DropService(DropRepository drops, DropReservationRepository reservations, RestaurantRepository restaurantRepo) {
         this.drops = drops;
         this.reservations = reservations;
+        this.restaurantRepo = restaurantRepo;
+    }
+
+    public DropService(DropRepository drops, DropReservationRepository reservations) {
+        this(drops, reservations, null);
     }
 
     @Transactional(readOnly = true)
@@ -245,6 +253,12 @@ public class DropService {
 
     @Transactional
     public DropResponseDTO createDrop(CreateDropRequestDTO req) {
+        if (req.restaurantId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Restaurant ID is required");
+        }
+        if (restaurantRepo != null && !restaurantRepo.existsById(req.restaurantId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Restaurant not found with id: " + req.restaurantId());
+        }
         Drop d = new Drop();
         d.setTitle(req.title());
         d.setDescription(req.description());
@@ -266,7 +280,12 @@ public class DropService {
         if (req.description() != null) d.setDescription(req.description());
         if (req.imageUrl() != null) d.setImageUrl(req.imageUrl());
         if (req.price() > 0) d.setPrice(req.price());
-        if (req.restaurantId() != null) d.setRestaurantId(req.restaurantId());
+        if (req.restaurantId() != null) {
+            if (restaurantRepo != null && !restaurantRepo.existsById(req.restaurantId())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Restaurant not found with id: " + req.restaurantId());
+            }
+            d.setRestaurantId(req.restaurantId());
+        }
         if (req.menuItemId() != null) d.setMenuItemId(req.menuItemId());
         if (req.startsAt() != null) d.setStartsAt(req.startsAt());
         if (req.endsAt() != null) d.setEndsAt(req.endsAt());

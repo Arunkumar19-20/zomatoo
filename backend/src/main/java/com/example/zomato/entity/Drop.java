@@ -19,6 +19,7 @@ public class Drop {
     private double price;
 
     /** Links to existing catalogue rows (plain ids to avoid coupling to those entities). */
+    @jakarta.validation.constraints.NotNull(message = "restaurantId is required")
     @Column(name = "restaurant_id", nullable = false)
     private Integer restaurantId;
     private Integer menuItemId;
