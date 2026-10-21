@@ -193,8 +193,8 @@ public class PaymentService {
             return false;
         }
 
-        if (secretKey == null || secretKey.isBlank()) {
-            logger.warn("Stripe secret key not configured; skipping remote refund call for order {}", orderId);
+        if (secretKey == null || secretKey.isBlank() || secretKey.startsWith("sk_test_mock") || "mock".equalsIgnoreCase(secretKey)) {
+            logger.warn("Stripe secret key not configured or mock key used; skipping remote refund call for order {}", orderId);
         } else {
             Stripe.apiKey = secretKey;
             RefundCreateParams params = RefundCreateParams.builder()
@@ -217,6 +217,7 @@ public class PaymentService {
         Order order = payment.getOrder();
         if (order != null) {
             order.setPaymentStatus(PaymentStatus.REFUNDED);
+            order.setStatus("CANCELLED");
             orderRepo.save(order);
             if (dropService != null) {
                 dropService.releaseByOrderId(orderId);
@@ -346,8 +347,11 @@ public class PaymentService {
 
         if (dropService != null && !dropService.confirmByOrderId(orderId)) {
             logger.error("Drop slot lost for paid order {}; refunding", orderId);
-            try { processRefund(orderId, "Drop sold out before payment completed"); }
-            catch (Exception e) { logger.error("Refund failed for order {}", orderId, e); }
+            try {
+                processRefund(orderId, "Drop sold out before payment completed");
+            } catch (Exception e) {
+                logger.error("Refund failed for order {}", orderId, e);
+            }
         }
     }
 

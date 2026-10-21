@@ -305,12 +305,16 @@ public class OrderService {
         }
 
         // Automatic refund if a paid order is cancelled by restaurant or admin
-        if ("CANCELLED".equals(targetStatus) && order.getPaymentStatus() == PaymentStatus.PAID) {
-            try {
-                paymentService.processRefund(orderId, "Order cancelled by " + role);
-            } catch (Exception e) {
-                logger.error("Failed to process refund for cancelled order {}: {}", orderId, e.getMessage(), e);
-                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not process refund: " + e.getMessage());
+        if ("CANCELLED".equals(targetStatus)) {
+            if (order.getPaymentStatus() == PaymentStatus.PAID) {
+                try {
+                    paymentService.processRefund(orderId, "Order cancelled by " + role);
+                } catch (Exception e) {
+                    logger.error("Failed to process refund for cancelled order {}: {}", orderId, e.getMessage(), e);
+                    throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not process refund: " + e.getMessage());
+                }
+            } else if (dropService != null) {
+                dropService.releaseByOrderId(orderId);
             }
         }
 
@@ -374,6 +378,9 @@ public class OrderService {
 
             o.setStatus("CANCELLED");
             orderRepo.save(o);
+            if (dropService != null) {
+                dropService.releaseByOrderId(o.getOrderId());
+            }
             cancelledCount++;
         }
         return cancelledCount;
@@ -400,6 +407,8 @@ public class OrderService {
                 logger.error("Failed to process refund for cancelled order {}: {}", orderId, e.getMessage(), e);
                 throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not process refund: " + e.getMessage());
             }
+        } else if (dropService != null) {
+            dropService.releaseByOrderId(orderId);
         }
 
         order.updateStatus("CANCELLED");
