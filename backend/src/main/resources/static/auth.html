@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign-in Complete</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #ff416c, #ff4b2b);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', sans-serif;
+        }
+        .card {
+            background: white;
+            padding: 48px 40px;
+            border-radius: 20px;
+            width: 380px;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+            animation: slideUp 0.4s ease;
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .check { font-size: 52px; margin-bottom: 12px; }
+        h2 { color: #ff4b2b; font-size: 22px; margin-bottom: 8px; }
+        p  { color: #888; font-size: 14px; }
+    </style>
+</head>
+<body>
+<div class="card">
+    <div class="check">✓</div>
+    <h2>Signed in successfully!</h2>
+    <p>Returning to the app…</p>
+</div>
+
+<script>
+(function () {
+    var params = new URLSearchParams(window.location.search);
+    var token  = params.get('token');
+    var email  = params.get('email') || '';
+    var role   = params.get('role')  || 'CUSTOMER';
+
+    if (!token) return;
+
+    var payload = JSON.stringify({ token: token, email: email, role: role });
+
+    if (window.opener && !window.opener.closed) {
+        // ── Popup flow: postMessage back to the Flutter web window ──
+        try { window.opener.postMessage(payload, window.location.origin); } catch (e) {}
+        setTimeout(function () { window.close(); }, 300);
+    } else {
+        // ── Direct-tab flow: write to localStorage, Flutter polls for it ──
+        try { localStorage.setItem('oauth_token', payload); } catch (e) {}
+        // Also write legacy keys so any other code still works
+        try {
+            localStorage.setItem('jwt_token',  token);
+            localStorage.setItem('user_email', email);
+            localStorage.setItem('user_role',  role);
+        } catch (e) {}
+        // Redirect back to the Flutter app after a short delay
+        setTimeout(function () { window.location.replace('/'); }, 800);
+    }
+})();
+</script>
+</body>
+</html>

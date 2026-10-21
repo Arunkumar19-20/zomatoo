@@ -1,0 +1,29 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    name: Spring Boot Test Suite
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Make Maven Wrapper Executable
+        run: chmod +x mvnw
+
+      - name: Run Surefire Test Suite
+        run: ./mvnw clean test --batch-mode
