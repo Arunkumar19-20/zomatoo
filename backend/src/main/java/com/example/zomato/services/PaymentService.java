@@ -49,6 +49,7 @@ public class PaymentService {
     private final ProcessedWebhookEventRepository processedWebhookEventRepo;
     private final DropService dropService;
     private final com.example.zomato.gateway.StripeGateway stripeGateway;
+    private final org.springframework.transaction.support.TransactionTemplate transactionTemplate;
 
     @Autowired
     public PaymentService(PaymentRepository paymentRepo,
@@ -56,13 +57,24 @@ public class PaymentService {
                           UserRepository userRepo,
                           ProcessedWebhookEventRepository processedWebhookEventRepo,
                           DropService dropService,
-                          com.example.zomato.gateway.StripeGateway stripeGateway) {
+                          com.example.zomato.gateway.StripeGateway stripeGateway,
+                          @Autowired(required = false) org.springframework.transaction.PlatformTransactionManager transactionManager) {
         this.paymentRepo = paymentRepo;
         this.orderRepo = orderRepo;
         this.userRepo = userRepo;
         this.processedWebhookEventRepo = processedWebhookEventRepo;
         this.dropService = dropService;
         this.stripeGateway = stripeGateway != null ? stripeGateway : new com.example.zomato.gateway.FakeStripeGateway();
+        this.transactionTemplate = transactionManager != null ? new org.springframework.transaction.support.TransactionTemplate(transactionManager) : null;
+    }
+
+    public PaymentService(PaymentRepository paymentRepo,
+                          OrderRepository orderRepo,
+                          UserRepository userRepo,
+                          ProcessedWebhookEventRepository processedWebhookEventRepo,
+                          DropService dropService,
+                          com.example.zomato.gateway.StripeGateway stripeGateway) {
+        this(paymentRepo, orderRepo, userRepo, processedWebhookEventRepo, dropService, stripeGateway, null);
     }
 
     public PaymentService(PaymentRepository paymentRepo,
@@ -70,14 +82,14 @@ public class PaymentService {
                           UserRepository userRepo,
                           ProcessedWebhookEventRepository processedWebhookEventRepo,
                           DropService dropService) {
-        this(paymentRepo, orderRepo, userRepo, processedWebhookEventRepo, dropService, new com.example.zomato.gateway.FakeStripeGateway());
+        this(paymentRepo, orderRepo, userRepo, processedWebhookEventRepo, dropService, new com.example.zomato.gateway.FakeStripeGateway(), null);
     }
 
     public PaymentService(PaymentRepository paymentRepo,
                           OrderRepository orderRepo,
                           UserRepository userRepo,
                           ProcessedWebhookEventRepository processedWebhookEventRepo) {
-        this(paymentRepo, orderRepo, userRepo, processedWebhookEventRepo, null, new com.example.zomato.gateway.FakeStripeGateway());
+        this(paymentRepo, orderRepo, userRepo, processedWebhookEventRepo, null, new com.example.zomato.gateway.FakeStripeGateway(), null);
     }
 
     @Transactional
@@ -239,7 +251,6 @@ public class PaymentService {
         return true;
     }
 
-    @Transactional
     public void handleStripeWebhook(String payload, String sigHeader) {
         if (webhookSecret == null || webhookSecret.isBlank()) {
             logger.warn("STRIPE_WEBHOOK_SECRET is not configured; skipping webhook signature validation.");
@@ -259,12 +270,47 @@ public class PaymentService {
 
         logger.info("Received Stripe webhook event: {} (id: {})", event.getType(), event.getId());
 
-        // Idempotency check: if event has already been processed, skip replayed event
+        // Fast-path idempotency check: if event has already been processed and committed, skip duplicate
         if (event.getId() != null && processedWebhookEventRepo.existsById(event.getId())) {
             logger.info("Event {} has already been processed. Skipping duplicate/replayed event.", event.getId());
             return;
         }
 
+        // Webhook Idempotency & Transactional Boundary:
+        // The event ID is inserted and flushed BEFORE business processing in the SAME database transaction.
+        // 1. If processing crashes or fails, the transaction rolls back, which rolls back both the
+        //    business state changes AND the event ID record, allowing subsequent Stripe webhook retries to succeed.
+        // 2. If two concurrent deliveries arrive for the same event, the second one will hit the unique constraint
+        //    on processed_webhook_events.event_id and throw DataIntegrityViolationException.
+        //    This exception is caught and treated as "already processed" (HTTP 200), not an error.
+        if (transactionTemplate != null) {
+            try {
+                transactionTemplate.execute(status -> {
+                    processWebhookEventInTransaction(event);
+                    return null;
+                });
+            } catch (org.springframework.dao.DataIntegrityViolationException ex) {
+                logger.info("Event {} was concurrently processed or duplicate key violation caught: {}. Treating as already processed (HTTP 200).",
+                        event.getId(), ex.getMessage());
+            }
+        } else {
+            try {
+                processWebhookEventInTransaction(event);
+            } catch (org.springframework.dao.DataIntegrityViolationException ex) {
+                logger.info("Event {} was concurrently processed (duplicate key): {}. Treating as already processed (HTTP 200).",
+                        event.getId(), ex.getMessage());
+            }
+        }
+    }
+
+    private void processWebhookEventInTransaction(Event event) {
+        if (event.getId() != null) {
+            processedWebhookEventRepo.saveAndFlush(new ProcessedWebhookEvent(event.getId(), event.getType()));
+        }
+        doProcessEventPayload(event);
+    }
+
+    private void doProcessEventPayload(Event event) {
         // Note on deserializeUnsafe(): Calling deserializeUnsafe() is secure and safe here because the payload
         // has already undergone cryptographic signature verification with Stripe's webhook secret above
         // (via Webhook.constructEvent). deserializeUnsafe() allows fallback when the event payload was generated
@@ -294,16 +340,6 @@ public class PaymentService {
             }
             if (stripeObject instanceof PaymentIntent intent) {
                 onPaymentFailed(intent);
-            }
-        }
-
-        // Record processed event ID to prevent replays.
-        // processed_webhook_events.event_id has a unique constraint; handle concurrent duplicate deliveries gracefully.
-        if (event.getId() != null) {
-            try {
-                processedWebhookEventRepo.save(new ProcessedWebhookEvent(event.getId(), event.getType()));
-            } catch (org.springframework.dao.DataIntegrityViolationException ex) {
-                logger.info("Event {} was concurrently recorded by another delivery thread; skipping duplicate.", event.getId());
             }
         }
     }
