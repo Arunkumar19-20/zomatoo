@@ -168,10 +168,11 @@ public class DropService {
 
         // 2. The single atomic check-and-increment. No read-then-write race.
         if (drops.tryReserveSlot(dropId, now) == 0) {
-            if (drop.getReservedSlots() >= drop.getTotalSlots()) {
-                throw new DropApiException(HttpStatus.CONFLICT, "SOLD_OUT", "Drop is sold out");
+            Drop current = drops.findById(dropId).orElse(drop);
+            if (current.getStartsAt() != null && (now.isBefore(current.getStartsAt()) || now.isAfter(current.getEndsAt()))) {
+                throw new DropApiException(HttpStatus.CONFLICT, "DROP_NOT_LIVE", "Drop is not live");
             }
-            throw new DropApiException(HttpStatus.CONFLICT, "DROP_NOT_LIVE", "Drop is not live or is sold out");
+            throw new DropApiException(HttpStatus.CONFLICT, "SOLD_OUT", "Drop is sold out");
         }
 
         // 3. Insert reservation atomically

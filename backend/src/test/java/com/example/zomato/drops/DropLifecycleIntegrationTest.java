@@ -313,9 +313,9 @@ public class DropLifecycleIntegrationTest {
         assertEquals(1, dropRepository.findById(drop.getId()).orElseThrow().getReservedSlots());
     }
 
-    // 7. 50 concurrent checkouts for the last slot -> exactly one wins
+    // 7. 50 concurrent reserve + checkout for the last slot -> exactly one wins order
     @Test
-    void testScenario7_50ConcurrentCheckoutsForLastSlot_exactlyOneWins() throws Exception {
+    void testScenario7_50ConcurrentReserveAndCheckout_exactlyOneWinsOrder() throws Exception {
         // Create drop with totalSlots = 1
         Drop singleSlotDrop = transactionTemplate.execute(status -> {
             Drop d = new Drop();
@@ -367,5 +367,78 @@ public class DropLifecycleIntegrationTest {
         assertEquals(1, successfulCheckouts.get(), "Exactly one user must win the single available slot");
         assertEquals(1, dropRepository.findById(singleSlotDrop.getId()).orElseThrow().getReservedSlots(),
                 "Reserved slots must be exactly 1");
+    }
+
+    // 8. Real test: 50 different users call reserve for the last slot concurrently; exactly one wins; the invariant holds.
+    @Test
+    void testScenario8_50ConcurrentUsersReserveLastSlot_exactlyOneWins_andInvariantHolds() throws Exception {
+        Drop singleSlotDrop = transactionTemplate.execute(status -> {
+            Drop d = new Drop();
+            d.setTitle("Last Slot Reserve Race Drop");
+            d.setPrice(60.0);
+            d.setTotalSlots(1);
+            d.setReservedSlots(0);
+            d.setRestaurantId(restaurant.getId());
+            d.setStartsAt(LocalDateTime.now().minusMinutes(1));
+            d.setEndsAt(LocalDateTime.now().plusHours(1));
+            return dropRepository.save(d);
+        });
+
+        int numUsers = 50;
+        ExecutorService pool = Executors.newFixedThreadPool(16);
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicInteger successfulReservations = new AtomicInteger();
+        AtomicInteger soldOutErrors = new AtomicInteger();
+
+        // Ensure users exist
+        for (int i = 0; i < numUsers; i++) {
+            String email = "reserve_race_user_" + i + "@cravey.com";
+            transactionTemplate.execute(status -> {
+                ensureCustomerUser(email);
+                return null;
+            });
+        }
+
+        java.util.List<Throwable> exceptions = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+        for (int i = 0; i < numUsers; i++) {
+            final String email = "reserve_race_user_" + i + "@cravey.com";
+            pool.submit(() -> {
+                try {
+                    latch.await();
+                    ReservationResponseDTO res = dropService.reserve(singleSlotDrop.getId(), email);
+                    if (res != null && "HELD".equalsIgnoreCase(res.status())) {
+                        successfulReservations.incrementAndGet();
+                    }
+                } catch (com.example.zomato.exception.DropApiException ex) {
+                    if ("SOLD_OUT".equals(ex.getCode())) {
+                        soldOutErrors.incrementAndGet();
+                    } else {
+                        exceptions.add(ex);
+                    }
+                } catch (Throwable t) {
+                    exceptions.add(t);
+                }
+            });
+        }
+
+        latch.countDown();
+        pool.shutdown();
+        assertTrue(pool.awaitTermination(20, TimeUnit.SECONDS));
+
+        // Exactly one user must win the reservation
+        assertEquals(1, successfulReservations.get(), "Exactly one user must win the last slot reservation");
+        assertEquals(49, soldOutErrors.get(), "All other 49 users must receive SOLD_OUT");
+
+        // Assert the invariant: reservedSlots == count(HELD) + count(CONFIRMED)
+        Drop finalDrop = dropRepository.findById(singleSlotDrop.getId()).orElseThrow();
+        long heldCount = reservationRepository.countByDrop_IdAndStatus(finalDrop.getId(), ReservationStatus.HELD);
+        long confirmedCount = reservationRepository.countByDrop_IdAndStatus(finalDrop.getId(), ReservationStatus.CONFIRMED);
+
+        assertEquals(1, finalDrop.getReservedSlots(), "Drop reservedSlots must be exactly 1");
+        assertEquals(1, heldCount, "Exactly 1 HELD reservation exists");
+        assertEquals(0, confirmedCount, "0 CONFIRMED reservations exist");
+        assertEquals(finalDrop.getReservedSlots(), heldCount + confirmedCount,
+                "Slot accounting invariant holds: reservedSlots == count(HELD) + count(CONFIRMED)");
     }
 }
