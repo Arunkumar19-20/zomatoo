@@ -2,13 +2,13 @@ name: Backend CI
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, drops-payments ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main, master, drops-payments ]
 
 jobs:
   test:
-    name: Spring Boot Test Suite
+    name: Spring Boot Test & Verify
     runs-on: ubuntu-latest
 
     steps:
@@ -25,5 +25,11 @@ jobs:
       - name: Make Maven Wrapper Executable
         run: chmod +x mvnw
 
-      - name: Run Surefire Test Suite
-        run: ./mvnw clean test --batch-mode
+      - name: Run Maven Clean Verify
+        env:
+          SPRING_PROFILES_ACTIVE: test
+          STRIPE_SECRET_KEY: sk_test_mock_secret_key
+          STRIPE_PUBLIC_KEY: pk_test_mock_public_key
+          STRIPE_WEBHOOK_SECRET: whsec_test_mock_secret
+          JWT_SECRET: test-jwt-secret-key-that-is-at-least-256-bits-long-for-testing-purposes-123456
+        run: ./mvnw clean verify --batch-mode
