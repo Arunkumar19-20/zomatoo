@@ -137,6 +137,31 @@ public class RateLimitingService {
         return bucket.tryConsume(1);
     }
 
+    private final Map<String, Bucket> reserveBuckets = new ConcurrentHashMap<>();
+
+    private Bucket createReserveBucket() {
+        // 10 drop reservation attempts per minute per user (burst up to 10, refills at 10/min)
+        Refill refill = Refill.greedy(10, Duration.ofMinutes(1));
+        Bandwidth limit = Bandwidth.classic(10, refill);
+        return Bucket.builder().addLimit(limit).build();
+    }
+
+    /**
+     * Rate limits POST /drops/{id}/reserve requests per user to protect against hoarding bots and spam.
+     * Limit: 10 attempts per minute per authenticated user account.
+     * Limits & Trade-offs:
+     * - Uses in-memory Token Bucket (Bucket4j). Suitable for single-node deployments.
+     * - For multi-replica production clusters, rate limiting state should be centralized
+     *   via Redis (bucket4j-redis) or an API Gateway (Cloudflare / Kong / Envoy) to prevent
+     *   rate-limit bypass across instances.
+     */
+    public boolean tryConsumeReserve(String email) {
+        if (email == null || email.isBlank()) return true;
+        String normalized = email.toLowerCase().trim();
+        Bucket bucket = reserveBuckets.computeIfAbsent(normalized, k -> createReserveBucket());
+        return bucket.tryConsume(1);
+    }
+
     // Backwards-compatible legacy method
     public boolean tryConsumeLogin(String key) {
         return tryConsumeLoginByIp(key);
@@ -151,5 +176,6 @@ public class RateLimitingService {
         resendVerificationIpBuckets.clear();
         resendVerificationEmailBuckets.clear();
         refreshBuckets.clear();
+        reserveBuckets.clear();
     }
 }

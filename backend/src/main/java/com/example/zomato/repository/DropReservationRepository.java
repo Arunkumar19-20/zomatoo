@@ -16,6 +16,10 @@ public interface DropReservationRepository extends JpaRepository<DropReservation
 
     boolean existsByDrop_IdAndCustomerEmailAndStatusIn(int dropId, String email, Collection<ReservationStatus> statuses);
 
+    List<DropReservation> findByDrop_IdAndCustomerEmailAndStatusIn(int dropId, String email, Collection<ReservationStatus> statuses);
+
+    long countByDrop_IdAndCustomerEmailAndStatusIn(int dropId, String email, Collection<ReservationStatus> statuses);
+
     @Query("select r.id from DropReservation r where r.status = com.example.zomato.entity.ReservationStatus.HELD and r.expiresAt < :now")
     List<Integer> findStaleHeldIds(@Param("now") LocalDateTime now);
 

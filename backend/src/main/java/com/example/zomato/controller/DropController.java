@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -18,8 +19,12 @@ import java.util.List;
 public class DropController {
 
     private final DropService service;
+    private final com.example.zomato.security.RateLimitingService rateLimitingService;
 
-    public DropController(DropService service) { this.service = service; }
+    public DropController(DropService service, com.example.zomato.security.RateLimitingService rateLimitingService) {
+        this.service = service;
+        this.rateLimitingService = rateLimitingService;
+    }
 
     @GetMapping
     public List<DropResponseDTO> list() { return service.listUpcomingAndLive(); }
@@ -49,7 +54,12 @@ public class DropController {
     /** Authentication.getName() is assumed to be the user's email, as in your order endpoints. */
     @PostMapping("/{id}/reserve")
     public ResponseEntity<ReservationResponseDTO> reserve(@PathVariable int id, Authentication auth) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(service.reserve(id, auth.getName()));
+        if (!rateLimitingService.tryConsumeReserve(auth.getName())) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Rate limit exceeded. Please try again later.");
+        }
+        DropService.ReserveResult result = service.reserveWithResult(id, auth.getName());
+        return ResponseEntity.status(result.created() ? HttpStatus.CREATED : HttpStatus.OK)
+                .body(result.reservation());
     }
 
     @DeleteMapping("/reservations/{reservationId}")

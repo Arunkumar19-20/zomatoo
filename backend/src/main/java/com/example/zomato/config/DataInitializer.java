@@ -23,6 +23,7 @@ public class DataInitializer implements CommandLineRunner {
     private final MenuItemRepository menuItemRepository;
     private final DropRepository dropRepository;
     private final PasswordEncoder passwordEncoder;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     public DataInitializer(UserRepository userRepository,
                            CustomerRepository customerRepository,
@@ -32,7 +33,8 @@ public class DataInitializer implements CommandLineRunner {
                            MenuCategoryRepository menuCategoryRepository,
                            MenuItemRepository menuItemRepository,
                            DropRepository dropRepository,
-                           PasswordEncoder passwordEncoder) {
+                           PasswordEncoder passwordEncoder,
+                           org.springframework.jdbc.core.JdbcTemplate jdbcTemplate) {
         this.userRepository = userRepository;
         this.customerRepository = customerRepository;
         this.restaurantOwnerRepository = restaurantOwnerRepository;
@@ -42,12 +44,21 @@ public class DataInitializer implements CommandLineRunner {
         this.menuItemRepository = menuItemRepository;
         this.dropRepository = dropRepository;
         this.passwordEncoder = passwordEncoder;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     @Override
     @Transactional
     public void run(String... args) {
         logger.info("[DEV] Initializing seed data...");
+
+        // Ensure database partial unique index exists to enforce atomic anti-hoarding per user
+        try {
+            jdbcTemplate.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_drop_res_active_unique ON drop_reservations (drop_id, customer_email) WHERE status IN ('HELD', 'CONFIRMED')");
+            logger.info("[DEV] Enforced partial unique index idx_drop_res_active_unique on drop_reservations.");
+        } catch (Exception e) {
+            logger.warn("[DEV] Could not create partial unique index idx_drop_res_active_unique: {}", e.getMessage());
+        }
 
         // 1. Admin account
         if (userRepository.findByEmail("admin@cravey.com").isEmpty()) {

@@ -26,20 +26,40 @@ public class DropService {
     public static final Duration PAYMENT_WINDOW = Duration.ofMinutes(30);
     public static final Duration HOLD_DURATION = Duration.ofMinutes(10);
 
+    @org.springframework.beans.factory.annotation.Value("${drops.max-per-user:1}")
+    private int maxPerUser = 1;
+
     private final DropRepository drops;
     private final DropReservationRepository reservations;
     private final RestaurantRepository restaurantRepo;
+    private final org.springframework.transaction.support.TransactionTemplate transactionTemplate;
 
     @org.springframework.beans.factory.annotation.Autowired
-    public DropService(DropRepository drops, DropReservationRepository reservations, RestaurantRepository restaurantRepo) {
+    public DropService(DropRepository drops,
+                       DropReservationRepository reservations,
+                       RestaurantRepository restaurantRepo,
+                       org.springframework.transaction.PlatformTransactionManager transactionManager) {
         this.drops = drops;
         this.reservations = reservations;
         this.restaurantRepo = restaurantRepo;
+        this.transactionTemplate = transactionManager != null ? new org.springframework.transaction.support.TransactionTemplate(transactionManager) : null;
+    }
+
+    public DropService(DropRepository drops,
+                       DropReservationRepository reservations,
+                       RestaurantRepository restaurantRepo) {
+        this(drops, reservations, restaurantRepo, (org.springframework.transaction.PlatformTransactionManager) null);
     }
 
     public DropService(DropRepository drops, DropReservationRepository reservations) {
-        this(drops, reservations, null);
+        this(drops, reservations, null, (org.springframework.transaction.PlatformTransactionManager) null);
     }
+
+    public void setMaxPerUser(int maxPerUser) {
+        this.maxPerUser = maxPerUser;
+    }
+
+    public record ReserveResult(ReservationResponseDTO reservation, boolean created) {}
 
     @Transactional(readOnly = true)
     public List<DropResponseDTO> listUpcomingAndLive() {
@@ -56,30 +76,94 @@ public class DropService {
 
     @Transactional
     public ReservationResponseDTO reserve(int dropId, String email) {
+        return reserveWithResult(dropId, email).reservation();
+    }
+
+    private final java.util.concurrent.ConcurrentHashMap<String, Object> userDropLocks = new java.util.concurrent.ConcurrentHashMap<>();
+
+    public ReserveResult reserveWithResult(int dropId, String email) {
+        String lockKey = dropId + ":" + (email != null ? email.toLowerCase().trim() : "");
+        synchronized (userDropLocks.computeIfAbsent(lockKey, k -> new Object())) {
+            if (transactionTemplate != null) {
+                return transactionTemplate.execute(status -> doReserveInternal(dropId, email));
+            } else {
+                return doReserveInternal(dropId, email);
+            }
+        }
+    }
+
+    @Transactional
+    public ReserveResult doReserveInternal(int dropId, String email) {
         Drop drop = drops.findById(dropId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Drop not found"));
 
-        if (reservations.existsByDrop_IdAndCustomerEmailAndStatusIn(
-                dropId, email, List.of(ReservationStatus.HELD, ReservationStatus.CONFIRMED))) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "You already have a slot in this drop");
+        LocalDateTime now = LocalDateTime.now();
+
+        // 1. Idempotency & Anti-hoarding check:
+        List<DropReservation> active = reservations.findByDrop_IdAndCustomerEmailAndStatusIn(
+                dropId, email, List.of(ReservationStatus.HELD, ReservationStatus.CONFIRMED));
+
+        if (!active.isEmpty()) {
+            // If already confirmed: strictly 409 ALREADY_RESERVED
+            boolean hasConfirmed = active.stream().anyMatch(r -> r.getStatus() == ReservationStatus.CONFIRMED);
+            if (hasConfirmed) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "ALREADY_RESERVED");
+            }
+
+            // If held and not expired: return existing HELD reservation (200 OK)
+            java.util.Optional<DropReservation> unexpiredHeld = active.stream()
+                    .filter(r -> r.getStatus() == ReservationStatus.HELD && r.getExpiresAt().isAfter(now))
+                    .findFirst();
+
+            if (unexpiredHeld.isPresent()) {
+                return new ReserveResult(ReservationResponseDTO.from(unexpiredHeld.get()), false);
+            }
+
+            // Stale held reservation: release before creating a new one
+            for (DropReservation r : active) {
+                if (r.getStatus() == ReservationStatus.HELD && !r.getExpiresAt().isAfter(now)) {
+                    transitionAndFreeSlot(r, ReservationStatus.EXPIRED);
+                }
+            }
         }
 
-        LocalDateTime now = LocalDateTime.now();
-        // The single atomic check-and-increment. No read-then-write race.
+        // Per-user limit enforcement
+        long activeCount = reservations.countByDrop_IdAndCustomerEmailAndStatusIn(
+                dropId, email, List.of(ReservationStatus.HELD, ReservationStatus.CONFIRMED));
+        if (activeCount >= maxPerUser) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "ALREADY_RESERVED");
+        }
+
+        // 2. The single atomic check-and-increment. No read-then-write race.
         if (drops.tryReserveSlot(dropId, now) == 0) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Drop is not live or is sold out");
         }
 
+        // 3. Insert reservation atomically
         DropReservation r = new DropReservation();
         r.setDrop(drop);
         r.setCustomerEmail(email);
         r.setStatus(ReservationStatus.HELD);
         r.setCreatedAt(now);
         r.setExpiresAt(now.plus(HOLD_DURATION));
+
         try {
-            return ReservationResponseDTO.from(reservations.saveAndFlush(r));
+            DropReservation saved = reservations.saveAndFlush(r);
+            return new ReserveResult(ReservationResponseDTO.from(saved), true);
         } catch (org.springframework.dao.DataIntegrityViolationException ex) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "You already have a slot in this drop");
+            // Concurrent request for same user won the race; compensate slot and return existing HELD or throw 409
+            drops.releaseSlot(dropId);
+
+            List<DropReservation> winningActive = reservations.findByDrop_IdAndCustomerEmailAndStatusIn(
+                    dropId, email, List.of(ReservationStatus.HELD, ReservationStatus.CONFIRMED));
+            if (!winningActive.isEmpty()) {
+                DropReservation winning = winningActive.get(0);
+                if (winning.getStatus() == ReservationStatus.CONFIRMED) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "ALREADY_RESERVED");
+                }
+                return new ReserveResult(ReservationResponseDTO.from(winning), false);
+            }
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "ALREADY_RESERVED");
         }
     }
 
