@@ -19,6 +19,7 @@ public class Drop {
     private double price;
 
     /** Links to existing catalogue rows (plain ids to avoid coupling to those entities). */
+    @jakarta.validation.constraints.NotNull(message = "restaurantId is required")
     @Column(name = "restaurant_id", nullable = false)
     private Integer restaurantId;
     private Integer menuItemId;
@@ -51,4 +52,12 @@ public class Drop {
     public void setTotalSlots(int totalSlots) { this.totalSlots = totalSlots; }
     public int getReservedSlots() { return reservedSlots; }
     public void setReservedSlots(int reservedSlots) { this.reservedSlots = reservedSlots; }
+
+    /**
+     * Invariant: reservedSlots == count(HELD) + count(CONFIRMED).
+     * Available slots is the remaining capacity.
+     */
+    public int getAvailableSlots() {
+        return Math.max(0, totalSlots - reservedSlots);
+    }
 }

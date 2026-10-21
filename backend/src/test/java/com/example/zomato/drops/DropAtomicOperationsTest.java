@@ -21,11 +21,23 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.example.zomato.repository.CustomerRepository;
+import com.example.zomato.repository.OrderRepository;
+import com.example.zomato.repository.PaymentRepository;
+import com.example.zomato.repository.UserRepository;
+import com.example.zomato.services.OrderService;
+
+import java.util.ArrayList;
+import java.util.List;
+
 @SpringBootTest
 public class DropAtomicOperationsTest {
 
     @Autowired
     private DropService dropService;
+
+    @Autowired
+    private OrderService orderService;
 
     @Autowired
     private DropRepository dropRepository;
@@ -35,6 +47,18 @@ public class DropAtomicOperationsTest {
 
     @Autowired
     private RestaurantRepository restaurantRepository;
+
+    @Autowired
+    private PaymentRepository paymentRepository;
+
+    @Autowired
+    private OrderRepository orderRepository;
+
+    @Autowired
+    private CustomerRepository customerRepository;
+
+    @Autowired
+    private UserRepository userRepository;
 
     @Autowired
     private org.springframework.transaction.PlatformTransactionManager transactionManager;
@@ -48,12 +72,30 @@ public class DropAtomicOperationsTest {
     void setUp() {
         transactionTemplate = new org.springframework.transaction.support.TransactionTemplate(transactionManager);
         transactionTemplate.execute(status -> {
+            paymentRepository.deleteAll();
             reservationRepository.deleteAll();
+            orderRepository.deleteAll();
             restaurant = restaurantRepository.findAll().stream().findFirst().orElseGet(() -> {
                 Restaurant r = new Restaurant();
                 r.setName("Atomic Ops Test Kitchen");
                 return restaurantRepository.save(r);
             });
+
+            for (String email : List.of("alice@cravey.com", "bob@cravey.com", "carol@cravey.com")) {
+                userRepository.findByEmail(email).orElseGet(() -> {
+                    User u = new User("User", email, "CUSTOMER");
+                    u.setPassword("Password123!");
+                    u.setEmailVerified(true);
+                    return userRepository.save(u);
+                });
+                customerRepository.findByEmail(email).orElseGet(() -> {
+                    Customer c = new Customer();
+                    c.setName("Customer");
+                    c.setEmail(email);
+                    c.setAddress("123 Cravey Lane");
+                    return customerRepository.save(c);
+                });
+            }
 
             Drop d = new Drop();
             d.setTitle("Atomic Burger Drop");
@@ -255,7 +297,7 @@ public class DropAtomicOperationsTest {
         dropService.releaseByOrderId(1012);
         assertEquals(0, dropRepository.findById(drop.getId()).orElseThrow().getReservedSlots());
         DropReservation released = reservationRepository.findById(resId).orElseThrow();
-        assertEquals(ReservationStatus.RELEASED, released.getStatus());
+        assertEquals(ReservationStatus.CANCELLED, released.getStatus());
 
         // Second release call (duplicate refund webhook or cancel+refund) changes nothing
         dropService.releaseByOrderId(1012);
@@ -325,5 +367,174 @@ public class DropAtomicOperationsTest {
         assertEquals(threads, successCount.get(), "All confirmation calls should succeed idempotently");
         assertEquals(1, dropRepository.findById(drop.getId()).orElseThrow().getReservedSlots(),
                 "Reserved slots count must remain exactly 1");
+    }
+
+    // --- Task 1: Invariant and Leak Verification Tests ---
+
+    @Test
+    void testCancelUnpaidOrderRestoresAvailableSlots() {
+        // 1. Reserve slot: increments reservedSlots (0 -> 1)
+        ReservationResponseDTO res = dropService.reserve(drop.getId(), "alice@cravey.com");
+        int resId = res.reservationId();
+        assertEquals(1, dropRepository.findById(drop.getId()).orElseThrow().getReservedSlots());
+        assertEquals(1, dropRepository.findById(drop.getId()).orElseThrow().getAvailableSlots());
+
+        // 2. Checkout: creates order in PLACED / PENDING status and attaches to reservation
+        Order order = orderService.checkoutDrop("alice@cravey.com", resId);
+        int orderId = order.getOrderId();
+        assertEquals(1, dropRepository.findById(drop.getId()).orElseThrow().getReservedSlots());
+
+        // 3. Cancel unpaid order
+        boolean cancelled = orderService.cancelOrder(orderId, "alice@cravey.com");
+        assertTrue(cancelled);
+
+        // 4. Assert slot is completely restored (disproving slot leak)
+        Drop updatedDrop = dropRepository.findById(drop.getId()).orElseThrow();
+        assertEquals(0, updatedDrop.getReservedSlots(), "Cancelling unpaid order must restore available slots (reservedSlots -> 0)");
+        assertEquals(2, updatedDrop.getAvailableSlots());
+
+        DropReservation updatedRes = reservationRepository.findById(resId).orElseThrow();
+        assertEquals(ReservationStatus.CANCELLED, updatedRes.getStatus());
+
+        // 5. Assert invariant: reservedSlots == count(HELD) + count(CONFIRMED)
+        long activeCount = reservationRepository.countByDrop_IdAndStatusIn(
+                drop.getId(), List.of(ReservationStatus.HELD, ReservationStatus.CONFIRMED));
+        assertEquals(updatedDrop.getReservedSlots(), activeCount);
+    }
+
+    @Test
+    void testReclaimPathAtomicityUnderConcurrentWebhooks() throws Exception {
+        ReservationResponseDTO res = dropService.reserve(drop.getId(), "alice@cravey.com");
+        int resId = res.reservationId();
+        dropService.attachOrder(resId, 2001, "alice@cravey.com");
+
+        // Simulate hold expiring and slot released by scheduler
+        transactionTemplate.execute(status -> {
+            DropReservation r = reservationRepository.findById(resId).orElseThrow();
+            r.setStatus(ReservationStatus.EXPIRED);
+            reservationRepository.saveAndFlush(r);
+            dropRepository.releaseSlot(drop.getId());
+            return null;
+        });
+
+        assertEquals(0, dropRepository.findById(drop.getId()).orElseThrow().getReservedSlots());
+
+        // Two or more simultaneous webhooks attempt late payment confirmation on the lapsed hold
+        int threads = 10;
+        ExecutorService pool = Executors.newFixedThreadPool(threads);
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicInteger successCount = new AtomicInteger();
+
+        for (int i = 0; i < threads; i++) {
+            pool.submit(() -> {
+                try {
+                    latch.await();
+                    if (dropService.confirmByOrderId(2001)) {
+                        successCount.incrementAndGet();
+                    }
+                } catch (Exception ignored) {
+                }
+            });
+        }
+
+        latch.countDown();
+        pool.shutdown();
+        assertTrue(pool.awaitTermination(10, TimeUnit.SECONDS));
+
+        assertEquals(threads, successCount.get(), "All webhooks return true (reclaim winner + idempotent replays)");
+        Drop updatedDrop = dropRepository.findById(drop.getId()).orElseThrow();
+        assertEquals(1, updatedDrop.getReservedSlots(), "Exactly 1 slot must be reclaimed; no double-increment");
+        assertEquals(1, updatedDrop.getAvailableSlots());
+
+        DropReservation finalRes = reservationRepository.findById(resId).orElseThrow();
+        assertEquals(ReservationStatus.CONFIRMED, finalRes.getStatus());
+
+        // Invariant holds
+        long activeCount = reservationRepository.countByDrop_IdAndStatusIn(
+                drop.getId(), List.of(ReservationStatus.HELD, ReservationStatus.CONFIRMED));
+        assertEquals(updatedDrop.getReservedSlots(), activeCount);
+    }
+
+    @Test
+    void testSlotAccountingInvariantRandomizedLifecycle() {
+        Drop multiDrop = transactionTemplate.execute(status -> {
+            Drop d = new Drop();
+            d.setTitle("Invariant Multi Drop");
+            d.setPrice(15.0);
+            d.setTotalSlots(10);
+            d.setReservedSlots(0);
+            d.setRestaurantId(restaurant.getId());
+            d.setStartsAt(LocalDateTime.now().minusMinutes(5));
+            d.setEndsAt(LocalDateTime.now().plusHours(1));
+            return dropRepository.save(d);
+        });
+        int dropId = multiDrop.getId();
+
+        Runnable assertInvariant = () -> {
+            Drop d = dropRepository.findById(dropId).orElseThrow();
+            long activeReservations = reservationRepository.countByDrop_IdAndStatusIn(
+                    dropId, List.of(ReservationStatus.HELD, ReservationStatus.CONFIRMED));
+            assertEquals(d.getReservedSlots(), activeReservations,
+                    "INVARIANT VIOLATION: reservedSlots (" + d.getReservedSlots() + ") != HELD+CONFIRMED (" + activeReservations + ")");
+            assertTrue(d.getReservedSlots() >= 0, "reservedSlots cannot be negative: " + d.getReservedSlots());
+            assertTrue(d.getReservedSlots() <= d.getTotalSlots(), "reservedSlots cannot exceed totalSlots: " + d.getReservedSlots());
+        };
+
+        // Assert initially
+        assertInvariant.run();
+
+        for (int i = 0; i < 20; i++) {
+            String email = "inv_user_" + i + "@cravey.com";
+            final String userEmail = email;
+            transactionTemplate.execute(status -> {
+                userRepository.findByEmail(userEmail).orElseGet(() -> {
+                    User u = new User("InvUser", userEmail, "CUSTOMER");
+                    u.setPassword("Password123!");
+                    u.setEmailVerified(true);
+                    return userRepository.save(u);
+                });
+                customerRepository.findByEmail(userEmail).orElseGet(() -> {
+                    Customer c = new Customer();
+                    c.setName("Customer");
+                    c.setEmail(userEmail);
+                    c.setAddress("123 Cravey Lane");
+                    return customerRepository.save(c);
+                });
+                return null;
+            });
+
+            try {
+                ReservationResponseDTO r = dropService.reserve(dropId, email);
+                assertInvariant.run();
+
+                if (i % 2 == 0) {
+                    Order o = orderService.checkoutDrop(email, r.reservationId());
+                    assertInvariant.run();
+
+                    if (i % 4 == 0) {
+                        dropService.confirmByOrderId(o.getOrderId());
+                        assertInvariant.run();
+
+                        if (i == 0) {
+                            dropService.releaseByOrderId(o.getOrderId());
+                            assertInvariant.run();
+                        }
+                    } else if (i % 4 == 2) {
+                        orderService.cancelOrder(o.getOrderId(), email);
+                        assertInvariant.run();
+                    }
+                } else if (i % 3 == 0) {
+                    dropService.release(r.reservationId(), email);
+                    assertInvariant.run();
+                }
+            } catch (ResponseStatusException ignored) {
+                // Sold out is expected when cap is hit
+                assertInvariant.run();
+            }
+        }
+
+        // Expire stale holds
+        dropService.expireStaleHolds();
+        assertInvariant.run();
     }
 }

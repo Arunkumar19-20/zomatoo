@@ -2,6 +2,7 @@ package com.example.zomato.services;
 
 import com.example.zomato.dto.OrderResponseDTO;
 import com.example.zomato.entity.*;
+import com.example.zomato.exception.DropApiException;
 import com.example.zomato.repository.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -146,16 +147,19 @@ public class OrderService {
         }
 
         DropReservation reservation = dropReservationRepo.findById(reservationId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reservation not found"));
+                .orElseThrow(() -> new DropApiException(HttpStatus.NOT_FOUND, "RESERVATION_NOT_FOUND", "Reservation not found"));
 
         if (!reservation.getCustomerEmail().equalsIgnoreCase(userEmail)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your reservation");
+            throw new DropApiException(HttpStatus.FORBIDDEN, "NOT_YOUR_RESERVATION", "Not your reservation");
         }
 
         if (reservation.getStatus() != ReservationStatus.HELD
                 || reservation.getExpiresAt().isBefore(LocalDateTime.now())
                 || reservation.getOrderId() != null) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Reservation expired or already used");
+            if (reservation.getStatus() == ReservationStatus.CONFIRMED || reservation.getOrderId() != null) {
+                throw new DropApiException(HttpStatus.CONFLICT, "RESERVATION_ALREADY_USED", "Reservation expired or already used");
+            }
+            throw new DropApiException(HttpStatus.CONFLICT, "HOLD_EXPIRED", "Reservation expired or already used");
         }
 
         Drop drop = reservation.getDrop();

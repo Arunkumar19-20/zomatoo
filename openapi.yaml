@@ -445,19 +445,6 @@ paths:
           description: Optional Drop Reservation ID for direct 1-item drop checkout
           schema:
             type: integer
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                restaurantId:
-                  type: integer
-                  description: Optional restaurant ID for cart checkout
-                reservationId:
-                  type: integer
-                  description: Optional Drop Reservation ID for direct 1-item drop checkout
       responses:
         '200':
           description: Order successfully placed
@@ -470,19 +457,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Forbidden (Not your reservation or email not verified)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: Reservation not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '409':
-          description: Reservation expired or already used
+          description: Forbidden (e.g. Email not verified)
           content:
             application/json:
               schema:
@@ -732,6 +707,12 @@ paths:
           schema:
             type: integer
       responses:
+        '200':
+          description: Existing active hold returned (idempotent reserve)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservationResponseDTO'
         '201':
           description: Slot successfully reserved with 10-minute hold
           content:
@@ -748,6 +729,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /drops/reservations/mine:
+    get:
+      summary: Get caller's active reservations (HELD or CONFIRMED)
+      tags: [Drops]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of active reservations for current user
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ReservationResponseDTO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
   /drops/reservations/{reservationId}:
     delete:
@@ -767,9 +768,23 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
-          $ref: '#/components/responses/Forbidden'
+          description: Forbidden (Not your reservation)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '404':
-          $ref: '#/components/responses/NotFound'
+          description: Reservation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict (Reservation hold has expired or is already confirmed/used)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
 components:
   securitySchemes:
@@ -1098,15 +1113,19 @@ components:
     ErrorResponse:
       type: object
       properties:
+        code:
+          type: string
+          enum: [DROP_NOT_FOUND, DROP_NOT_LIVE, SOLD_OUT, ALREADY_RESERVED, RESERVATION_NOT_FOUND, NOT_YOUR_RESERVATION, HOLD_EXPIRED, RESERVATION_ALREADY_USED, RATE_LIMIT_EXCEEDED, EMAIL_NOT_VERIFIED]
+          example: DROP_NOT_FOUND
+        message:
+          type: string
+          example: Drop not found
         status:
           type: integer
           example: 400
         error:
           type: string
           example: Bad Request
-        message:
-          type: string
-          example: An error occurred
 
     DropResponseDTO:
       type: object
@@ -1124,7 +1143,11 @@ components:
           format: double
         restaurantId:
           type: integer
+          nullable: false
+        restaurantName:
+          type: string
           nullable: true
+          example: Cravey Kitchen
         menuItemId:
           type: integer
           nullable: true
@@ -1155,7 +1178,7 @@ components:
           type: integer
         status:
           type: string
-          enum: [HELD, CONFIRMED, RELEASED, EXPIRED]
+          enum: [HELD, CONFIRMED, CANCELLED, EXPIRED]
           example: HELD
         expiresAt:
           type: string
@@ -1163,6 +1186,9 @@ components:
         orderId:
           type: integer
           nullable: true
+        serverTime:
+          type: string
+          format: date-time
 
     CreateDropRequestDTO:
       type: object
