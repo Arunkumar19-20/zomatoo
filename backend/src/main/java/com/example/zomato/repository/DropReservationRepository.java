@@ -45,15 +45,38 @@ public interface DropReservationRepository extends JpaRepository<DropReservation
                                     @Param("to") ReservationStatus to,
                                     @Param("now") LocalDateTime now);
 
-    /** Atomic CONFIRMED -> RELEASED transition; guarantees slot is released once even under duplicate refund calls. */
+    /** Atomic CONFIRMED -> CANCELLED transition; guarantees slot is released once even under duplicate refund calls. */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query("update DropReservation r set r.status = com.example.zomato.entity.ReservationStatus.RELEASED " +
+    @Query("update DropReservation r set r.status = com.example.zomato.entity.ReservationStatus.CANCELLED " +
            "where r.id = :id and r.status = com.example.zomato.entity.ReservationStatus.CONFIRMED")
-    int transitionFromConfirmedToReleased(@Param("id") int id);
+    int transitionFromConfirmedToCancelled(@Param("id") int id);
 
-    /** Atomic transition to CONFIRMED for reservations that lapsed and are re-claiming a slot. */
+    /** Backward-compatible alias for transitionFromConfirmedToCancelled. */
+    default int transitionFromConfirmedToReleased(int id) {
+        return transitionFromConfirmedToCancelled(id);
+    }
+
+    /** Atomic transition to CONFIRMED for reservations that lapsed (EXPIRED or CANCELLED) and are re-claiming a slot. */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("update DropReservation r set r.status = com.example.zomato.entity.ReservationStatus.CONFIRMED " +
-           "where r.id = :id and r.status in (com.example.zomato.entity.ReservationStatus.EXPIRED, com.example.zomato.entity.ReservationStatus.RELEASED)")
-    int transitionFromExpiredOrReleasedToConfirmed(@Param("id") int id);
+           "where r.id = :id and r.status in (com.example.zomato.entity.ReservationStatus.EXPIRED, com.example.zomato.entity.ReservationStatus.CANCELLED, com.example.zomato.entity.ReservationStatus.RELEASED)")
+    int transitionFromLapsedToConfirmed(@Param("id") int id);
+
+    /** Backward-compatible alias for transitionFromLapsedToConfirmed. */
+    default int transitionFromExpiredOrReleasedToConfirmed(int id) {
+        return transitionFromLapsedToConfirmed(id);
+    }
+
+    /** Atomic conditional status rollback/compensation. */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("update DropReservation r set r.status = :to " +
+           "where r.id = :id and r.status = :from")
+    int transitionStatus(@Param("id") int id,
+                         @Param("from") ReservationStatus from,
+                         @Param("to") ReservationStatus to);
+
+    /** Slot accounting invariant queries: count active reservations holding slots. */
+    long countByDrop_IdAndStatusIn(int dropId, Collection<ReservationStatus> statuses);
+
+    long countByDrop_IdAndStatus(int dropId, ReservationStatus status);
 }

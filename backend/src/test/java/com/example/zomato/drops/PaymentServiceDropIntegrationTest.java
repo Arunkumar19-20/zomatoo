@@ -257,7 +257,7 @@ public class PaymentServiceDropIntegrationTest {
         // Slot freed
         assertEquals(0, dropRepository.findById(drop.getId()).orElseThrow().getReservedSlots());
         DropReservation r = reservationRepository.findById(res.reservationId()).orElseThrow();
-        assertEquals(ReservationStatus.RELEASED, r.getStatus());
+        assertEquals(ReservationStatus.CANCELLED, r.getStatus());
 
         // Second refund call does NOT double-release
         boolean secondRefund = paymentService.processRefund(orderId, "duplicate request");
@@ -281,7 +281,7 @@ public class PaymentServiceDropIntegrationTest {
         // Slot released
         assertEquals(0, dropRepository.findById(drop.getId()).orElseThrow().getReservedSlots());
         DropReservation r = reservationRepository.findById(res.reservationId()).orElseThrow();
-        assertEquals(ReservationStatus.RELEASED, r.getStatus());
+        assertEquals(ReservationStatus.CANCELLED, r.getStatus());
     }
 
     @Test

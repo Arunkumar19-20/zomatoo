@@ -75,6 +75,30 @@ public class DropService {
         }
     }
 
+    /**
+     * =========================================================================
+     * SLOT ACCOUNTING INVARIANT:
+     * For every drop d:
+     *   d.reservedSlots == count(r in d.reservations WHERE r.status IN (HELD, CONFIRMED))
+     *
+     * Invariant Properties:
+     * 1. A HELD reservation occupies exactly 1 slot in d.reservedSlots.
+     * 2. A CONFIRMED reservation occupies exactly 1 slot in d.reservedSlots.
+     * 3. A CANCELLED, RELEASED, or EXPIRED reservation occupies 0 slots in d.reservedSlots.
+     * 4. 0 <= d.reservedSlots <= d.totalSlots.
+     * 5. d.availableSlots == max(0, d.totalSlots - d.reservedSlots).
+     *
+     * Atomic Transitions & Slot Effects:
+     * - [NEW] -> HELD: tryReserveSlot() (+1)
+     * - HELD -> CONFIRMED: atomic status transition only (0 net slot change)
+     * - HELD -> CANCELLED / EXPIRED: releaseSlot() (-1)
+     * - CONFIRMED -> CANCELLED: releaseSlot() (-1)
+     * - EXPIRED/CANCELLED -> CONFIRMED (late-payment reclaim):
+     *     first win transitionFromLapsedToConfirmed(), then tryReserveSlot() (+1).
+     *     On failure, rollback status CONFIRMED -> CANCELLED (0 net slot change).
+     * =========================================================================
+     */
+
     /** User cancels their own hold. */
     @Transactional
     public void release(int reservationId, String email) {
@@ -83,7 +107,7 @@ public class DropService {
         if (!r.getCustomerEmail().equalsIgnoreCase(email)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your reservation");
         }
-        transitionAndFreeSlot(r, ReservationStatus.RELEASED);
+        transitionAndFreeSlot(r, ReservationStatus.CANCELLED);
     }
 
     /** Call from the payment-success path (PaymentService) once the order is paid. */
@@ -102,7 +126,7 @@ public class DropService {
     @Transactional
     public void releaseByPaymentFailure(int reservationId) {
         reservations.findById(reservationId)
-                .ifPresent(r -> transitionAndFreeSlot(r, ReservationStatus.RELEASED));
+                .ifPresent(r -> transitionAndFreeSlot(r, ReservationStatus.CANCELLED));
     }
 
     @Transactional
@@ -169,24 +193,31 @@ public class DropService {
             return true; // idempotent webhook replay
         }
 
-        // 3. If EXPIRED or RELEASED, customer paid after hold lapsed.
-        // Try to re-claim a slot if one is free without overselling.
-        if (r.getStatus() == ReservationStatus.EXPIRED || r.getStatus() == ReservationStatus.RELEASED) {
-            LocalDateTime now = LocalDateTime.now();
-            if (drops.tryReserveSlot(dropId, now) == 1) {
-                // Securely transition reservation state to CONFIRMED
-                int transitioned = reservations.transitionFromExpiredOrReleasedToConfirmed(id);
-                if (transitioned == 1) {
+        // 3. If EXPIRED, CANCELLED, or RELEASED, customer paid after hold lapsed.
+        // The reclaim path must FIRST win an atomic conditional status transition (EXPIRED/CANCELLED -> CONFIRMED)
+        // and ONLY THEN tryReserveSlot, or compensate on failure, so two simultaneous webhooks can never double-increment.
+        if (r.getStatus() == ReservationStatus.EXPIRED || r.getStatus() == ReservationStatus.CANCELLED || r.getStatus() == ReservationStatus.RELEASED) {
+            int won = reservations.transitionFromLapsedToConfirmed(id);
+            if (won == 1) {
+                // This thread won the status transition! Now try to reserve the slot.
+                LocalDateTime now = LocalDateTime.now();
+                if (drops.tryReserveSlot(dropId, now) == 1) {
                     return true;
                 } else {
-                    // Another concurrent webhook already transitioned it to CONFIRMED.
-                    // Release the redundant slot we just reserved to avoid inventory leak.
-                    drops.releaseSlot(dropId);
-                    return true;
+                    // No slot available (sold out or drop ended)!
+                    // Compensate: rollback status from CONFIRMED back to CANCELLED
+                    reservations.transitionStatus(id, ReservationStatus.CONFIRMED, ReservationStatus.CANCELLED);
+                    log.error("Order {} paid but drop {} slot was lost; refund required", orderId, dropId);
+                    return false;
                 }
+            } else {
+                // Another concurrent webhook already won the status transition.
+                DropReservation current = reservations.findById(id).orElse(null);
+                if (current != null && current.getStatus() == ReservationStatus.CONFIRMED) {
+                    return true; // The winning webhook successfully confirmed
+                }
+                return false;
             }
-            log.error("Order {} paid but drop {} slot was lost; refund required", orderId, dropId);
-            return false;
         }
         return false;
     }
@@ -198,17 +229,17 @@ public class DropService {
             int id = r.getId();
             int dropId = r.getDrop().getId();
 
-            // Try atomic CONFIRMED -> RELEASED transition
-            if (reservations.transitionFromConfirmedToReleased(id) == 1) {
+            // Try atomic CONFIRMED -> CANCELLED transition (decrements slot once)
+            if (reservations.transitionFromConfirmedToCancelled(id) == 1) {
                 drops.releaseSlot(dropId);
                 return;
             }
 
-            // Or try atomic HELD -> RELEASED transition
-            if (reservations.transitionFromHeld(id, ReservationStatus.RELEASED) == 1) {
+            // Or try atomic HELD -> CANCELLED transition (decrements slot once)
+            if (reservations.transitionFromHeld(id, ReservationStatus.CANCELLED) == 1) {
                 drops.releaseSlot(dropId);
             }
-            // If already RELEASED or EXPIRED, do nothing (never double-release).
+            // If already CANCELLED, RELEASED, or EXPIRED, do nothing (never double-release).
         });
     }
 

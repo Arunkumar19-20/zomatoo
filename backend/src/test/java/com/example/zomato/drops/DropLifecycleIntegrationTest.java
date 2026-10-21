@@ -242,7 +242,7 @@ public class DropLifecycleIntegrationTest {
         boolean firstRefund = paymentService.processRefund(order.getOrderId(), "Customer cancellation");
         assertTrue(firstRefund);
         assertEquals(0, dropRepository.findById(drop.getId()).orElseThrow().getReservedSlots());
-        assertEquals(ReservationStatus.RELEASED, reservationRepository.findById(res.reservationId()).orElseThrow().getStatus());
+        assertEquals(ReservationStatus.CANCELLED, reservationRepository.findById(res.reservationId()).orElseThrow().getStatus());
 
         // Second refund call changes nothing
         boolean secondRefund = paymentService.processRefund(order.getOrderId(), "Duplicate refund");

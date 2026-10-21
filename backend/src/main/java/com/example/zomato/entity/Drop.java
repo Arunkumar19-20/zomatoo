@@ -51,4 +51,12 @@ public class Drop {
     public void setTotalSlots(int totalSlots) { this.totalSlots = totalSlots; }
     public int getReservedSlots() { return reservedSlots; }
     public void setReservedSlots(int reservedSlots) { this.reservedSlots = reservedSlots; }
+
+    /**
+     * Invariant: reservedSlots == count(HELD) + count(CONFIRMED).
+     * Available slots is the remaining capacity.
+     */
+    public int getAvailableSlots() {
+        return Math.max(0, totalSlots - reservedSlots);
+    }
 }
