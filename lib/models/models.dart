@@ -10,6 +10,7 @@ class Restaurant {
   final String address;
   final int? locationId;
   final int? ownerId;
+  final String? ownerEmail;
   final double? rating;
   final bool? isOpen;
   final String? openingHours;
@@ -21,6 +22,7 @@ class Restaurant {
     required this.address,
     this.locationId,
     this.ownerId,
+    this.ownerEmail,
     this.rating,
     this.isOpen,
     this.openingHours,
@@ -33,6 +35,7 @@ class Restaurant {
         address: j['address'] ?? '',
         locationId: j['locationId'],
         ownerId: j['ownerId'],
+        ownerEmail: j['ownerEmail'],
         rating: (j['rating'] as num?)?.toDouble(),
         // Backend serialises as "open" due to @JsonProperty("open")
         isOpen: j['open'] ?? j['isOpen'],
@@ -57,14 +60,24 @@ class MenuCategory {
   final int? id;
   final String name;
   final int? displayOrder;
+  final int? restaurantId;
 
-  MenuCategory({this.id, required this.name, this.displayOrder});
+  MenuCategory({this.id, required this.name, this.displayOrder, this.restaurantId});
 
-  factory MenuCategory.fromJson(Map<String, dynamic> j) => MenuCategory(
-        id: j['id'],
-        name: j['name'] ?? '',
-        displayOrder: j['displayOrder'],
-      );
+  factory MenuCategory.fromJson(Map<String, dynamic> j) {
+    int? restId;
+    if (j['restaurant'] is Map<String, dynamic>) {
+      restId = (j['restaurant'] as Map<String, dynamic>)['id'] as int?;
+    } else if (j['restaurantId'] is int) {
+      restId = j['restaurantId'] as int;
+    }
+    return MenuCategory(
+      id: j['id'] ?? j['categoryId'],
+      name: j['name'] ?? j['categoryName'] ?? '',
+      displayOrder: j['displayOrder'],
+      restaurantId: restId,
+    );
+  }
 
   Map<String, dynamic> toJson() => {
         if (id != null) 'id': id,
@@ -149,6 +162,8 @@ class MenuItem {
   final bool? isVeg;
   final bool? isAvailable;
   final String? imageUrl;
+  final int? restaurantId;
+  final String? categoryName;
 
   MenuItem({
     this.id,
@@ -158,17 +173,36 @@ class MenuItem {
     this.isVeg,
     this.isAvailable,
     this.imageUrl,
+    this.restaurantId,
+    this.categoryName,
   });
 
-  factory MenuItem.fromJson(Map<String, dynamic> j) => MenuItem(
-        id: j['id'],
-        name: j['name'] ?? '',
-        description: j['description'],
-        price: (j['price'] as num?)?.toDouble() ?? 0,
-        isVeg: j['isVeg'],
-        isAvailable: j['isAvailable'],
-        imageUrl: j['imageUrl'],
-      );
+  factory MenuItem.fromJson(Map<String, dynamic> j) {
+    int? restId;
+    String? catName;
+    if (j['category'] is Map<String, dynamic>) {
+      final cat = j['category'] as Map<String, dynamic>;
+      catName = cat['name'] ?? cat['categoryName'];
+      if (cat['restaurant'] is Map<String, dynamic>) {
+        restId = (cat['restaurant'] as Map<String, dynamic>)['id'] as int?;
+      } else if (cat['restaurantId'] is int) {
+        restId = cat['restaurantId'] as int;
+      }
+    } else if (j['categoryName'] is String) {
+      catName = j['categoryName'] as String;
+    }
+    return MenuItem(
+      id: j['id'] ?? j['itemId'],
+      name: j['name'] ?? j['itemName'] ?? '',
+      description: j['description'],
+      price: (j['price'] as num?)?.toDouble() ?? 0,
+      isVeg: j['isVeg'],
+      isAvailable: j['isAvailable'] ?? j['available'] ?? true,
+      imageUrl: j['imageUrl'] ?? j['image_url'],
+      restaurantId: restId,
+      categoryName: catName,
+    );
+  }
 
   Map<String, dynamic> toJson() => {
         if (id != null) 'id': id,
@@ -474,6 +508,7 @@ class OrderModel {
   final String? restaurantImageUrl;
   final String? customerName;
   final String? customerEmail;
+  final int? customerId;
   final List<dynamic>? items;
 
   OrderModel({
@@ -487,20 +522,22 @@ class OrderModel {
     this.restaurantImageUrl,
     this.customerName,
     this.customerEmail,
+    this.customerId,
     this.items,
   });
 
   factory OrderModel.fromJson(Map<String, dynamic> j) => OrderModel(
-        orderId: j['orderId'],
+        orderId: j['orderId'] ?? j['id'],
         totalAmount: (j['totalAmount'] as num?)?.toDouble() ?? 0,
         status: j['status'],
-        orderDate: j['orderDate']?.toString(),
+        orderDate: j['orderDate']?.toString() ?? j['createdAt']?.toString(),
         restaurantId: j['restaurantId'],
         restaurantName: j['restaurantName'],
         restaurantAddress: j['restaurantAddress'],
         restaurantImageUrl: j['restaurantImageUrl'],
         customerName: j['customerName'],
         customerEmail: j['customerEmail'],
+        customerId: j['customerId'],
         items: j['items'] as List<dynamic>?,
       );
 
@@ -508,14 +545,19 @@ class OrderModel {
         if (orderId != null) 'orderId': orderId,
         'totalAmount': totalAmount,
         'status': status,
+        if (orderDate != null) 'orderDate': orderDate,
         if (restaurantId != null) 'restaurantId': restaurantId,
         if (restaurantName != null) 'restaurantName': restaurantName,
         if (restaurantAddress != null) 'restaurantAddress': restaurantAddress,
         if (restaurantImageUrl != null) 'restaurantImageUrl': restaurantImageUrl,
         if (customerName != null) 'customerName': customerName,
         if (customerEmail != null) 'customerEmail': customerEmail,
+        if (customerId != null) 'customerId': customerId,
+        if (items != null) 'items': items,
       };
 }
+
+
 
 class Customer {
   final int? customerId;
@@ -643,6 +685,7 @@ class DeliveryPartner {
   final String vehicleNumber;
   final bool isAvailable;
   final double rating;
+  final String? email;
 
   DeliveryPartner({
     this.id,
@@ -650,6 +693,7 @@ class DeliveryPartner {
     required this.vehicleNumber,
     this.isAvailable = true,
     this.rating = 0,
+    this.email,
   });
 
   factory DeliveryPartner.fromJson(Map<String, dynamic> j) => DeliveryPartner(
@@ -658,6 +702,7 @@ class DeliveryPartner {
         vehicleNumber: j['vehicleNumber'] ?? '',
         isAvailable: j['isAvailable'] ?? true,
         rating: (j['rating'] as num?)?.toDouble() ?? 0,
+        email: j['email'] ?? j['userEmail'],
       );
 
   Map<String, dynamic> toJson() => {

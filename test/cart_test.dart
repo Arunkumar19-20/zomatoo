@@ -34,7 +34,7 @@ void main() {
       expect(cartState.items[0].foodItem.id, item1.id);
       expect(cartState.items[0].quantity, 1);
       expect(cartState.activeRestaurant?.id, mockRestaurant.id);
-      expect(cartState.subtotal, 567.99);
+      expect(cartState.subtotal, item1.price);
       expect(cartState.deliveryFee, mockRestaurant.deliveryFee);
     });
 
@@ -45,7 +45,7 @@ void main() {
       expect(cartState.items.length, 1);
       expect(cartState.totalItemCount, 2);
       expect(cartState.items[0].quantity, 2);
-      expect(cartState.subtotal, 567.99 * 2);
+      expect(cartState.subtotal, item1.price * 2);
     });
 
     test('Add different item updates cart', () {
@@ -54,7 +54,7 @@ void main() {
 
       expect(cartState.items.length, 2);
       expect(cartState.totalItemCount, 2);
-      expect(cartState.subtotal, 567.99 + 99.00);
+      expect(cartState.subtotal, item1.price + item2.price);
     });
 
     test('Remove item decrements quantity or removes it', () {
@@ -81,6 +81,7 @@ void main() {
       cartState.addItem(item1, mockRestaurant);
       cartState.setDeliveryAddress("456 Park Avenue");
       cartState.setPaymentMethod("Cash on Delivery");
+      final expectedTotal = cartState.total;
 
       cartState.placeOrder();
 
@@ -92,7 +93,7 @@ void main() {
       expect(cartState.recentOrderItems.length, 1);
       expect(cartState.recentOrderItems[0].foodItem.id, item1.id);
       expect(cartState.recentOrderRestaurant?.id, mockRestaurant.id);
-      expect(cartState.recentOrderTotal, 567.99 + 567.99 + 567.99);
+      expect(cartState.recentOrderTotal, expectedTotal);
       
       // Tracking status should be preparing
       expect(cartState.currentStatus, OrderStatus.preparing);

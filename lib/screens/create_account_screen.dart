@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/scale_tap.dart';
-
-import '../services/api_client.dart';
-import '../services/auth_service.dart';
+import '../services/user_service.dart';
+import '../services/session_provider.dart';
 
 class CreateAccountScreen extends StatefulWidget {
   const CreateAccountScreen({super.key});
@@ -40,53 +40,36 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
 
     setState(() => _isLoading = true);
     try {
-      await AuthService.instance.register(
+      final session = context.read<SessionProvider>();
+      final role = session.selectedRole;
+
+      await UserService().register(
         name: _nameController.text.trim(),
         email: _emailController.text.trim(),
         password: _passwordController.text,
+        role: role,
+      );
+
+      await session.loginAsDemo(
+        role,
+        email: _emailController.text.trim(),
+        name: _nameController.text.trim(),
       );
 
       if (mounted) {
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (ctx) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: const Text('Account Created! 🎉'),
-            content: Text(
-              'A verification email has been sent to ${_emailController.text.trim()}.\n\n'
-              'Please verify your email address to unlock checkout and order placement.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.of(ctx).pop();
-                  Navigator.of(context).pushReplacementNamed('/login');
-                },
-                child: const Text('Go to Login'),
-              ),
-            ],
-          ),
-        );
+        setState(() => _isLoading = false);
+        final dest = SessionProvider.routeForRole(role);
+        Navigator.of(context).pushNamedAndRemoveUntil(dest, (r) => false);
       }
     } catch (e) {
       if (mounted) {
-        String msg = 'Failed to create account. Please try again.';
-        if (e is RateLimitException) {
-          msg = 'Too many attempts. Please wait a minute before retrying.';
-        } else if (e is ApiException) {
-          msg = e.message;
-        }
+        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(msg),
-            backgroundColor: Colors.redAccent,
+            content: Text('Registration failed: ${e.toString().replaceAll('ApiException', '').trim()}'),
+            backgroundColor: Colors.red.shade600,
           ),
         );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
       }
     }
   }

@@ -18,6 +18,8 @@ class CartScreen extends StatefulWidget {
 }
 
 class _CartScreenState extends State<CartScreen> {
+  bool _proceeding = false;
+
   @override
   void initState() {
     super.initState();
@@ -26,6 +28,30 @@ class _CartScreenState extends State<CartScreen> {
         context.read<CartState>().syncWithBackend();
       }
     });
+  }
+
+  Future<void> _proceedToCheckout() async {
+    final cart = context.read<CartState>();
+    final session = context.read<SessionProvider>();
+    final customerId = session.customerId;
+    final restaurantId = cart.activeRestaurant?.backendId;
+
+    if (cart.items.isEmpty) return;
+    setState(() => _proceeding = true);
+
+    try {
+      if (customerId != null && restaurantId != null) {
+        await cart.syncCartWithBackend(
+          customerId: customerId,
+          restaurantId: restaurantId,
+        );
+      }
+    } catch (_) {}
+
+    if (mounted) {
+      setState(() => _proceeding = false);
+      Navigator.of(context).pushNamed('/checkout');
+    }
   }
 
   @override
@@ -349,10 +375,8 @@ class _CartScreenState extends State<CartScreen> {
 
               // Proceed to Checkout
               PrimaryButton(
-                text: "Proceed to Checkout",
-                onPressed: () {
-                  Navigator.of(context).pushNamed('/checkout');
-                },
+                text: _proceeding ? "Syncing cart..." : "Proceed to Checkout",
+                onPressed: _proceeding ? null : _proceedToCheckout,
               ),
             ],
           ),

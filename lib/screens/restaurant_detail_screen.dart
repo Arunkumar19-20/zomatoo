@@ -11,6 +11,7 @@ import '../widgets/menu/menu_item_tile.dart';
 import '../widgets/menu/menu_search_bar.dart';
 import '../widgets/menu/menu_filter_sheet.dart';
 import '../repositories/restaurant_repository.dart';
+import '../services/menu_service.dart';
 import '../services/session_provider.dart';
 
 class RestaurantDetailScreen extends StatefulWidget {
@@ -69,10 +70,32 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
                   : (item.isVeg == true ? 'Veg' : 'Non-Veg'),
               rating: 4.5,
               backendItemId: item.itemId,
+              isVeg: item.isVeg,
             ));
           }
         }
       }
+
+      if (items.isEmpty) {
+        final allItems = await MenuService().getAllItems();
+        items.addAll(allItems
+            .where((i) =>
+                (i.restaurantId == null || i.restaurantId == restaurantId) &&
+                i.isAvailable != false)
+            .map((i) => FoodItem(
+                  id: 'api_${i.id}',
+                  name: i.name,
+                  description: i.description ?? '',
+                  price: i.price.toDouble(),
+                  imageUrl: i.imageUrl ??
+                      'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&auto=format&fit=crop&q=60',
+                  category: i.categoryName ?? (i.isVeg == true ? 'Veg' : 'Non-Veg'),
+                  rating: 4.8,
+                  isVeg: i.isVeg,
+                  backendItemId: i.id,
+                )));
+      }
+
       if (mounted) {
         setState(() {
           _apiMenuItems = items;

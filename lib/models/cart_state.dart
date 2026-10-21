@@ -36,6 +36,8 @@ class CartState extends ChangeNotifier {
   int? _backendCartId;
   int? _backendOrderId;
   models.OrderResponseDTO? _lastCreatedOrder;
+  int? _backendRestaurantId;
+  bool _isSyncingCart = false;
 
   // Tracking Simulation
   OrderStatus _currentStatus = OrderStatus.preparing;
@@ -73,7 +75,9 @@ class CartState extends ChangeNotifier {
   int? get backendCartId => _backendCartId;
   int? get backendOrderId => _backendOrderId;
   models.OrderResponseDTO? get lastCreatedOrder => _lastCreatedOrder;
+  int? get backendRestaurantId => _backendRestaurantId;
   bool get isPlacingOrder => _isPlacingOrder;
+  bool get isSyncingCart => _isSyncingCart;
   String? get orderError => _orderError;
   bool get isEmailNotVerified => _isEmailNotVerified;
 
@@ -179,6 +183,48 @@ class CartState extends ChangeNotifier {
     }, onError: (_) {});
   }
 
+  /// Syncs the current local cart with the backend.
+  /// Creates a new cart record and adds every item in it.
+  /// Stores the returned cartId so [placeOrder] can use it.
+  Future<void> syncCartWithBackend({
+    required int customerId,
+    required int restaurantId,
+  }) async {
+    if (items.isEmpty) return;
+    _isSyncingCart = true;
+    _backendRestaurantId = restaurantId;
+    notifyListeners();
+    try {
+      final svc = CartService();
+
+      // 1. Create the cart in the backend
+      final cartModel = await svc.createCart(models.CartModel(
+        customerId: customerId,
+        restaurantId: restaurantId,
+        totalAmount: subtotal,
+      ));
+      _backendCartId = cartModel.id;
+
+      // 2. Add each item to the backend cart
+      for (final ci in items) {
+        // Parse numeric menu-item id from 'api_<id>' or direct int string
+        final rawId = ci.foodItem.id.replaceFirst('api_', '');
+        final itemId = int.tryParse(rawId);
+        if (itemId == null) continue;
+        await svc.addItemViaCart(models.CartItemModel(
+          cartId: _backendCartId!,
+          itemId: itemId,
+          price: ci.foodItem.price,
+          quantity: ci.quantity,
+        ));
+      }
+    } catch (_) {
+      // Non-fatal — will fall back to local simulation in placeOrder
+    } finally {
+      _isSyncingCart = false;
+      notifyListeners();
+    }
+  }
   // Cart Operations
   void addItem(FoodItem item, Restaurant restaurant) {
     final switched = _pureCart.addItem(item, restaurant);
@@ -231,7 +277,7 @@ class CartState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Places the order — calls backend checkout if authenticated,
+  /// Places the order — calls backend checkout if authenticated or IDs available,
   /// otherwise falls back to local simulation.
   Future<bool> placeOrder({int? customerId, int? restaurantId}) async {
     // Reset order tracking simulation state
@@ -251,14 +297,18 @@ class CartState extends ChangeNotifier {
     _recentOrderServiceFee = serviceFee;
     _recentOrderTotal = total;
 
-    // Authenticated checkout against backend
-    if (AuthService.instance.isLoggedIn) {
+    final effectiveRestaurantId = restaurantId ?? activeRestaurant?.backendId ?? _backendRestaurantId;
+
+    // Authenticated checkout against backend (or if IDs provided)
+    if (AuthService.instance.isLoggedIn || (customerId != null && _backendCartId != null && effectiveRestaurantId != null)) {
       _isPlacingOrder = true;
       notifyListeners();
 
       try {
         final order = await _orderRepository.checkout(
-          restaurantId: restaurantId ?? activeRestaurant?.backendId,
+          restaurantId: effectiveRestaurantId,
+          cartId: _backendCartId,
+          customerId: customerId,
         );
         _backendOrderId = order.orderId;
         _lastCreatedOrder = order;
