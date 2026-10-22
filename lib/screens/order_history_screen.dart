@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
-import '../Services/session_provider.dart';
-import '../Services/order_service.dart';
+import '../services/session_provider.dart';
+import '../services/order_service.dart';
 import '../models/models.dart';
 import '../widgets/citrus_header.dart';
 
