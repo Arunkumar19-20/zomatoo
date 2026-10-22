@@ -19,6 +19,8 @@ import 'screens/restaurant_dashboard_screen.dart';
 import 'screens/delivery_dashboard_screen.dart';
 import 'screens/admin_dashboard_screen.dart';
 import 'screens/order_history_screen.dart';
+import 'screens/drop_detail_screen.dart';
+import 'screens/drop_checkout_screen.dart';
 import 'theme/app_theme.dart';
 import 'services/web_oauth_storage_stub.dart'
     if (dart.library.html) 'services/web_oauth_storage_web.dart';
@@ -31,6 +33,9 @@ import 'repositories/cart_repository.dart';
 import 'repositories/order_repository.dart';
 import 'repositories/payment_repository.dart';
 import 'controllers/checkout_controller.dart';
+import 'services/drop_service.dart';
+import 'repositories/drop_repository.dart';
+import 'models/drop_state.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -66,8 +71,15 @@ void main() async {
         Provider<CartRepository>(create: (_) => CartService()),
         Provider<OrderRepository>(create: (_) => OrderService()),
         Provider<PaymentRepository>(create: (_) => PaymentService()),
+        Provider<DropRepository>(create: (_) => DropService()),
         ChangeNotifierProvider.value(value: session),
         ChangeNotifierProvider(create: (_) => CartState()),
+        ChangeNotifierProvider(
+          create: (ctx) => DropState(
+            repository: ctx.read<DropRepository>(),
+            isLoggedIn: () => session.isLoggedIn,
+          ),
+        ),
         ChangeNotifierProvider(
           create: (ctx) => CheckoutController(
             paymentRepository: ctx.read<PaymentRepository>(),
@@ -105,6 +117,8 @@ class MyApp extends StatelessWidget {
         '/delivery-dashboard': (context) => const DeliveryDashboardScreen(),
         '/admin-dashboard': (context) => const AdminDashboardScreen(),
         '/orders-history': (context) => const OrderHistoryScreen(),
+        '/drop': (context) => const DropDetailScreen(),
+        '/drop-checkout': (context) => const DropCheckoutScreen(),
       },
     );
   }

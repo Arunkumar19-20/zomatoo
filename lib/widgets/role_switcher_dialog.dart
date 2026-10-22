@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../Services/session_provider.dart';
+import '../services/session_provider.dart';
 import '../theme/app_theme.dart';
 import 'scale_tap.dart';
 

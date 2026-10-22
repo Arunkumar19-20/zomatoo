@@ -3,6 +3,7 @@ package com.example.zomato.controller;
 import com.example.zomato.dto.CreateDropRequestDTO;
 import com.example.zomato.dto.DropResponseDTO;
 import com.example.zomato.dto.ReservationResponseDTO;
+import com.example.zomato.dto.WaitlistEntryResponseDTO;
 import com.example.zomato.services.DropService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -74,5 +75,27 @@ public class DropController {
     public ResponseEntity<Void> release(@PathVariable int reservationId, Authentication auth) {
         service.release(reservationId, auth.getName());
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/waitlist")
+    public ResponseEntity<WaitlistEntryResponseDTO> joinWaitlist(@PathVariable int id, Authentication auth) {
+        if (!rateLimitingService.tryConsumeReserve(auth.getName())) {
+            throw new com.example.zomato.exception.DropApiException(HttpStatus.TOO_MANY_REQUESTS, "RATE_LIMIT_EXCEEDED", "Rate limit exceeded. Please try again later.");
+        }
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.joinWaitlist(id, auth.getName()));
+    }
+
+    @DeleteMapping("/{id}/waitlist")
+    public ResponseEntity<Void> leaveWaitlist(@PathVariable int id, Authentication auth) {
+        service.leaveWaitlist(id, auth.getName());
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/waitlist/mine")
+    public List<WaitlistEntryResponseDTO> getMyWaitlist(Authentication auth) {
+        if (auth == null || auth.getName() == null) {
+            throw new com.example.zomato.exception.DropApiException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Authentication required");
+        }
+        return service.getMyWaitlist(auth.getName());
     }
 }
