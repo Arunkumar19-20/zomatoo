@@ -1,0 +1,16 @@
+{
+  "id": 4,
+  "title": "E2E Wagyu Drop",
+  "description": "E2E",
+  "imageUrl": null,
+  "price": 24.5,
+  "restaurantId": 1,
+  "restaurantName": "Cravey Kitchen",
+  "menuItemId": null,
+  "startsAt": "2026-10-22T23:13:39",
+  "endsAt": "2026-10-23T01:14:39",
+  "totalSlots": 2,
+  "remainingSlots": 2,
+  "status": "LIVE",
+  "serverTime": "2026-10-22T23:14:40.06964"
+}

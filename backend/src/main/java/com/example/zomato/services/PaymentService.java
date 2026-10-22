@@ -43,6 +43,9 @@ public class PaymentService {
     @Value("${stripe.webhook.secret:}")
     private String webhookSecret;
 
+    @Value("${payments.refund-max-attempts:8}")
+    private int refundMaxAttempts = 8;
+
     private final PaymentRepository paymentRepo;
     private final OrderRepository orderRepo;
     private final UserRepository userRepo;
@@ -121,6 +124,7 @@ public class PaymentService {
                 PaymentIntent existingIntent = retrieveStripeIntent(payment.getTransactionId());
                 if (existingIntent != null && !"canceled".equalsIgnoreCase(existingIntent.getStatus())) {
                     logger.info("Reusing existing pending Stripe PaymentIntent {} for order {}", existingIntent.getId(), orderId);
+                    keepDropHoldAlive(orderId);
                     return new PaymentResponseDTO(
                             existingIntent.getClientSecret(),
                             existingIntent.getId(),
@@ -169,6 +173,7 @@ public class PaymentService {
             order.setPaymentStatus(PaymentStatus.PENDING);
             orderRepo.save(order);
         }
+        keepDropHoldAlive(orderId);
 
         return new PaymentResponseDTO(
                 intent.getClientSecret(),
@@ -231,7 +236,11 @@ public class PaymentService {
         } catch (Exception e) {
             logger.error("ALERT: Stripe refund failed for order {} intent {}: {}. Leaving order in retryable state.",
                     orderId, payment.getTransactionId(), e.getMessage(), e);
+            int attempts = payment.getRefundAttempts() + 1;
             payment.setStatus("REFUND_FAILED");
+            payment.setRefundAttempts(attempts);
+            // exponential back-off: 1, 2, 4, 8 ... capped at 30 minutes
+            payment.setNextRefundAt(java.time.LocalDateTime.now().plusMinutes(Math.min(30L, 1L << Math.min(attempts - 1, 5))));
             paymentRepo.save(payment);
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Stripe refund failed: " + e.getMessage(), e);
         }
@@ -249,6 +258,37 @@ public class PaymentService {
             }
         }
         return true;
+    }
+
+    /** Retries refunds that failed earlier (Stripe outage etc.) so a customer is never left charged for nothing. */
+    public int retryFailedRefunds() {
+        int succeeded = 0;
+        for (Payment p : paymentRepo.findDueRefundRetries(java.time.LocalDateTime.now(), refundMaxAttempts)) {
+            if (p.getOrder() == null) continue;
+            int orderId = p.getOrder().getOrderId();
+            try {
+                if (processRefund(orderId, "Retry after failed refund")) succeeded++;
+            } catch (Exception e) {
+                logger.warn("Refund retry for order {} failed again (attempt {}): {}", orderId, p.getRefundAttempts() + 1, e.getMessage());
+            }
+        }
+        return succeeded;
+    }
+
+    /** Refunds that exhausted automatic retries or are still waiting; surfaced to admins. */
+    public java.util.List<Payment> findFailedRefunds() {
+        return paymentRepo.findByStatus("REFUND_FAILED");
+    }
+
+    /** A payment for this order is in flight: stop the drop hold from lapsing underneath it. */
+    private void keepDropHoldAlive(int orderId) {
+        if (dropService != null) {
+            try {
+                dropService.extendHoldForPayment(orderId);
+            } catch (Exception e) {
+                logger.warn("Could not extend drop hold for order {}: {}", orderId, e.getMessage());
+            }
+        }
     }
 
     public void handleStripeWebhook(String payload, String sigHeader) {
@@ -311,36 +351,42 @@ public class PaymentService {
     }
 
     private void doProcessEventPayload(Event event) {
-        // Note on deserializeUnsafe(): Calling deserializeUnsafe() is secure and safe here because the payload
-        // has already undergone cryptographic signature verification with Stripe's webhook secret above
-        // (via Webhook.constructEvent). deserializeUnsafe() allows fallback when the event payload was generated
-        // with an API version that differs from the SDK version.
-        if ("payment_intent.succeeded".equals(event.getType())) {
-            EventDataObjectDeserializer deserializer = event.getDataObjectDeserializer();
-            StripeObject stripeObject = deserializer.getObject().orElse(null);
-            if (stripeObject == null) {
-                try {
-                    stripeObject = deserializer.deserializeUnsafe();
-                } catch (Exception e) {
-                    logger.warn("Failed to deserialize unsafe Stripe object: {}", e.getMessage());
-                }
+        String type = event.getType();
+        if ("payment_intent.succeeded".equals(type)) {
+            PaymentIntent intent = deserializeIntent(event);
+            if (intent != null) onPaymentSucceeded(intent);
+        } else if ("payment_intent.payment_failed".equals(type)) {
+            PaymentIntent intent = deserializeIntent(event);
+            if (intent != null) onPaymentFailed(intent);
+        } else if ("payment_intent.processing".equals(type) || "payment_intent.requires_action".equals(type)) {
+            PaymentIntent intent = deserializeIntent(event);
+            if (intent != null) onPaymentInFlight(intent);
+        }
+    }
+
+    private PaymentIntent deserializeIntent(Event event) {
+        // Note on deserializeUnsafe(): calling it is safe here because the payload has already undergone
+        // cryptographic signature verification (Webhook.constructEvent). It allows a fallback when the event
+        // was generated with an API version that differs from the SDK version.
+        EventDataObjectDeserializer deserializer = event.getDataObjectDeserializer();
+        StripeObject stripeObject = deserializer.getObject().orElse(null);
+        if (stripeObject == null) {
+            try {
+                stripeObject = deserializer.deserializeUnsafe();
+            } catch (Exception e) {
+                logger.warn("Failed to deserialize unsafe Stripe object: {}", e.getMessage());
             }
-            if (stripeObject instanceof PaymentIntent intent) {
-                onPaymentSucceeded(intent);
-            }
-        } else if ("payment_intent.payment_failed".equals(event.getType())) {
-            EventDataObjectDeserializer deserializer = event.getDataObjectDeserializer();
-            StripeObject stripeObject = deserializer.getObject().orElse(null);
-            if (stripeObject == null) {
-                try {
-                    stripeObject = deserializer.deserializeUnsafe();
-                } catch (Exception e) {
-                    logger.warn("Failed to deserialize unsafe Stripe object: {}", e.getMessage());
-                }
-            }
-            if (stripeObject instanceof PaymentIntent intent) {
-                onPaymentFailed(intent);
-            }
+        }
+        return stripeObject instanceof PaymentIntent intent ? intent : null;
+    }
+
+    /** processing / 3-D Secure: the customer is mid-payment, so the drop hold must not expire under them. */
+    private void onPaymentInFlight(PaymentIntent intent) {
+        if (intent.getMetadata() == null || !intent.getMetadata().containsKey("orderId")) return;
+        try {
+            keepDropHoldAlive(Integer.parseInt(intent.getMetadata().get("orderId")));
+        } catch (NumberFormatException e) {
+            logger.warn("Ignoring in-flight Stripe event with invalid orderId metadata: {}", intent.getMetadata().get("orderId"));
         }
     }
 
@@ -394,12 +440,26 @@ public class PaymentService {
         order.setPaymentStatus(PaymentStatus.PAID);
         orderRepo.save(order);
 
-        if (dropService != null && !dropService.confirmByOrderId(orderId)) {
-            logger.error("Drop slot lost for paid order {}; refunding", orderId);
-            try {
-                processRefund(orderId, "Drop sold out before payment completed");
-            } catch (Exception e) {
-                logger.error("Refund failed for order {}", orderId, e);
+        if (dropService != null) {
+            boolean slotSecured = dropService.confirmByOrderId(orderId);
+            if (slotSecured) {
+                if ("CANCELLED".equalsIgnoreCase(order.getStatus()) && dropService.isDropOrder(orderId)) {
+                    // The hold lapsed and the unpaid order was cancelled, but the customer paid anyway and the slot
+                    // was still free, so the reclaim worked: bring the order back so the kitchen actually sees it.
+                    logger.info("Reviving cancelled drop order {} after a late payment reclaimed its slot", orderId);
+                    order.setStatus("PLACED");
+                    orderRepo.save(order);
+                }
+            } else {
+                logger.error("Drop slot lost for paid order {}; refunding", orderId);
+                // The restaurant must never see (and cook) an order whose slot is gone, even if the refund is retried later.
+                order.setStatus("CANCELLED");
+                orderRepo.save(order);
+                try {
+                    processRefund(orderId, "Drop sold out before payment completed");
+                } catch (Exception e) {
+                    logger.error("Refund failed for order {}", orderId, e);
+                }
             }
         }
     }
