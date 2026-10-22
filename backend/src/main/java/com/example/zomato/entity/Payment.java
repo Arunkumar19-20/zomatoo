@@ -34,13 +34,6 @@ public class Payment {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
-    /** Failed Stripe refund attempts so far (null on rows created before refund retries existed). */
-    @Column(name = "refund_attempts")
-    private Integer refundAttempts = 0;
-
-    @Column(name = "next_refund_at")
-    private LocalDateTime nextRefundAt;
-
     public Payment() {
         this.createdAt = LocalDateTime.now();
     }
@@ -68,10 +61,4 @@ public class Payment {
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
-
-    public int getRefundAttempts() { return refundAttempts == null ? 0 : refundAttempts; }
-    public void setRefundAttempts(int refundAttempts) { this.refundAttempts = refundAttempts; }
-
-    public LocalDateTime getNextRefundAt() { return nextRefundAt; }
-    public void setNextRefundAt(LocalDateTime nextRefundAt) { this.nextRefundAt = nextRefundAt; }
 }

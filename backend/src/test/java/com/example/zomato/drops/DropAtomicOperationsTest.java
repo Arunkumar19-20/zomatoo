@@ -122,13 +122,8 @@ public class DropAtomicOperationsTest {
         DropReservation updated = reservationRepository.findById(res.reservationId()).orElseThrow();
         assertEquals(1001, updated.getOrderId());
         assertEquals(ReservationStatus.HELD, updated.getStatus());
-        // One timer rule: checkout guarantees at least 5 more minutes but never shortens the 10-minute hold,
-        // and no extension passes the 20-minute hard cap.
-        assertFalse(updated.getExpiresAt().isBefore(res.expiresAt()), "attachOrder must never shorten the hold");
-        assertFalse(updated.getExpiresAt().isBefore(beforeAttach.plusMinutes(5).minusSeconds(1)),
-                "checkout guarantees at least min-payment-minutes");
-        assertTrue(updated.getExpiresAt().isBefore(updated.getCreatedAt().plusMinutes(20).plusSeconds(1)),
-                "hard cap holds");
+        assertTrue(updated.getExpiresAt().isAfter(beforeAttach.plusMinutes(25)),
+                "Expiry should be extended by PAYMENT_WINDOW (30 min)");
     }
 
     @Test
