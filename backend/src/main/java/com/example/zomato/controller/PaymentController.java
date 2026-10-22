@@ -4,12 +4,10 @@ import com.example.zomato.dto.PaymentResponseDTO;
 import com.example.zomato.services.PaymentService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -53,17 +51,5 @@ public class PaymentController {
         paymentService.handleStripeWebhook(payload, sigHeader);
         return ResponseEntity.ok("Webhook processed successfully");
     }
-
-    /** Refunds still failing after automatic retries; an admin has to look at these. */
-    @PreAuthorize("hasRole('ADMIN')")
-    @GetMapping("/refunds/failed")
-    public List<Map<String, Object>> failedRefunds() {
-        return paymentService.findFailedRefunds().stream()
-                .map(p -> Map.<String, Object>of(
-                        "orderId", p.getOrder() != null ? p.getOrder().getOrderId() : -1,
-                        "amount", p.getAmount() != null ? p.getAmount() : 0.0,
-                        "attempts", p.getRefundAttempts(),
-                        "nextRetryAt", String.valueOf(p.getNextRefundAt())))
-                .toList();
-    }
 }
+
