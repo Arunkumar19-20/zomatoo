@@ -50,6 +50,16 @@ class PaymentService implements PaymentRepository {
     }
   }
 
+  /// `Stripe.publishableKey` throws (it does not return '') until [initialize] has set a real key.
+  static bool get _stripeConfigured {
+    try {
+      final key = Stripe.publishableKey;
+      return key.isNotEmpty && key != 'pk_test_placeholder';
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// POST /payment/create?orderId=
   @override
   Future<PaymentResponseDTO> createPaymentIntent(int orderId) async {
@@ -70,11 +80,8 @@ class PaymentService implements PaymentRepository {
     required String clientSecret,
     required int orderId,
   }) async {
-    // If Stripe publishable key is not set or mock secret is used, return true for test environments
-    if (Stripe.publishableKey.isEmpty ||
-        Stripe.publishableKey == 'pk_test_placeholder' ||
-        clientSecret.isEmpty ||
-        clientSecret.startsWith('mock_')) {
+    // Without a real publishable key (local demo) or with a mock secret, simulate the payment sheet.
+    if (!_stripeConfigured || clientSecret.isEmpty || clientSecret.startsWith('mock_')) {
       debugPrint('[PaymentService] Simulated payment confirmation for order $orderId');
       return true;
     }

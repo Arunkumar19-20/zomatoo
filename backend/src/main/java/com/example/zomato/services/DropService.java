@@ -25,7 +25,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -445,6 +444,12 @@ public class DropService {
         return false;
     }
 
+    /** True if this order was created from a drop reservation. */
+    @Transactional(readOnly = true)
+    public boolean isDropOrder(int orderId) {
+        return reservations.findByOrderId(orderId).isPresent();
+    }
+
     /** Order cancelled or refunded: free the slot if it was still held or confirmed. */
     @Transactional
     public void releaseByOrderId(int orderId) {
@@ -725,11 +730,22 @@ public class DropService {
         return DropResponseDTO.from(drops.findById(saved.getId()).orElse(saved), LocalDateTime.now(), restaurantName);
     }
 
+    /**
+     * Deletes a drop that nobody is currently holding or has paid for. Settled history (cancelled / expired
+     * reservations, closed waitlist entries) goes with it; live holds and confirmed slots block the delete so a
+     * paid customer is never left with an order for a drop that no longer exists.
+     */
     @Transactional
     public void deleteDrop(int id) {
         if (!drops.existsById(id)) {
             throw new DropApiException(HttpStatus.NOT_FOUND, "DROP_NOT_FOUND", "Drop not found");
         }
+        if (reservations.countByDrop_IdAndStatusIn(id, ACTIVE) > 0) {
+            throw new DropApiException(HttpStatus.CONFLICT, "DROP_HAS_RESERVATIONS",
+                    "Drop has held or confirmed reservations; cancel them first");
+        }
+        waitlist.deleteByDrop_Id(id);
+        reservations.deleteByDrop_Id(id);
         drops.deleteById(id);
     }
 }

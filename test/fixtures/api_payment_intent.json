@@ -1,0 +1,8 @@
+{
+  "clientSecret": "pi_fake_1001_secret_mock",
+  "paymentIntentId": "pi_fake_1001",
+  "amount": 24.5,
+  "currency": "inr",
+  "status": "PENDING",
+  "orderId": 1
+}

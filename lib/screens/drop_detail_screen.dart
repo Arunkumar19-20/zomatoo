@@ -177,7 +177,9 @@ class _DropDetailScreenState extends State<DropDetailScreen> {
         ),
         const SizedBox(height: 6),
         Text(
-          drop.isSoldOut ? 'All ${drop.totalSlots} slots are taken' : '${drop.remainingSlots} of ${drop.totalSlots} slots left',
+          drop.isSoldOut
+              ? (drop.totalSlots == 1 ? 'The only slot is taken' : 'All ${drop.totalSlots} slots are taken')
+              : '${drop.remainingSlots} of ${drop.totalSlots} ${drop.totalSlots == 1 ? 'slot' : 'slots'} left',
           style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
         ),
         const SizedBox(height: 20),
@@ -235,13 +237,11 @@ class _DropDetailScreenState extends State<DropDetailScreen> {
       return PrimaryButton(text: 'Join waitlist', isLoading: _busy, onPressed: () => _join(drop));
     }
     return PrimaryButton(
-      text: 'Reserve a slot (held ${_holdMinutes}m)',
+      text: 'Reserve a slot',
       isLoading: _busy,
       onPressed: () => _reserve(drop),
     );
   }
-
-  static const int _holdMinutes = 10;
 
   Widget _note(IconData icon, Color color, String title, String body) {
     return Container(

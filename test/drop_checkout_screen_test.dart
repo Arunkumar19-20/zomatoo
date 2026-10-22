@@ -204,5 +204,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('This hold has expired'), findsOneWidget);
+    expect(find.text('Back to drop'), findsOneWidget, reason: 'remembers the drop even though the server forgot the hold');
   });
 }

@@ -63,6 +63,7 @@ public class DropHoldPolicyAndWaitlistTest {
     @Autowired private UserRepository userRepository;
     @Autowired private CustomerRepository customerRepository;
     @Autowired private RestaurantRepository restaurantRepository;
+    @Autowired private NotificationRepository notificationRepository;
     @Autowired private PlatformTransactionManager transactionManager;
 
     private TransactionTemplate tx;
@@ -76,6 +77,7 @@ public class DropHoldPolicyAndWaitlistTest {
         tx.execute(status -> {
             processedWebhookEventRepository.deleteAll();
             paymentRepository.deleteAll();
+            notificationRepository.deleteAll();
             waitlistRepository.deleteAll();
             reservationRepository.deleteAll();
             orderRepository.deleteAll();
@@ -285,6 +287,27 @@ public class DropHoldPolicyAndWaitlistTest {
         assertInvariant();
     }
 
+    @Test
+    @DisplayName("Late payment after the order was cancelled for a lapsed hold, slot still free: reclaimed and order revived")
+    void latePaymentReclaimsSlotAndRevivesOrder() throws Exception {
+        ReservationResponseDTO res = dropService.reserve(drop.getId(), ALICE);
+        Order order = orderService.checkoutDrop(ALICE, res.reservationId());
+        int orderId = order.getOrderId();
+        setTimes(res.reservationId(), null, LocalDateTime.now().minusMinutes(1));
+        dropService.expireStaleHolds();
+        assertEquals("CANCELLED", orderRepository.findById(orderId).orElseThrow().getStatus());
+        assertEquals(0, reservedSlots());
+
+        sendWebhook(webhookPayload("evt_late_free_1", "payment_intent.succeeded", orderId, 30.0, "pi_late_free_1"));
+
+        Order after = orderRepository.findById(orderId).orElseThrow();
+        assertEquals(PaymentStatus.PAID, after.getPaymentStatus());
+        assertEquals("PLACED", after.getStatus(), "the kitchen must see an order that was paid for");
+        assertEquals(ReservationStatus.CONFIRMED, reservation(res.reservationId()).getStatus());
+        assertEquals(1, reservedSlots());
+        assertInvariant();
+    }
+
     // ---------------------------------------------------------------- refunds
 
     @Test
@@ -350,6 +373,11 @@ public class DropHoldPolicyAndWaitlistTest {
         assertNotNull(bobMine.get(0).offerExpiresAt());
         assertEquals(1, dropService.getMyWaitlist(CAROL).get(0).position());
         assertInvariant();
+
+        // bob is told his slot is waiting (the notification must really be committed, not just attempted)
+        Integer bobUserId = userRepository.findByEmail(BOB).orElseThrow().getUserId();
+        assertTrue(notificationRepository.findByUser_UserId(bobUserId).stream()
+                .anyMatch(n -> "DROP_SLOT_OFFERED".equals(n.getType()) && n.getMessage().contains("Hold Policy Drop")));
 
         // an outsider cannot take it
         DropApiException sold = assertThrows(DropApiException.class, () -> dropService.reserve(drop.getId(), "outsider@cravey.com"));
@@ -485,6 +513,24 @@ public class DropHoldPolicyAndWaitlistTest {
                 "Renamed", null, null, 0, null, null, null, null, 0));
         assertEquals(1, reservedSlots());
         assertEquals("Renamed", dropRepository.findById(big.getId()).orElseThrow().getTitle());
+    }
+
+    @Test
+    @DisplayName("A drop can be deleted once nobody holds it; live holds and paid slots block the delete")
+    void deleteDropRules() {
+        ReservationResponseDTO res = dropService.reserve(drop.getId(), ALICE);
+        DropApiException blocked = assertThrows(DropApiException.class, () -> dropService.deleteDrop(drop.getId()));
+        assertEquals("DROP_HAS_RESERVATIONS", blocked.getCode());
+
+        dropService.joinWaitlist(drop.getId(), BOB);
+        dropService.release(res.reservationId(), ALICE); // hands the slot to bob
+        dropService.leaveWaitlist(drop.getId(), BOB);     // bob gives it up, nothing is held any more
+        assertEquals(0, reservedSlots());
+
+        dropService.deleteDrop(drop.getId());
+        assertTrue(dropRepository.findById(drop.getId()).isEmpty());
+        assertEquals(0, reservationRepository.count());
+        assertEquals(0, waitlistRepository.count());
     }
 
     // ------------------------------------------------------------------- HTTP
