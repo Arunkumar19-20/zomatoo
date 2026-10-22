@@ -31,7 +31,8 @@ public interface DropReservationRepository extends JpaRepository<DropReservation
 
     /** Atomic attachOrder: conditional UPDATE requiring HELD, not expired, caller email, and orderId IS NULL. */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query("update DropReservation r set r.orderId = :orderId, r.expiresAt = :newExpiresAt " +
+    @Query("update DropReservation r set r.orderId = :orderId, " +
+           "r.expiresAt = case when r.expiresAt > :newExpiresAt then r.expiresAt else :newExpiresAt end " +
            "where r.id = :id and lower(r.customerEmail) = lower(:email) " +
            "and r.status = com.example.zomato.entity.ReservationStatus.HELD " +
            "and r.expiresAt >= :now and r.orderId is null")
@@ -40,6 +41,13 @@ public interface DropReservationRepository extends JpaRepository<DropReservation
                           @Param("email") String email,
                           @Param("now") LocalDateTime now,
                           @Param("newExpiresAt") LocalDateTime newExpiresAt);
+
+    /** Payment-aware extension: pushes expiry forward only while still HELD, never backwards. */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("update DropReservation r set r.expiresAt = :newExpiresAt " +
+           "where r.id = :id and r.status = com.example.zomato.entity.ReservationStatus.HELD " +
+           "and r.expiresAt < :newExpiresAt")
+    int extendExpiry(@Param("id") int id, @Param("newExpiresAt") LocalDateTime newExpiresAt);
 
     /** Atomic expiry: only transitions to EXPIRED if still HELD and expiresAt < now. */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
