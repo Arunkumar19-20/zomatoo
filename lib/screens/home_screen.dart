@@ -14,6 +14,9 @@ import '../widgets/role_switcher_dialog.dart';
 import '../services/restaurant_service.dart';
 import '../services/menu_service.dart';
 import '../services/session_provider.dart';
+import '../models/drop_state.dart';
+import '../widgets/drops/drops_section.dart';
+import '../widgets/drops/hold_banner.dart';
 
 String _restaurantImage(int? id, String name) {
   final n = name.toLowerCase();
@@ -113,16 +116,20 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentPage = 0;
   bool _hasMore = true;
   String? _error;
+  DropState? _dropState;
 
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
     _loadRestaurants(reset: true);
+    // Live drops, the caller's slot hold and waitlist position stay fresh while the home screen is open.
+    _dropState = context.read<DropState>()..retainPolling();
   }
 
   @override
   void dispose() {
+    _dropState?.releasePolling();
     _searchController.dispose();
     _scrollController.dispose();
     _debounceTimer?.cancel();
@@ -565,6 +572,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
+
+                    // Active drop slot hold (countdown) and limited-drop row
+                    const HoldBanner(),
+                    const DropsSection(),
 
                     // Header row
                     Row(

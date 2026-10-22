@@ -34,6 +34,20 @@ class OrderService implements OrderRepository {
     }
   }
 
+  /// POST /orders/checkout?reservationId= - one-item order for a held drop slot
+  @override
+  Future<OrderResponseDTO> checkoutDrop(int reservationId) async {
+    try {
+      final res = await _dio.post(
+        '/orders/checkout',
+        queryParameters: {'reservationId': reservationId},
+      );
+      return OrderResponseDTO.fromJson(res.data);
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
   /// GET /orders - Retrieves user's own order history
   @override
   Future<List<OrderResponseDTO>> getMyOrders() async {

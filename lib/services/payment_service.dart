@@ -121,6 +121,17 @@ class PaymentService implements PaymentRepository {
         final payStatus = (order.paymentStatus ?? '').toUpperCase();
         final orderStatus = (order.status ?? '').toUpperCase();
 
+        // Paid, but the drop sold out meanwhile: the backend cancels the order and refunds. This must be
+        // checked before PAID, otherwise the customer would be told their order went through.
+        if (orderStatus == 'CANCELLED' && (payStatus == 'PAID' || payStatus == 'REFUNDED')) {
+          return PaymentPollResult(
+            status: PaymentPollStatus.failed,
+            order: order,
+            errorMessage:
+                'Sorry, this drop sold out before your payment completed. Your payment will be refunded automatically.',
+          );
+        }
+
         if (payStatus == 'PAID' ||
             payStatus == 'SUCCESS' ||
             orderStatus == 'CONFIRMED' ||
