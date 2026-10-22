@@ -637,7 +637,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     // Restaurants list — shimmer while loading, real/mock data when ready
                     _loading
                         ? SizedBox(
-                            height: 280,
+                            height: 350,
                             child: ListView.builder(
                               scrollDirection: Axis.horizontal,
                               itemCount: 3,
@@ -645,7 +645,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 margin: const EdgeInsets.only(right: 16, bottom: 8),
                                 child: const ShimmerPlaceholder(
                                   width: 260,
-                                  height: 280,
+                                  height: 350,
                                   borderRadius: 20,
                                 ),
                               ),
@@ -694,7 +694,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                               )
                             : SizedBox(
-                                height: 280,
+                                height: 350,
                                 child: ListView.builder(
                                   scrollDirection: Axis.horizontal,
                                   itemCount: _displayRestaurants.length,
