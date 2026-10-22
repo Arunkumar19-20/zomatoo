@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
-import 'scale_tap.dart';
 
 class PrimaryButton extends StatelessWidget {
   final String text;
@@ -22,17 +21,12 @@ class PrimaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ButtonStyle style = ElevatedButton.styleFrom(
-      backgroundColor: useGradient ? Colors.transparent : AppTheme.primaryColor,
-      shadowColor: Colors.transparent,
-      padding: EdgeInsets.zero,
-      shape: const StadiumBorder(),
-    );
+    final bool isEnabled = onPressed != null && !isLoading;
 
-    Widget buttonChild = isLoading
+    final Widget buttonContent = isLoading
         ? const SizedBox(
-            height: 24,
-            width: 24,
+            height: 22,
+            width: 22,
             child: CircularProgressIndicator(
               color: Colors.white,
               strokeWidth: 2.5,
@@ -40,61 +34,30 @@ class PrimaryButton extends StatelessWidget {
           )
         : Text(
             text,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
           );
 
-    Widget innerWidget = SizedBox(
+    return SizedBox(
       width: width ?? double.infinity,
       height: height,
       child: ElevatedButton(
-        style: style,
-        onPressed: isLoading ? null : onPressed,
-        child: Center(child: buttonChild),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: isEnabled ? AppTheme.primaryColor : AppTheme.disabledColor,
+          elevation: isEnabled ? 2 : 0,
+          shadowColor: AppTheme.primaryColor.withOpacity(0.3),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(height / 2),
+          ),
+          padding: EdgeInsets.zero,
+        ),
+        onPressed: isEnabled ? onPressed : null,
+        child: buttonContent,
       ),
-    );
-
-    Widget containerWidget;
-    if (useGradient && onPressed != null && !isLoading) {
-      containerWidget = Container(
-        decoration: BoxDecoration(
-          gradient: AppTheme.primaryGradient,
-          borderRadius: BorderRadius.circular(height / 2),
-          boxShadow: [
-            BoxShadow(
-              color: AppTheme.primaryColor.withOpacity(0.2),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: innerWidget,
-      );
-    } else {
-      containerWidget = Container(
-        decoration: BoxDecoration(
-          color: onPressed == null ? AppTheme.disabledColor : AppTheme.primaryColor,
-          borderRadius: BorderRadius.circular(height / 2),
-          boxShadow: onPressed == null
-              ? null
-              : [
-                  BoxShadow(
-                    color: AppTheme.primaryColor.withOpacity(0.15),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-        ),
-        child: innerWidget,
-      );
-    }
-
-    return ScaleTap(
-      onTap: onPressed == null || isLoading ? null : onPressed,
-      child: containerWidget,
     );
   }
 }
