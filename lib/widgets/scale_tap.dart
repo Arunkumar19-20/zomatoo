@@ -41,6 +41,7 @@ class _ScaleTapState extends State<ScaleTap> with SingleTickerProviderStateMixin
     final bool isInteractive = widget.onTap != null;
 
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTapDown: (_) => isInteractive ? _controller.forward() : null,
       onTapUp: (_) => isInteractive ? _controller.reverse() : null,
       onTapCancel: () => isInteractive ? _controller.reverse() : null,

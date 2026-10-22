@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
-import '../Services/session_provider.dart';
-import '../Services/order_service.dart';
+import '../services/session_provider.dart';
+import '../services/order_service.dart';
 import '../models/models.dart';
 import '../widgets/citrus_header.dart';
 
@@ -28,12 +28,12 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
     setState(() { _loading = true; _error = null; });
     try {
       final session = context.read<SessionProvider>();
-      final customerId = session.customerId;
-      if (customerId == null) {
+      if (!session.isLoggedIn) {
         setState(() { _error = 'Please log in as a customer to view orders.'; _loading = false; });
         return;
       }
-      final orders = await OrderService().getOrdersByCustomer(customerId);
+      // The backend scopes GET /orders to the signed-in customer; there is no /orders/customer/{id} endpoint.
+      final orders = await OrderService().getMyOrderHistory();
       if (mounted) setState(() { _orders = orders; _loading = false; });
     } catch (e) {
       if (mounted) setState(() { _error = 'Could not load orders. Please try again.'; _loading = false; });
