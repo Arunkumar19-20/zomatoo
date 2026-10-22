@@ -28,6 +28,10 @@ public interface DropWaitlistRepository extends JpaRepository<DropWaitlistEntry,
 
     long countByDrop_IdAndStatus(int dropId, WaitlistStatus status);
 
+    @Modifying
+    @Query("delete from DropWaitlistEntry w where w.drop.id = :dropId")
+    void deleteByDrop_Id(@Param("dropId") int dropId);
+
     long countByDrop_IdAndStatusAndIdLessThan(int dropId, WaitlistStatus status, int id);
 
     /** Atomic status transition; returns 1 only for the single caller that wins it. */

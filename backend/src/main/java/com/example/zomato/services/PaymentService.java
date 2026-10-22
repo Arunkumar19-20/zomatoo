@@ -440,15 +440,26 @@ public class PaymentService {
         order.setPaymentStatus(PaymentStatus.PAID);
         orderRepo.save(order);
 
-        if (dropService != null && !dropService.confirmByOrderId(orderId)) {
-            logger.error("Drop slot lost for paid order {}; refunding", orderId);
-            // The restaurant must never see (and cook) an order whose slot is gone, even if the refund is retried later.
-            order.setStatus("CANCELLED");
-            orderRepo.save(order);
-            try {
-                processRefund(orderId, "Drop sold out before payment completed");
-            } catch (Exception e) {
-                logger.error("Refund failed for order {}", orderId, e);
+        if (dropService != null) {
+            boolean slotSecured = dropService.confirmByOrderId(orderId);
+            if (slotSecured) {
+                if ("CANCELLED".equalsIgnoreCase(order.getStatus()) && dropService.isDropOrder(orderId)) {
+                    // The hold lapsed and the unpaid order was cancelled, but the customer paid anyway and the slot
+                    // was still free, so the reclaim worked: bring the order back so the kitchen actually sees it.
+                    logger.info("Reviving cancelled drop order {} after a late payment reclaimed its slot", orderId);
+                    order.setStatus("PLACED");
+                    orderRepo.save(order);
+                }
+            } else {
+                logger.error("Drop slot lost for paid order {}; refunding", orderId);
+                // The restaurant must never see (and cook) an order whose slot is gone, even if the refund is retried later.
+                order.setStatus("CANCELLED");
+                orderRepo.save(order);
+                try {
+                    processRefund(orderId, "Drop sold out before payment completed");
+                } catch (Exception e) {
+                    logger.error("Refund failed for order {}", orderId, e);
+                }
             }
         }
     }

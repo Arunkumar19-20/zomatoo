@@ -31,6 +31,7 @@ class _DropCheckoutScreenState extends State<DropCheckoutScreen> {
   int? _reservationId;
   int? _orderId; // remembered so a retried payment reuses the order instead of creating a second one
   bool _paying = false;
+  DropDto? _lastDrop; // so the expired state can still link back to the drop once the server forgot the hold
 
   OrderRepository get _orders => widget.orderRepository ?? context.read<OrderRepository>();
   CheckoutController get _checkout => widget.controller ?? context.read<CheckoutController>();
@@ -107,6 +108,7 @@ class _DropCheckoutScreenState extends State<DropCheckoutScreen> {
     final hold = _reservationId == null ? null : state.reservationById(_reservationId!);
     final live = hold != null && state.isLiveHold(hold);
     final drop = hold == null ? null : state.dropById(hold.dropId);
+    if (drop != null) _lastDrop = drop;
 
     return Scaffold(
       backgroundColor: AppTheme.scaffoldBackground,
@@ -119,7 +121,7 @@ class _DropCheckoutScreenState extends State<DropCheckoutScreen> {
       body: !state.loadedOnce
           ? const Center(child: CircularProgressIndicator())
           : !live || drop == null
-              ? _expired(context, hold, drop)
+              ? _expired(context, hold, drop ?? _lastDrop)
               : _checkoutBody(context, hold, drop),
     );
   }

@@ -94,6 +94,10 @@ public interface DropReservationRepository extends JpaRepository<DropReservation
            "order by r.id desc")
     List<DropReservation> findActiveByCustomerEmail(@Param("email") String email, @Param("now") LocalDateTime now);
 
+    @Modifying
+    @Query("delete from DropReservation r where r.drop.id = :dropId")
+    void deleteByDrop_Id(@Param("dropId") int dropId);
+
     /** Slot accounting invariant queries: count active reservations holding slots. */
     long countByDrop_IdAndStatusIn(int dropId, Collection<ReservationStatus> statuses);
 

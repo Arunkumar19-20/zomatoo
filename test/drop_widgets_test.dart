@@ -206,7 +206,7 @@ void main() {
       await open(tester);
 
       expect(find.text('4 of 10 slots left'), findsOneWidget);
-      await tester.tap(find.text('Reserve a slot (held 10m)'));
+      await tester.tap(find.text('Reserve a slot'));
       await tester.pumpAndSettle();
 
       expect(repo.reserveCalls, 1);
@@ -219,7 +219,7 @@ void main() {
       repo.drops = [makeDrop()];
       await open(tester);
 
-      await tester.tap(find.text('Reserve a slot (held 10m)'));
+      await tester.tap(find.text('Reserve a slot'));
       await tester.pumpAndSettle();
 
       expect(repo.reserveCalls, 0);
@@ -260,7 +260,7 @@ void main() {
       repo.reservations = [makeHold(id: 51, expiresAt: serverNow.add(const Duration(minutes: 7)))];
       await open(tester);
 
-      expect(find.text('Reserve a slot (held 10m)'), findsNothing);
+      expect(find.text('Reserve a slot'), findsNothing);
       await tester.tap(find.text('Checkout now'));
       await tester.pumpAndSettle();
       expect(pushed.last.arguments, 51);
@@ -270,7 +270,7 @@ void main() {
       repo.drops = [makeDrop(id: 1, status: 'SCHEDULED'), makeDrop(id: 2, status: 'ENDED', remaining: 0)];
       await open(tester, dropId: 1);
       expect(find.text('Not live yet'), findsOneWidget);
-      expect(find.text('Reserve a slot (held 10m)'), findsNothing);
+      expect(find.text('Reserve a slot'), findsNothing);
     });
   });
 }

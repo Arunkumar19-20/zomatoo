@@ -1,0 +1,8 @@
+{
+  "reservationId": 1,
+  "dropId": 4,
+  "status": "HELD",
+  "expiresAt": "2026-10-22T23:24:45.85995",
+  "orderId": null,
+  "serverTime": "2026-10-22T23:14:45.890916"
+}

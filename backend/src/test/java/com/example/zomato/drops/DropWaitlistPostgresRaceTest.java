@@ -156,6 +156,61 @@ public class DropWaitlistPostgresRaceTest {
     }
 
     @Test
+    void fiveHundredCustomersFightForTwentySlotsWithZeroOversell() throws Exception {
+        int slots = 20;
+        int customers = 500;
+        Drop drop = newDrop(slots);
+
+        long started = System.nanoTime();
+        List<String> outcomes = runConcurrently(customers, i -> () -> {
+            try {
+                dropService.reserve(drop.getId(), "load" + i + "@cravey.com");
+                return "HELD";
+            } catch (DropApiException e) {
+                return e.getCode();
+            }
+        });
+        long millis = (System.nanoTime() - started) / 1_000_000;
+
+        Map<String, Long> tally = outcomes.stream().collect(Collectors.groupingBy(o -> o, TreeMap::new, Collectors.counting()));
+        System.out.printf("LOAD-REPORT customers=%d slots=%d wallMillis=%d outcomes=%s%n", customers, slots, millis, tally);
+
+        assertEquals(slots, tally.getOrDefault("HELD", 0L), "exactly `slots` customers win");
+        assertEquals(customers - slots, tally.getOrDefault("SOLD_OUT", 0L), "everybody else is told it is sold out");
+        assertEquals(customers, tally.values().stream().mapToLong(Long::longValue).sum(), "no request failed in any other way");
+        assertEquals(slots, dropRepository.findById(drop.getId()).orElseThrow().getReservedSlots());
+        assertInvariant(drop.getId());
+    }
+
+    @Test
+    void partialUniqueIndexesExistAndSameCustomerCannotQueueTwiceAcrossInstances() throws Exception {
+        List<String> indexes = jdbc.queryForList("select indexname from pg_indexes where indexname like 'idx_drop_%'", String.class);
+        assertTrue(indexes.contains("idx_drop_res_active_unique"), indexes.toString());
+        assertTrue(indexes.contains("idx_drop_waitlist_active_unique"), indexes.toString());
+
+        Drop drop = newDrop(1);
+        dropService.reserve(drop.getId(), "holder@cravey.com");
+        DropService otherInstance = new DropService(dropRepository, reservationRepository, waitlistRepository, restaurantRepository, transactionManager);
+
+        List<Integer> entryIds = runConcurrently(24, i -> () -> (i % 2 == 0 ? dropService : otherInstance)
+                .joinWaitlist(drop.getId(), "queuer@cravey.com").entryId());
+
+        assertEquals(1, new HashSet<>(entryIds).size(), "every request resolves to the same single entry");
+        assertEquals(1, waitlistRepository.countByDrop_IdAndStatus(drop.getId(), WaitlistStatus.WAITING));
+    }
+
+    @Test
+    void settledDropCanBeDeletedDespiteForeignKeys() {
+        Drop drop = newDrop(1);
+        DropReservation r = reservationRepository.findById(dropService.reserve(drop.getId(), "gone@cravey.com").reservationId()).orElseThrow();
+        dropService.release(r.getId(), "gone@cravey.com");
+
+        dropService.deleteDrop(drop.getId());
+
+        assertTrue(dropRepository.findById(drop.getId()).isEmpty());
+    }
+
+    @Test
     void concurrentHandOffsServeTheOldestWaitersInOrder() throws Exception {
         int slots = 5;
         Drop drop = newDrop(slots);

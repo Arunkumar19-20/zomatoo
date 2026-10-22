@@ -99,10 +99,11 @@ class OrderService implements OrderRepository {
     }
   }
 
-  /// GET /orders/customer/{customerId} -> list of past orders for the customer
-  Future<List<OrderModel>> getOrdersByCustomer(int customerId) async {
+  /// GET /orders -> the signed-in customer's own orders (the backend scopes it to the caller;
+  /// there is no /orders/customer/{id} endpoint).
+  Future<List<OrderModel>> getMyOrderHistory() async {
     try {
-      final res = await _dio.get('/orders/customer/$customerId');
+      final res = await _dio.get('/orders');
       return (res.data as List).map((e) => OrderModel.fromJson(e)).toList();
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);

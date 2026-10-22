@@ -207,5 +207,10 @@ void main() {
 
       expect(result.status, PaymentPollStatus.failed);
     });
+
+    test('8. Without a Stripe publishable key the payment sheet is simulated instead of crashing', () async {
+      final confirmed = await PaymentService().confirmPaymentWithStripe(clientSecret: 'pi_demo_secret', orderId: 9);
+      expect(confirmed, isTrue);
+    });
   });
 }

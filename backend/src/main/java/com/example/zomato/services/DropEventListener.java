@@ -7,6 +7,8 @@ import com.example.zomato.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
@@ -41,6 +43,9 @@ public class DropEventListener {
         }
     }
 
+    // REQUIRES_NEW: at AFTER_COMMIT the original transaction can no longer commit anything, so a plain save here
+    // would silently be dropped.
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void onWaitlistOffered(WaitlistOfferedEvent event) {
         try {
