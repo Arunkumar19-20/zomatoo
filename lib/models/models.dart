@@ -165,6 +165,14 @@ class MenuItem {
   final int? restaurantId;
   final String? categoryName;
 
+  /// Captured when the owner adds the dish; this is what craving search matches on.
+  final int? categoryId;
+  final int? spiceLevel; // 0 (mild) .. 4 (very hot)
+  final String? servingTemp; // HOT | COLD | ROOM
+  final String? ingredients;
+  final String? mood;
+  final List<String>? flavorTags;
+
   MenuItem({
     this.id,
     required this.name,
@@ -175,14 +183,22 @@ class MenuItem {
     this.imageUrl,
     this.restaurantId,
     this.categoryName,
+    this.categoryId,
+    this.spiceLevel,
+    this.servingTemp,
+    this.ingredients,
+    this.mood,
+    this.flavorTags,
   });
 
   factory MenuItem.fromJson(Map<String, dynamic> j) {
     int? restId;
+    int? catId;
     String? catName;
     if (j['category'] is Map<String, dynamic>) {
       final cat = j['category'] as Map<String, dynamic>;
       catName = cat['name'] ?? cat['categoryName'];
+      catId = (cat['id'] ?? cat['categoryId']) as int?;
       if (cat['restaurant'] is Map<String, dynamic>) {
         restId = (cat['restaurant'] as Map<String, dynamic>)['id'] as int?;
       } else if (cat['restaurantId'] is int) {
@@ -201,6 +217,12 @@ class MenuItem {
       imageUrl: j['imageUrl'] ?? j['image_url'],
       restaurantId: restId,
       categoryName: catName,
+      categoryId: catId,
+      spiceLevel: (j['spiceLevel'] as num?)?.toInt(),
+      servingTemp: j['servingTemp']?.toString(),
+      ingredients: j['ingredients']?.toString(),
+      mood: j['mood']?.toString(),
+      flavorTags: j['flavorTags'] is List ? (j['flavorTags'] as List).map((e) => e.toString()).toList() : null,
     );
   }
 
@@ -212,6 +234,12 @@ class MenuItem {
         'isVeg': isVeg,
         'isAvailable': isAvailable,
         'imageUrl': imageUrl,
+        if (categoryId != null) 'category': {'id': categoryId},
+        if (spiceLevel != null) 'spiceLevel': spiceLevel,
+        if (servingTemp != null) 'servingTemp': servingTemp,
+        if (ingredients != null && ingredients!.isNotEmpty) 'ingredients': ingredients,
+        if (mood != null && mood!.isNotEmpty) 'mood': mood,
+        if (flavorTags != null) 'flavorTags': flavorTags,
       };
 }
 

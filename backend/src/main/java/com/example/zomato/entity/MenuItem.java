@@ -39,6 +39,29 @@ public class MenuItem {
     @JoinColumn(name = "category_id")
     private MenuCategory category;
 
+    /** 0 (mild) to 4 (very hot); captured when the owner adds the dish and used by craving search. */
+    @Column(name = "spice_level")
+    private Integer spiceLevel;
+
+    /** HOT, COLD or ROOM */
+    @Column(name = "serving_temp", length = 8)
+    private String servingTemp;
+
+    @Column(name = "ingredients", length = 1000)
+    private String ingredients;
+
+    /** Free text such as "cozy, after a night out, sharing" */
+    @Column(name = "mood", length = 255)
+    private String mood;
+
+    /**
+     * Input only: flavor tags the owner picked. Stored in menu_item_tag, not in this table. When absent the
+     * backend suggests tags itself (marked AUTO). At least two are required when this is sent.
+     */
+    @Transient
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    private java.util.List<String> flavorTags;
+
     public MenuItem() {}
 
     public MenuItem(String name, String description, Float price,
@@ -76,4 +99,19 @@ public class MenuItem {
 
     public String getImageUrl() { return imageUrl; }
     public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
+
+    public Integer getSpiceLevel() { return spiceLevel; }
+    public void setSpiceLevel(Integer spiceLevel) { this.spiceLevel = spiceLevel; }
+
+    public String getServingTemp() { return servingTemp; }
+    public void setServingTemp(String servingTemp) { this.servingTemp = servingTemp; }
+
+    public String getIngredients() { return ingredients; }
+    public void setIngredients(String ingredients) { this.ingredients = ingredients; }
+
+    public String getMood() { return mood; }
+    public void setMood(String mood) { this.mood = mood; }
+
+    public java.util.List<String> getFlavorTags() { return flavorTags; }
+    public void setFlavorTags(java.util.List<String> flavorTags) { this.flavorTags = flavorTags; }
 }

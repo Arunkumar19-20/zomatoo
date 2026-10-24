@@ -48,3 +48,7 @@ app.*.map.json
 backend/target/
 backend/.mvn/wrapper/maven-wrapper.jar
 
+
+# Dish search: downloaded model and datasets (not committed)
+backend/models/
+data/

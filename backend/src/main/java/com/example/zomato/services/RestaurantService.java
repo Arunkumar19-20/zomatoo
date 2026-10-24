@@ -9,6 +9,7 @@ import com.example.zomato.entity.Restaurant;
 import com.example.zomato.repository.MenuCategoryRepository;
 import com.example.zomato.repository.MenuItemRepository;
 import com.example.zomato.repository.RestaurantRepository;
+import com.example.zomato.search.SearchIndexService;
 import com.example.zomato.specification.RestaurantSpecification;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -26,13 +27,16 @@ public class RestaurantService {
     private final RestaurantRepository restaurantRepository;
     private final MenuItemRepository menuItemRepository;
     private final MenuCategoryRepository menuCategoryRepository;
+    private final SearchIndexService searchIndex;
 
     public RestaurantService(RestaurantRepository restaurantRepository,
                              MenuItemRepository menuItemRepository,
-                             MenuCategoryRepository menuCategoryRepository) {
+                             MenuCategoryRepository menuCategoryRepository,
+                             SearchIndexService searchIndex) {
         this.restaurantRepository = restaurantRepository;
         this.menuItemRepository = menuItemRepository;
         this.menuCategoryRepository = menuCategoryRepository;
+        this.searchIndex = searchIndex;
     }
 
     public Page<RestaurantDTO> getRestaurants(String cuisine, Float minRating, Boolean isOpen, String search, Pageable pageable) {
@@ -116,10 +120,13 @@ public class RestaurantService {
     }
 
     public void addMenuItem(MenuItem item) {
-        menuItemRepository.save(item);
+        List<String> ownerTags = SearchIndexService.validateOwnerInput(item);
+        MenuItem saved = menuItemRepository.save(item);
+        searchIndex.onSaved(saved, ownerTags);
     }
 
     public void removeMenuItem(int itemId) {
         menuItemRepository.deleteById(itemId);
+        searchIndex.onDeleted(itemId);
     }
 }

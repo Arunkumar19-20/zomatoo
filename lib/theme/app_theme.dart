@@ -11,6 +11,10 @@ class AppTheme {
   static const Color scaffoldBackground = Color(0xFFFAFAFA);
   static const Color cardBackground = Colors.white;
   
+  // Bitezy/Figma tokens (sampled from the design file): headings are warm brown, chips a stronger orange
+  static const Color textBrown = Color(0xFF5C3E27);
+  static const Color chipOrange = Color(0xFFFF6D00);
+  static const Color freshGreen = Color(0xFF8CC63E);
   static const Color textDark = Color(0xFF1A1A1A); // Soft charcoal gray
   static const Color textLight = Color(0xFF757575);
   static const Color textLightest = Color(0xFF9E9E9E);

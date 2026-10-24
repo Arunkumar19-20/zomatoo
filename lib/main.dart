@@ -36,6 +36,9 @@ import 'controllers/checkout_controller.dart';
 import 'services/drop_service.dart';
 import 'repositories/drop_repository.dart';
 import 'models/drop_state.dart';
+import 'services/dish_search_service.dart';
+import 'repositories/dish_search_repository.dart';
+import 'models/dish_search_state.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -72,8 +75,13 @@ void main() async {
         Provider<OrderRepository>(create: (_) => OrderService()),
         Provider<PaymentRepository>(create: (_) => PaymentService()),
         Provider<DropRepository>(create: (_) => DropService()),
+        Provider<DishSearchRepository>(create: (_) => DishSearchService()),
+        Provider<MenuTagRepository>(create: (_) => DishSearchService()),
         ChangeNotifierProvider.value(value: session),
         ChangeNotifierProvider(create: (_) => CartState()),
+        ChangeNotifierProvider(
+          create: (ctx) => DishSearchState(repository: ctx.read<DishSearchRepository>()),
+        ),
         ChangeNotifierProvider(
           create: (ctx) => DropState(
             repository: ctx.read<DropRepository>(),

@@ -162,6 +162,16 @@ public class RateLimitingService {
         return bucket.tryConsume(1);
     }
 
+    private final Map<String, Bucket> searchBuckets = new ConcurrentHashMap<>();
+
+    /** Dish search runs an embedding per query, so it gets a per-IP limit (in memory, single instance like the rest). */
+    public boolean tryConsumeSearch(String ip, int perMinute) {
+        if (ip == null || ip.isBlank()) return true;
+        Bucket bucket = searchBuckets.computeIfAbsent(ip,
+                k -> Bucket.builder().addLimit(Bandwidth.classic(perMinute, Refill.greedy(perMinute, Duration.ofMinutes(1)))).build());
+        return bucket.tryConsume(1);
+    }
+
     // Backwards-compatible legacy method
     public boolean tryConsumeLogin(String key) {
         return tryConsumeLoginByIp(key);
@@ -177,5 +187,6 @@ public class RateLimitingService {
         resendVerificationEmailBuckets.clear();
         refreshBuckets.clear();
         reserveBuckets.clear();
+        searchBuckets.clear();
     }
 }

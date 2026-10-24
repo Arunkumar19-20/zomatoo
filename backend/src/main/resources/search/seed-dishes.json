@@ -1,0 +1,2187 @@
+{
+ "restaurants": [
+  {
+   "name": "Bella Napoli",
+   "cuisine": "Italian",
+   "address": "12 Via Roma Lane",
+   "rating": 4.6,
+   "deliveryTime": 30,
+   "discount": "20% OFF up to Rs 100"
+  },
+  {
+   "name": "Smokehouse 66",
+   "cuisine": "American BBQ, Burgers",
+   "address": "66 Route Road",
+   "rating": 4.5,
+   "deliveryTime": 35,
+   "discount": "Free fries over Rs 500"
+  },
+  {
+   "name": "Spice Route",
+   "cuisine": "North Indian",
+   "address": "8 Masala Market",
+   "rating": 4.7,
+   "deliveryTime": 35,
+   "discount": "10% OFF"
+  },
+  {
+   "name": "Tokyo Ramen House",
+   "cuisine": "Japanese",
+   "address": "5 Sakura Street",
+   "rating": 4.6,
+   "deliveryTime": 30,
+   "discount": "Free gyoza over Rs 600"
+  },
+  {
+   "name": "Casa Fuego",
+   "cuisine": "Mexican",
+   "address": "21 Fiesta Plaza",
+   "rating": 4.4,
+   "deliveryTime": 30,
+   "discount": "2 for 1 tacos on Tuesdays"
+  },
+  {
+   "name": "Sugar & Spice Patisserie",
+   "cuisine": "Desserts, Bakery",
+   "address": "3 Pastry Alley",
+   "rating": 4.8,
+   "deliveryTime": 25,
+   "discount": "Buy 2 get 1 on cupcakes"
+  },
+  {
+   "name": "Green Bowl",
+   "cuisine": "Healthy, Salads, Bowls",
+   "address": "17 Garden Court",
+   "rating": 4.5,
+   "deliveryTime": 25,
+   "discount": "15% OFF first order"
+  },
+  {
+   "name": "Bangkok Street",
+   "cuisine": "Thai",
+   "address": "9 Lemongrass Lane",
+   "rating": 4.5,
+   "deliveryTime": 35,
+   "discount": "Free Thai tea over Rs 700"
+  }
+ ],
+ "dishes": [
+  {
+   "restaurant": "Bella Napoli",
+   "category": "Pizza",
+   "name": "Margherita Pizza",
+   "description": "Wood-fired pizza with San Marzano tomato, fresh mozzarella and basil.",
+   "price": 349,
+   "veg": true,
+   "ingredients": "tomato, mozzarella, basil, olive oil",
+   "spiceLevel": 0,
+   "servingTemp": "HOT",
+   "mood": "family dinner",
+   "tags": [
+    "savory",
+    "creamy",
+    "comfort"
+   ]
+  },
+  {
+   "restaurant": "Bella Napoli",
+   "category": "Pizza",
+   "name": "Diavola Pizza",
+   "description": "Wood-fired pizza topped with spicy salami, chili oil and mozzarella.",
+   "price": 449,
+   "veg": false,
+   "ingredients": "spicy salami, chili oil, mozzarella, tomato",
+   "spiceLevel": 3,
+   "servingTemp": "HOT",
+   "mood": "movie night",
+   "tags": [
+    "spicy",
+    "savory",
+    "smoky"
+   ]
+  },
+  {
+   "restaurant": "Bella Napoli",
+   "category": "Pizza",
+   "name": "Quattro Formaggi Pizza",
+   "description": "Four cheeses melted on a thin crust: mozzarella, gorgonzola, parmesan and fontina.",
+   "price": 429,
+   "veg": true,
+   "ingredients": "mozzarella, gorgonzola, parmesan, fontina",
+   "spiceLevel": 0,
+   "servingTemp": "HOT",
+   "mood": "cheese lovers",
+   "tags": [
+    "creamy",
+    "rich",
+    "savory"
+   ]
+  },
+  {
+   "restaurant": "Bella Napoli",
+   "category": "Pizza",
+   "name": "Calzone Ripieno",
+   "description": "Folded pizza stuffed with ricotta, ham and mozzarella, baked until golden.",
+   "price": 399,
+   "veg": false,
+   "ingredients": "ricotta, ham, mozzarella, tomato",
+   "spiceLevel": 0,
+   "servingTemp": "HOT",
+   "mood": "hearty lunch",
+   "tags": [
+    "savory",
+    "creamy",
+    "comfort"
+   ]
+  },
+  {
+   "restaurant": "Bella Napoli",
+   "category": "Pasta",
+   "name": "Spaghetti Carbonara",
+   "description": "Spaghetti tossed with egg yolk, pecorino and crispy guanciale.",
+   "price": 399,
+   "veg": false,
+   "ingredients": "spaghetti, egg, pecorino, guanciale, black pepper",
+   "spiceLevel": 0,
+   "servingTemp": "HOT",
+   "mood": "comfort dinner",
+   "tags": [
+    "creamy",
+    "rich",
+    "savory",
+    "comfort"
+   ]
+  },
+  {
+   "restaurant": "Bella Napoli",
+   "category": "Pasta",
+   "name": "Penne Arrabbiata",
+   "description": "Penne in a fiery tomato sauce with garlic and red chili.",
+   "price": 329,
+   "veg": true,
+   "ingredients": "penne, tomato, garlic, red chili, parsley",
+   "spiceLevel": 3,
+   "servingTemp": "HOT",
+   "mood": "quick dinner",
+   "tags": [
+    "spicy",
+    "tangy",
+    "savory"
+   ]
+  },
+  {
+   "restaurant": "Bella Napoli",
+   "category": "Pasta",
+   "name": "Fettuccine Alfredo",
+   "description": "Silky fettuccine in a butter, cream and parmesan sauce.",
+   "price": 369,
+   "veg": true,
+   "ingredients": "fettuccine, cream, butter, parmesan",
+   "spiceLevel": 0,
+   "servingTemp": "HOT",
+   "mood": "cozy night",
+   "tags": [
+    "creamy",
+    "rich",
+    "comfort"
+   ]
+  },
+  {
+   "restaurant": "Bella Napoli",
+   "category": "Pasta",
+   "name": "Lasagna al Forno",
+   "description": "Layers of pasta, slow-cooked beef ragu and bechamel, baked bubbling.",
+   "price": 419,
+   "veg": false,
+   "ingredients": "pasta sheets, beef ragu, bechamel, mozzarella",
+   "spiceLevel": 0,
+   "servingTemp": "HOT",
+   "mood": "sunday lunch",
+   "tags": [
+    "comfort",
+    "rich",
+    "savory",
+    "creamy"
+   ]
+  },
+  {
+   "restaurant": "Bella Napoli",
+   "category": "Pasta",
+   "name": "Pesto Gnocchi",
+   "description": "Soft potato gnocchi in basil pesto with pine nuts.",
+   "price": 359,
+   "veg": true,
+   "ingredients": "potato gnocchi, basil, pine nuts, parmesan",
+   "spiceLevel": 0,
+   "servingTemp": "HOT",
+   "mood": "light dinner",
+   "tags": [
+    "savory",
+    "fresh",
+    "comfort"
+   ]
+  },
+  {
+   "restaurant": "Bella Napoli",
+   "category": "Mains",
+   "name": "Mushroom Risotto",
+   "description": "Creamy arborio rice with porcini and parmesan.",
+   "price": 379,
+   "veg": true,
+   "ingredients": "arborio rice, porcini, parmesan, white wine",
+   "spiceLevel": 0,
+   "servingTemp": "HOT",
+   "mood": "rainy day",
+   "tags": [
+    "creamy",
+    "savory",
+    "comfort"
+   ]
+  },
+  {
+   "restaurant": "Bella Napoli",
+   "category": "Starters",
+   "name": "Caprese Salad",
+   "description": "Tomato, fresh mozzarella and basil with balsamic.",
+   "price": 299,
+   "veg": true,
+   "ingredients": "tomato, mozzarella, basil, balsamic",
+   "spiceLevel": 0,
+   "servingTemp": "COLD",
+   "mood": "light lunch",
+   "tags": [
+    "fresh",
+    "light",
+    "tangy"
+   ]
+  },
+  {
+   "restaurant": "Bella Napoli",
+   "category": "Starters",
+   "name": "Bruschetta Pomodoro",
+   "description": "Toasted bread piled with marinated tomato, garlic and basil.",
+   "price": 229,
+   "veg": true,
+   "ingredients": "bread, tomato, garlic, basil, olive oil",
+   "spiceLevel": 0,
+   "servingTemp": "ROOM",
+   "mood": "sharing",
+   "tags": [
+    "crunchy",
+    "tangy",
+    "fresh"
+   ]
+  },
+  {
+   "restaurant": "Bella Napoli",
+   "category": "Starters",
+   "name": "Garlic Bread with Cheese",
+   "description": "Crisp garlic bread topped with melted mozzarella.",
+   "price": 179,
+   "veg": true,
+   "ingredients": "bread, garlic butter, mozzarella",
+   "spiceLevel": 0,
+   "servingTemp": "HOT",
+   "mood": "sharing",
+   "tags": [
+    "crunchy",
+    "savory",
+    "creamy"
+   ]
+  },
+  {
+   "restaurant": "Bella Napoli",
+   "category": "Desserts",
+   "name": "Tiramisu",
+   "description": "Espresso-soaked sponge layered with mascarpone and cocoa.",
+   "price": 249,
+   "veg": true,
+   "ingredients": "mascarpone, espresso, ladyfingers, cocoa",
+   "spiceLevel": 0,
+   "servingTemp": "COLD",
+   "mood": "after dinner",
+   "tags": [
+    "sweet",
+    "creamy",
+    "rich"
+   ]
+  },
+  {
+   "restaurant": "Bella Napoli",
+   "category": "Desserts",
+   "name": "Panna Cotta with Berry Compote",
+   "description": "Vanilla panna cotta with a sharp berry compote.",
+   "price": 229,
+   "veg": true,
+   "ingredients": "cream, vanilla, gelatin, mixed berries",
+   "spiceLevel": 0,
+   "servingTemp": "COLD",
+   "mood": "date night",
+   "tags": [
+    "sweet",
+    "creamy",
+    "light"
+   ]
+  },
+  {
+   "restaurant": "Smokehouse 66",
+   "category": "Burgers",
+   "name": "Smoked Brisket Burger",
+   "description": "Hickory-smoked brisket, cheddar, pickles and bbq sauce in a brioche bun.",
+   "price": 459,
+   "veg": false,
+   "ingredients": "brisket, cheddar, pickles, bbq sauce, brioche",
+   "spiceLevel": 1,
+   "servingTemp": "HOT",
+   "mood": "big appetite",
+   "tags": [
+    "smoky",
+    "savory",
+    "rich"
+   ]
+  },
+  {
+   "restaurant": "Smokehouse 66",
+   "category": "Burgers",
+   "name": "Classic Cheeseburger",
+   "description": "Juicy beef patty, American cheese, lettuce, tomato and house sauce.",
+   "price": 349,
+   "veg": false,
+   "ingredients": "beef patty, cheese, lettuce, tomato",
+   "spiceLevel": 0,
+   "servingTemp": "HOT",
+   "mood": "comfort",
+   "tags": [
+    "savory",
+    "creamy",
+    "comfort"
+   ]
+  },
+  {
+   "restaurant": "Smokehouse 66",
+   "category": "Burgers",
+   "name": "Veggie Smash Burger",
+   "description": "Smashed black bean and corn patty with chipotle mayo.",
+   "price": 329,
+   "veg": true,
+   "ingredients": "black beans, corn, chipotle mayo, lettuce",
+   "spiceLevel": 1,
+   "servingTemp": "HOT",
+   "mood": "vegetarian craving",
+   "tags": [
+    "savory",
+    "smoky",
+    "comfort"
+   ]
+  },
+  {
+   "restaurant": "Smokehouse 66",
+   "category": "Sandwiches",
+   "name": "Nashville Hot Chicken Sandwich",
+   "description": "Fried chicken brushed with cayenne oil, pickles and slaw on a toasted bun.",
+   "price": 399,
+   "veg": false,
+   "ingredients": "fried chicken, cayenne oil, pickles, slaw",
+   "spiceLevel": 4,
+   "servingTemp": "HOT",
+   "mood": "brave appetite",
+   "tags": [
+    "spicy",
+    "crunchy",
+    "savory"
+   ]
+  },
+  {
+   "restaurant": "Smokehouse 66",
+   "category": "Sandwiches",
+   "name": "Pulled Pork Sandwich",
+   "description": "Slow-smoked pulled pork with tangy bbq sauce and slaw.",
+   "price": 399,
+   "veg": false,
+   "ingredients": "pulled pork, bbq sauce, slaw, bun",
+   "spiceLevel": 1,
+   "servingTemp": "HOT",
+   "mood": "game day",
+   "tags": [
+    "smoky",
+    "savory",
+    "comfort"
+   ]
+  },
+  {
+   "restaurant": "Smokehouse 66",
+   "category": "Chicken",
+   "name": "Buffalo Wings",
+   "description": "Eight crispy wings tossed in tangy buffalo sauce with blue cheese dip.",
+   "price": 349,
+   "veg": false,
+   "ingredients": "chicken wings, buffalo sauce, butter, blue cheese",
+   "spiceLevel": 3,
+   "servingTemp": "HOT",
+   "mood": "game night",
+   "tags": [
+    "spicy",
+    "crunchy",
+    "tangy"
+   ]
+  },
+  {
+   "restaurant": "Smokehouse 66",
+   "category": "Chicken",
+   "name": "Honey Hot Chicken Tenders",
+   "description": "Crispy chicken tenders glazed in hot honey, sweet first then a slow burn.",
+   "price": 379,
+   "veg": false,
+   "ingredients": "chicken, hot honey, chili flakes, flour",
+   "spiceLevel": 2,
+   "servingTemp": "HOT",
+   "mood": "sweet and heat craving",
+   "tags": [
+    "sweet",
+    "spicy",
+    "crunchy"
+   ]
+  },
+  {
+   "restaurant": "Smokehouse 66",
+   "category": "Ribs",
+   "name": "BBQ Ribs Half Rack",
+   "description": "Fall-off-the-bone pork ribs lacquered with a sweet smoky glaze.",
+   "price": 649,
+   "veg": false,
+   "ingredients": "pork ribs, bbq glaze, brown sugar, paprika",
+   "spiceLevel": 1,
+   "servingTemp": "HOT",
+   "mood": "weekend feast",
+   "tags": [
+    "smoky",
+    "sweet",
+    "rich"
+   ]
+  },
+  {
+   "restaurant": "Smokehouse 66",
+   "category": "Sides",
+   "name": "Loaded Fries",
+   "description": "Fries under cheese sauce, bacon and pickled jalapeno.",
+   "price": 279,
+   "veg": false,
+   "ingredients": "fries, cheese sauce, bacon, jalapeno",
+   "spiceLevel": 2,
+   "servingTemp": "HOT",
+   "mood": "late night",
+   "tags": [
+    "crunchy",
+    "creamy",
+    "spicy"
+   ]
+  },
+  {
+   "restaurant": "Smokehouse 66",
+   "category": "Sides",
+   "name": "Mac and Cheese Skillet",
+   "description": "Baked macaroni in a three-cheese sauce with a crumb top.",
+   "price": 299,
+   "veg": true,
+   "ingredients": "macaroni, cheddar, mozzarella, breadcrumbs",
+   "spiceLevel": 0,
+   "servingTemp": "HOT",
+   "mood": "comfort",
+   "tags": [
+    "creamy",
+    "comfort",
+    "rich"
+   ]
+  },
+  {
+   "restaurant": "Smokehouse 66",
+   "category": "Sides",
+   "name": "Mac and Cheese Bites",
+   "description": "Crumb-coated fried macaroni and cheese bites with ranch.",
+   "price": 229,
+   "veg": true,
+   "ingredients": "macaroni, cheese, breadcrumbs, ranch",
+   "spiceLevel": 0,
+   "servingTemp": "HOT",
+   "mood": "snack",
+   "tags": [
+    "crunchy",
+    "creamy"
+   ]
+  },
+  {
+   "restaurant": "Smokehouse 66",
+   "category": "Sides",
+   "name": "Coleslaw",
+   "description": "Cool, crunchy cabbage slaw in a tangy dressing.",
+   "price": 99,
+   "veg": true,
+   "ingredients": "cabbage, carrot, vinegar, mayo",
+   "spiceLevel": 0,
+   "servingTemp": "COLD",
+   "mood": "side",
+   "tags": [
+    "tangy",
+    "fresh",
+    "crunchy"
+   ]
+  },
+  {
+   "restaurant": "Smokehouse 66",
+   "category": "Sides",
+   "name": "Chili Lime Corn on the Cob",
+   "description": "Grilled corn with chili-lime butter.",
+   "price": 149,
+   "veg": true,
+   "ingredients": "corn, butter, chili, lime",
+   "spiceLevel": 1,
+   "servingTemp": "HOT",
+   "mood": "side",
+   "tags": [
+    "tangy",
+    "spicy",
+    "savory"
+   ]
+  },
+  {
+   "restaurant": "Smokehouse 66",
+   "category": "Desserts",
+   "name": "Apple Pie a la Mode",
+   "description": "Warm cinnamon apple pie with vanilla ice cream.",
+   "price": 229,
+   "veg": true,
+   "ingredients": "apple, cinnamon, pastry, vanilla ice cream",
+   "spiceLevel": 0,
+   "servingTemp": "HOT",
+   "mood": "comfort treat",
+   "tags": [
+    "sweet",
+    "comfort",
+    "creamy"
+   ]
+  },
+  {
+   "restaurant": "Smokehouse 66",
+   "category": "Desserts",
+   "name": "Chocolate Brownie Sundae",
+   "description": "Fudgy brownie with ice cream, chocolate sauce and nuts.",
+   "price": 249,
+   "veg": true,
+   "ingredients": "brownie, vanilla ice cream, chocolate sauce, walnuts",
+   "spiceLevel": 0,
+   "servingTemp": "HOT",
+   "mood": "treat yourself",
+   "tags": [
+    "sweet",
+    "rich",
+    "creamy"
+   ]
+  },
+  {
+   "restaurant": "Spice Route",
+   "category": "Curries",
+   "name": "Butter Chicken",
+   "description": "Tandoori chicken in a velvety tomato-butter-cream gravy.",
+   "price": 429,
+   "veg": false,
+   "ingredients": "chicken, tomato, butter, cream, kasuri methi",
+   "spiceLevel": 1,
+   "servingTemp": "HOT",
+   "mood": "family dinner",
+   "tags": [
+    "creamy",
+    "rich",
+    "comfort"
+   ]
+  },
+  {
+   "restaurant": "Spice Route",
+   "category": "Curries",
+   "name": "Paneer Tikka Masala",
+   "description": "Charred paneer cubes in a spiced, smoky tomato masala.",
+   "price": 379,
+   "veg": true,
+   "ingredients": "paneer, tomato, onion, capsicum, garam masala",
+   "spiceLevel": 2,
+   "servingTemp": "HOT",
+   "mood": "vegetarian dinner",
+   "tags": [
+    "spicy",
+    "creamy",
+    "smoky"
+   ]
+  },
+  {
+   "restaurant": "Spice Route",
+   "category": "Curries",
+   "name": "Dal Makhani",
+   "description": "Black lentils slow-cooked overnight with butter and cream.",
+   "price": 299,
+   "veg": true,
+   "ingredients": "black lentils, kidney beans, butter, cream",
+   "spiceLevel": 0,
+   "servingTemp": "HOT",
+   "mood": "comfort",
+   "tags": [
+    "creamy",
+    "rich",
+    "comfort"
+   ]
+  },
+  {
+   "restaurant": "Spice Route",
+   "category": "Curries",
+   "name": "Lamb Rogan Josh",
+   "description": "Kashmiri lamb curry with deep red chili and whole spices.",
+   "price": 499,
+   "veg": false,
+   "ingredients": "lamb, kashmiri chili, yogurt, fennel",
+   "spiceLevel": 3,
+   "servingTemp": "HOT",
+   "mood": "special dinner",
+   "tags": [
+    "spicy",
+    "rich",
+    "savory"
+   ]
+  },
+  {
+   "restaurant": "Spice Route",
+   "category": "Curries",
+   "name": "Chana Masala",
+   "description": "Chickpeas in a tangy, spicy onion-tomato masala.",
+   "price": 249,
+   "veg": true,
+   "ingredients": "chickpeas, onion, tomato, amchur, green chili",
+   "spiceLevel": 2,
+   "servingTemp": "HOT",
+   "mood": "comfort lunch",
+   "tags": [
+    "spicy",
+    "tangy",
+    "comfort"
+   ]
+  },
+  {
+   "restaurant": "Spice Route",
+   "category": "Rice",
+   "name": "Chicken Biryani",
+   "description": "Fragrant basmati layered with spiced chicken and saffron.",
+   "price": 399,
+   "veg": false,
+   "ingredients": "basmati, chicken, saffron, mint, fried onion",
+   "spiceLevel": 2,
+   "servingTemp": "HOT",
+   "mood": "feast",
+   "tags": [
+    "spicy",
+    "savory",
+    "comfort"
+   ]
+  },
+  {
+   "restaurant": "Spice Route",
+   "category": "Rice",
+   "name": "Vegetable Biryani",
+   "description": "Basmati dum-cooked with seasonal vegetables and whole spices.",
+   "price": 329,
+   "veg": true,
+   "ingredients": "basmati, vegetables, saffron, mint",
+   "spiceLevel": 2,
+   "servingTemp": "HOT",
+   "mood": "vegetarian feast",
+   "tags": [
+    "spicy",
+    "savory",
+    "comfort"
+   ]
+  },
+  {
+   "restaurant": "Spice Route",
+   "category": "Snacks",
+   "name": "Samosa Chaat",
+   "description": "Crushed samosas with yogurt, tamarind and mint chutney.",
+   "price": 169,
+   "veg": true,
+   "ingredients": "samosa, yogurt, tamarind chutney, mint chutney, sev",
+   "spiceLevel": 1,
+   "servingTemp": "ROOM",
+   "mood": "street food craving",
+   "tags": [
+    "crunchy",
+    "tangy",
+    "sweet"
+   ]
+  },
+  {
+   "restaurant": "Spice Route",
+   "category": "Snacks",
+   "name": "Pani Puri",
+   "description": "Crisp puris filled with spiced, tangy mint water.",
+   "price": 129,
+   "veg": true,
+   "ingredients": "puri, potato, mint water, tamarind, chickpeas",
+   "spiceLevel": 2,
+   "servingTemp": "ROOM",
+   "mood": "street food craving",
+   "tags": [
+    "tangy",
+    "spicy",
+    "crunchy"
+   ]
+  },
+  {
+   "restaurant": "Spice Route",
+   "category": "Snacks",
+   "name": "Masala Dosa",
+   "description": "Crisp rice crepe filled with spiced potato, with sambar and chutney.",
+   "price": 219,
+   "veg": true,
+   "ingredients": "rice batter, potato, mustard seeds, sambar, coconut chutney",
+   "spiceLevel": 1,
+   "servingTemp": "HOT",
+   "mood": "breakfast",
+   "tags": [
+    "crunchy",
+    "savory",
+    "comfort"
+   ]
+  },
+  {
+   "restaurant": "Spice Route",
+   "category": "Snacks",
+   "name": "Chilli Paneer Dry",
+   "description": "Indo-Chinese paneer tossed with green chili, soy and capsicum.",
+   "price": 299,
+   "veg": true,
+   "ingredients": "paneer, green chili, soy sauce, capsicum, vinegar",
+   "spiceLevel": 3,
+   "servingTemp": "HOT",
+   "mood": "starter",
+   "tags": [
+    "spicy",
+    "tangy",
+    "savory"
+   ]
+  },
+  {
+   "restaurant": "Spice Route",
+   "category": "Tandoor",
+   "name": "Tandoori Chicken (Half)",
+   "description": "Yogurt-marinated chicken roasted in a clay tandoor.",
+   "price": 449,
+   "veg": false,
+   "ingredients": "chicken, yogurt, kashmiri chili, tandoor",
+   "spiceLevel": 2,
+   "servingTemp": "HOT",
+   "mood": "grill craving",
+   "tags": [
+    "smoky",
+    "spicy",
+    "savory"
+   ]
+  },
+  {
+   "restaurant": "Spice Route",
+   "category": "Desserts",
+   "name": "Gulab Jamun",
+   "description": "Soft milk dumplings soaked in rose-cardamom syrup.",
+   "price": 149,
+   "veg": true,
+   "ingredients": "khoya, sugar syrup, cardamom, rose water",
+   "spiceLevel": 0,
+   "servingTemp": "HOT",
+   "mood": "festival sweet",
+   "tags": [
+    "sweet",
+    "rich",
+    "comfort"
+   ]
+  },
+  {
+   "restaurant": "Spice Route",
+   "category": "Desserts",
+   "name": "Jalebi with Rabri",
+   "description": "Crisp saffron jalebi served with thickened sweet milk.",
+   "price": 169,
+   "veg": true,
+   "ingredients": "flour, sugar syrup, saffron, rabri",
+   "spiceLevel": 0,
+   "servingTemp": "HOT",
+   "mood": "winter treat",
+   "tags": [
+    "sweet",
+    "crunchy",
+    "rich"
+   ]
+  },
+  {
+   "restaurant": "Spice Route",
+   "category": "Desserts",
+   "name": "Rasmalai",
+   "description": "Soft cheese discs in chilled saffron-cardamom milk.",
+   "price": 179,
+   "veg": true,
+   "ingredients": "chenna, milk, saffron, cardamom, pistachio",
+   "spiceLevel": 0,
+   "servingTemp": "COLD",
+   "mood": "after dinner",
+   "tags": [
+    "sweet",
+    "creamy",
+    "light"
+   ]
+  },
+  {
+   "restaurant": "Spice Route",
+   "category": "Drinks",
+   "name": "Mango Lassi",
+   "description": "Thick chilled yogurt drink blended with Alphonso mango.",
+   "price": 129,
+   "veg": true,
+   "ingredients": "yogurt, mango, sugar, cardamom",
+   "spiceLevel": 0,
+   "servingTemp": "COLD",
+   "mood": "hot afternoon",
+   "tags": [
+    "sweet",
+    "creamy",
+    "fresh"
+   ]
+  },
+  {
+   "restaurant": "Tokyo Ramen House",
+   "category": "Ramen",
+   "name": "Tonkotsu Ramen",
+   "description": "Milky 12-hour pork bone broth, chashu, egg and noodles.",
+   "price": 449,
+   "veg": false,
+   "ingredients": "pork broth, noodles, chashu, soft egg, nori",
+   "spiceLevel": 0,
+   "servingTemp": "HOT",
+   "mood": "cold night",
+   "tags": [
+    "savory",
+    "rich",
+    "comfort"
+   ]
+  },
+  {
+   "restaurant": "Tokyo Ramen House",
+   "category": "Ramen",
+   "name": "Spicy Miso Ramen",
+   "description": "Miso broth with chili paste, corn, bean sprouts and minced pork.",
+   "price": 429,
+   "veg": false,
+   "ingredients": "miso broth, chili paste, noodles, pork mince, corn",
+   "spiceLevel": 3,
+   "servingTemp": "HOT",
+   "mood": "rainy day",
+   "tags": [
+    "spicy",
+    "savory",
+    "comfort"
+   ]
+  },
+  {
+   "restaurant": "Tokyo Ramen House",
+   "category": "Ramen",
+   "name": "Shoyu Ramen",
+   "description": "Clear soy-based chicken broth with bamboo shoots and egg.",
+   "price": 399,
+   "veg": false,
+   "ingredients": "soy broth, noodles, chicken, bamboo shoot, egg",
+   "spiceLevel": 0,
+   "servingTemp": "HOT",
+   "mood": "warm-up",
+   "tags": [
+    "savory",
+    "comfort"
+   ]
+  },
+  {
+   "restaurant": "Tokyo Ramen House",
+   "category": "Ramen",
+   "name": "Veggie Miso Ramen",
+   "description": "Light miso broth with mushrooms, tofu and greens.",
+   "price": 369,
+   "veg": true,
+   "ingredients": "miso broth, noodles, tofu, shiitake, bok choy",
+   "spiceLevel": 0,
+   "servingTemp": "HOT",
+   "mood": "light and warm",
+   "tags": [
+    "savory",
+    "light",
+    "comfort"
+   ]
+  },
+  {
+   "restaurant": "Tokyo Ramen House",
+   "category": "Starters",
+   "name": "Gyoza (6 pc)",
+   "description": "Pan-fried dumplings with crisp bottoms and ponzu dip.",
+   "price": 249,
+   "veg": false,
+   "ingredients": "pork, cabbage, ginger, ponzu",
+   "spiceLevel": 0,
+   "servingTemp": "HOT",
+   "mood": "sharing",
+   "tags": [
+    "crunchy",
+    "savory"
+   ]
+  },
+  {
+   "restaurant": "Tokyo Ramen House",
+   "category": "Starters",
+   "name": "Takoyaki",
+   "description": "Crisp octopus batter balls with sauce, mayo and bonito.",
+   "price": 299,
+   "veg": false,
+   "ingredients": "octopus, batter, takoyaki sauce, mayo, bonito",
+   "spiceLevel": 0,
+   "servingTemp": "HOT",
+   "mood": "street snack",
+   "tags": [
+    "crunchy",
+    "savory"
+   ]
+  },
+  {
+   "restaurant": "Tokyo Ramen House",
+   "category": "Starters",
+   "name": "Edamame with Sea Salt",
+   "description": "Steamed soybeans in the pod with flaky salt.",
+   "price": 149,
+   "veg": true,
+   "ingredients": "edamame, sea salt",
+   "spiceLevel": 0,
+   "servingTemp": "HOT",
+   "mood": "light snack",
+   "tags": [
+    "light",
+    "savory",
+    "fresh"
+   ]
+  },
+  {
+   "restaurant": "Tokyo Ramen House",
+   "category": "Starters",
+   "name": "Vegetable Tempura",
+   "description": "Lightly battered, shatteringly crisp seasonal vegetables.",
+   "price": 279,
+   "veg": true,
+   "ingredients": "sweet potato, broccoli, pumpkin, tempura batter",
+   "spiceLevel": 0,
+   "servingTemp": "HOT",
+   "mood": "snack",
+   "tags": [
+    "crunchy",
+    "light"
+   ]
+  },
+  {
+   "restaurant": "Tokyo Ramen House",
+   "category": "Mains",
+   "name": "Chicken Katsu Curry",
+   "description": "Crisp panko chicken cutlet over rice with mild Japanese curry.",
+   "price": 429,
+   "veg": false,
+   "ingredients": "chicken, panko, curry sauce, rice",
+   "spiceLevel": 1,
+   "servingTemp": "HOT",
+   "mood": "hearty meal",
+   "tags": [
+    "crunchy",
+    "savory",
+    "comfort"
+   ]
+  },
+  {
+   "restaurant": "Tokyo Ramen House",
+   "category": "Mains",
+   "name": "Teriyaki Chicken Bowl",
+   "description": "Grilled chicken glazed in sweet soy teriyaki over rice.",
+   "price": 379,
+   "veg": false,
+   "ingredients": "chicken, teriyaki sauce, rice, sesame",
+   "spiceLevel": 0,
+   "servingTemp": "HOT",
+   "mood": "lunch",
+   "tags": [
+    "sweet",
+    "savory"
+   ]
+  },
+  {
+   "restaurant": "Tokyo Ramen House",
+   "category": "Sushi",
+   "name": "Salmon Sashimi",
+   "description": "Twelve slices of silky, cold, fresh Atlantic salmon.",
+   "price": 599,
+   "veg": false,
+   "ingredients": "salmon, wasabi, pickled ginger",
+   "spiceLevel": 0,
+   "servingTemp": "COLD",
+   "mood": "light and fresh",
+   "tags": [
+    "light",
+    "fresh"
+   ]
+  },
+  {
+   "restaurant": "Tokyo Ramen House",
+   "category": "Sushi",
+   "name": "Spicy Tuna Roll",
+   "description": "Tuna with sriracha mayo and cucumber, rolled in rice.",
+   "price": 449,
+   "veg": false,
+   "ingredients": "tuna, sriracha mayo, cucumber, rice, nori",
+   "spiceLevel": 2,
+   "servingTemp": "COLD",
+   "mood": "sushi night",
+   "tags": [
+    "spicy",
+    "fresh",
+    "creamy"
+   ]
+  },
+  {
+   "restaurant": "Tokyo Ramen House",
+   "category": "Sushi",
+   "name": "Vegetable Sushi Platter",
+   "description": "Cucumber, avocado and pickled radish rolls.",
+   "price": 399,
+   "veg": true,
+   "ingredients": "cucumber, avocado, radish, rice, nori",
+   "spiceLevel": 0,
+   "servingTemp": "COLD",
+   "mood": "vegetarian light meal",
+   "tags": [
+    "light",
+    "fresh"
+   ]
+  },
+  {
+   "restaurant": "Tokyo Ramen House",
+   "category": "Desserts",
+   "name": "Matcha Ice Cream",
+   "description": "Creamy green tea ice cream with a gentle bitterness.",
+   "price": 179,
+   "veg": true,
+   "ingredients": "matcha, milk, cream, sugar",
+   "spiceLevel": 0,
+   "servingTemp": "COLD",
+   "mood": "after dinner",
+   "tags": [
+    "sweet",
+    "creamy"
+   ]
+  },
+  {
+   "restaurant": "Tokyo Ramen House",
+   "category": "Desserts",
+   "name": "Dorayaki",
+   "description": "Fluffy pancakes sandwiching sweet red bean paste.",
+   "price": 169,
+   "veg": true,
+   "ingredients": "pancake, red bean paste, honey",
+   "spiceLevel": 0,
+   "servingTemp": "ROOM",
+   "mood": "tea time",
+   "tags": [
+    "sweet",
+    "comfort"
+   ]
+  },
+  {
+   "restaurant": "Tokyo Ramen House",
+   "category": "Desserts",
+   "name": "Mochi Trio",
+   "description": "Soft rice cakes with strawberry, mango and chocolate filling.",
+   "price": 199,
+   "veg": true,
+   "ingredients": "glutinous rice, strawberry, mango, chocolate",
+   "spiceLevel": 0,
+   "servingTemp": "COLD",
+   "mood": "light sweet",
+   "tags": [
+    "sweet",
+    "light"
+   ]
+  },
+  {
+   "restaurant": "Casa Fuego",
+   "category": "Tacos",
+   "name": "Tacos al Pastor",
+   "description": "Chili-marinated pork with grilled pineapple, onion and coriander, sweet heat in every bite.",
+   "price": 349,
+   "veg": false,
+   "ingredients": "pork, guajillo chili, pineapple, onion, coriander",
+   "spiceLevel": 2,
+   "servingTemp": "HOT",
+   "mood": "street food craving",
+   "tags": [
+    "spicy",
+    "sweet",
+    "smoky"
+   ]
+  },
+  {
+   "restaurant": "Casa Fuego",
+   "category": "Tacos",
+   "name": "Beef Birria Tacos",
+   "description": "Crisp tortillas of slow-braised beef dunked in rich chili consome.",
+   "price": 399,
+   "veg": false,
+   "ingredients": "beef, guajillo chili, cheese, consome",
+   "spiceLevel": 2,
+   "servingTemp": "HOT",
+   "mood": "indulgent",
+   "tags": [
+    "savory",
+    "rich",
+    "spicy"
+   ]
+  },
+  {
+   "restaurant": "Casa Fuego",
+   "category": "Mains",
+   "name": "Vegetable Fajita Plate",
+   "description": "Sizzling peppers, onions and mushrooms with tortillas.",
+   "price": 329,
+   "veg": true,
+   "ingredients": "peppers, onion, mushroom, tortilla, lime",
+   "spiceLevel": 1,
+   "servingTemp": "HOT",
+   "mood": "vegetarian dinner",
+   "tags": [
+    "smoky",
+    "savory"
+   ]
+  },
+  {
+   "restaurant": "Casa Fuego",
+   "category": "Mains",
+   "name": "Chicken Burrito",
+   "description": "Rice, beans, grilled chicken and salsa wrapped in a flour tortilla.",
+   "price": 369,
+   "veg": false,
+   "ingredients": "chicken, rice, black beans, salsa, cheese",
+   "spiceLevel": 1,
+   "servingTemp": "HOT",
+   "mood": "filling lunch",
+   "tags": [
+    "savory",
+    "comfort"
+   ]
+  },
+  {
+   "restaurant": "Casa Fuego",
+   "category": "Mains",
+   "name": "Cheese Quesadilla",
+   "description": "Golden tortilla stuffed with melted cheese and peppers.",
+   "price": 249,
+   "veg": true,
+   "ingredients": "tortilla, cheese, peppers, sour cream",
+   "spiceLevel": 0,
+   "servingTemp": "HOT",
+   "mood": "snack",
+   "tags": [
+    "creamy",
+    "savory",
+    "crunchy"
+   ]
+  },
+  {
+   "restaurant": "Casa Fuego",
+   "category": "Mains",
+   "name": "Chipotle Black Bean Soup",
+   "description": "Smoky black bean soup with a chipotle kick.",
+   "price": 229,
+   "veg": true,
+   "ingredients": "black beans, chipotle, tomato, cumin",
+   "spiceLevel": 2,
+   "servingTemp": "HOT",
+   "mood": "cold day",
+   "tags": [
+    "smoky",
+    "spicy",
+    "comfort"
+   ]
+  },
+  {
+   "restaurant": "Casa Fuego",
+   "category": "Starters",
+   "name": "Loaded Nachos",
+   "description": "Tortilla chips under cheese sauce, beans, jalapeno and salsa.",
+   "price": 299,
+   "veg": true,
+   "ingredients": "tortilla chips, cheese sauce, beans, jalapeno, salsa",
+   "spiceLevel": 2,
+   "servingTemp": "HOT",
+   "mood": "sharing",
+   "tags": [
+    "crunchy",
+    "creamy",
+    "spicy"
+   ]
+  },
+  {
+   "restaurant": "Casa Fuego",
+   "category": "Starters",
+   "name": "Guacamole and Chips",
+   "description": "Fresh smashed avocado with lime and warm tortilla chips.",
+   "price": 229,
+   "veg": true,
+   "ingredients": "avocado, lime, onion, coriander, tortilla chips",
+   "spiceLevel": 0,
+   "servingTemp": "ROOM",
+   "mood": "sharing",
+   "tags": [
+    "fresh",
+    "creamy",
+    "crunchy"
+   ]
+  },
+  {
+   "restaurant": "Casa Fuego",
+   "category": "Starters",
+   "name": "Jalapeno Poppers",
+   "description": "Crisp jalapenos stuffed with cream cheese.",
+   "price": 249,
+   "veg": true,
+   "ingredients": "jalapeno, cream cheese, breadcrumbs",
+   "spiceLevel": 2,
+   "servingTemp": "HOT",
+   "mood": "snack",
+   "tags": [
+    "spicy",
+    "crunchy",
+    "creamy"
+   ]
+  },
+  {
+   "restaurant": "Casa Fuego",
+   "category": "Starters",
+   "name": "Mango Habanero Wings",
+   "description": "Crispy wings tossed in a sweet mango and habanero glaze that bites back.",
+   "price": 399,
+   "veg": false,
+   "ingredients": "chicken wings, mango, habanero, lime",
+   "spiceLevel": 4,
+   "servingTemp": "HOT",
+   "mood": "sweet and fire craving",
+   "tags": [
+    "sweet",
+    "spicy",
+    "crunchy"
+   ]
+  },
+  {
+   "restaurant": "Casa Fuego",
+   "category": "Starters",
+   "name": "Elote Street Corn",
+   "description": "Grilled corn with crema, cotija and chili powder.",
+   "price": 179,
+   "veg": true,
+   "ingredients": "corn, crema, cotija, chili powder, lime",
+   "spiceLevel": 1,
+   "servingTemp": "HOT",
+   "mood": "street food craving",
+   "tags": [
+    "creamy",
+    "tangy",
+    "smoky"
+   ]
+  },
+  {
+   "restaurant": "Casa Fuego",
+   "category": "Seafood",
+   "name": "Shrimp Ceviche",
+   "description": "Shrimp cured in lime with tomato, onion and coriander, served cold.",
+   "price": 449,
+   "veg": false,
+   "ingredients": "shrimp, lime, tomato, onion, coriander",
+   "spiceLevel": 1,
+   "servingTemp": "COLD",
+   "mood": "light and bright",
+   "tags": [
+    "tangy",
+    "fresh",
+    "light"
+   ]
+  },
+  {
+   "restaurant": "Casa Fuego",
+   "category": "Desserts",
+   "name": "Churros with Chocolate Sauce",
+   "description": "Cinnamon sugar churros with warm chocolate dip.",
+   "price": 199,
+   "veg": true,
+   "ingredients": "dough, cinnamon sugar, dark chocolate",
+   "spiceLevel": 0,
+   "servingTemp": "HOT",
+   "mood": "treat",
+   "tags": [
+    "sweet",
+    "crunchy",
+    "rich"
+   ]
+  },
+  {
+   "restaurant": "Casa Fuego",
+   "category": "Desserts",
+   "name": "Tres Leches Cake",
+   "description": "Sponge soaked in three milks with whipped cream.",
+   "price": 229,
+   "veg": true,
+   "ingredients": "sponge, condensed milk, evaporated milk, cream",
+   "spiceLevel": 0,
+   "servingTemp": "COLD",
+   "mood": "celebration",
+   "tags": [
+    "sweet",
+    "creamy"
+   ]
+  },
+  {
+   "restaurant": "Casa Fuego",
+   "category": "Drinks",
+   "name": "Horchata",
+   "description": "Chilled rice and cinnamon drink.",
+   "price": 119,
+   "veg": true,
+   "ingredients": "rice, cinnamon, milk, sugar",
+   "spiceLevel": 0,
+   "servingTemp": "COLD",
+   "mood": "hot day",
+   "tags": [
+    "sweet",
+    "creamy",
+    "fresh"
+   ]
+  },
+  {
+   "restaurant": "Casa Fuego",
+   "category": "Drinks",
+   "name": "Pineapple Jalapeno Cooler",
+   "description": "Sparkling pineapple with a jalapeno kick, served over ice.",
+   "price": 189,
+   "veg": true,
+   "ingredients": "pineapple, jalapeno, lime, soda",
+   "spiceLevel": 1,
+   "servingTemp": "COLD",
+   "mood": "something different",
+   "tags": [
+    "sweet",
+    "spicy",
+    "tangy",
+    "fresh"
+   ]
+  },
+  {
+   "restaurant": "Sugar & Spice Patisserie",
+   "category": "Cakes",
+   "name": "Chocolate Lava Cake",
+   "description": "Warm chocolate cake with a molten dark chocolate centre.",
+   "price": 249,
+   "veg": true,
+   "ingredients": "dark chocolate, butter, eggs, flour",
+   "spiceLevel": 0,
+   "servingTemp": "HOT",
+   "mood": "indulgence",
+   "tags": [
+    "sweet",
+    "rich"
+   ]
+  },
+  {
+   "restaurant": "Sugar & Spice Patisserie",
+   "category": "Cakes",
+   "name": "Red Velvet Cupcake",
+   "description": "Red velvet cupcake with cream cheese frosting.",
+   "price": 129,
+   "veg": true,
+   "ingredients": "flour, cocoa, buttermilk, cream cheese",
+   "spiceLevel": 0,
+   "servingTemp": "ROOM",
+   "mood": "treat",
+   "tags": [
+    "sweet",
+    "creamy"
+   ]
+  },
+  {
+   "restaurant": "Sugar & Spice Patisserie",
+   "category": "Cakes",
+   "name": "New York Cheesecake",
+   "description": "Dense baked cheesecake on a biscuit base.",
+   "price": 269,
+   "veg": true,
+   "ingredients": "cream cheese, biscuit, sugar, vanilla",
+   "spiceLevel": 0,
+   "servingTemp": "COLD",
+   "mood": "celebration",
+   "tags": [
+    "sweet",
+    "creamy",
+    "rich"
+   ]
+  },
+  {
+   "restaurant": "Sugar & Spice Patisserie",
+   "category": "Brownies",
+   "name": "Salted Caramel Brownie",
+   "description": "Fudgy brownie with salted caramel ribbons.",
+   "price": 179,
+   "veg": true,
+   "ingredients": "chocolate, caramel, sea salt, butter",
+   "spiceLevel": 0,
+   "servingTemp": "ROOM",
+   "mood": "treat",
+   "tags": [
+    "sweet",
+    "rich",
+    "comfort"
+   ]
+  },
+  {
+   "restaurant": "Sugar & Spice Patisserie",
+   "category": "Brownies",
+   "name": "Chili Chocolate Truffle",
+   "description": "Dark chocolate truffle with a slow cayenne heat.",
+   "price": 149,
+   "veg": true,
+   "ingredients": "dark chocolate, cream, cayenne, cocoa",
+   "spiceLevel": 2,
+   "servingTemp": "ROOM",
+   "mood": "something unusual",
+   "tags": [
+    "sweet",
+    "spicy",
+    "rich"
+   ]
+  },
+  {
+   "restaurant": "Sugar & Spice Patisserie",
+   "category": "Waffles",
+   "name": "Biscoff Waffle",
+   "description": "Warm crisp waffle with Biscoff spread and crumbs.",
+   "price": 249,
+   "veg": true,
+   "ingredients": "waffle, biscoff spread, cream, biscuit",
+   "spiceLevel": 0,
+   "servingTemp": "HOT",
+   "mood": "brunch",
+   "tags": [
+    "sweet",
+    "crunchy",
+    "comfort"
+   ]
+  },
+  {
+   "restaurant": "Sugar & Spice Patisserie",
+   "category": "Bakery",
+   "name": "Cinnamon Roll",
+   "description": "Soft roll swirled with cinnamon sugar and glazed.",
+   "price": 159,
+   "veg": true,
+   "ingredients": "dough, cinnamon, sugar, icing",
+   "spiceLevel": 0,
+   "servingTemp": "HOT",
+   "mood": "breakfast",
+   "tags": [
+    "sweet",
+    "comfort"
+   ]
+  },
+  {
+   "restaurant": "Sugar & Spice Patisserie",
+   "category": "Bakery",
+   "name": "Almond Croissant",
+   "description": "Buttery croissant filled with almond cream.",
+   "price": 149,
+   "veg": true,
+   "ingredients": "croissant, almond cream, almonds",
+   "spiceLevel": 0,
+   "servingTemp": "ROOM",
+   "mood": "breakfast",
+   "tags": [
+    "sweet",
+    "crunchy"
+   ]
+  },
+  {
+   "restaurant": "Sugar & Spice Patisserie",
+   "category": "Bakery",
+   "name": "Mini Doughnuts Box",
+   "description": "Warm mini doughnuts with sugar and dips.",
+   "price": 199,
+   "veg": true,
+   "ingredients": "dough, sugar, chocolate dip",
+   "spiceLevel": 0,
+   "servingTemp": "HOT",
+   "mood": "sharing",
+   "tags": [
+    "sweet",
+    "comfort"
+   ]
+  },
+  {
+   "restaurant": "Sugar & Spice Patisserie",
+   "category": "Bakery",
+   "name": "Spicy Ginger Cookie Box",
+   "description": "Crisp ginger snaps with a peppery bite.",
+   "price": 119,
+   "veg": true,
+   "ingredients": "ginger, black pepper, molasses, flour",
+   "spiceLevel": 1,
+   "servingTemp": "ROOM",
+   "mood": "tea time",
+   "tags": [
+    "sweet",
+    "spicy",
+    "crunchy"
+   ]
+  },
+  {
+   "restaurant": "Sugar & Spice Patisserie",
+   "category": "Tarts",
+   "name": "Fruit Tart",
+   "description": "Vanilla custard in a crisp shell, topped with fresh fruit.",
+   "price": 199,
+   "veg": true,
+   "ingredients": "custard, pastry, strawberry, kiwi",
+   "spiceLevel": 0,
+   "servingTemp": "COLD",
+   "mood": "light sweet",
+   "tags": [
+    "sweet",
+    "tangy",
+    "light"
+   ]
+  },
+  {
+   "restaurant": "Sugar & Spice Patisserie",
+   "category": "Tarts",
+   "name": "Lemon Meringue Pie Slice",
+   "description": "Sharp lemon curd under toasted meringue.",
+   "price": 189,
+   "veg": true,
+   "ingredients": "lemon, meringue, pastry, sugar",
+   "spiceLevel": 0,
+   "servingTemp": "COLD",
+   "mood": "afternoon",
+   "tags": [
+    "sweet",
+    "tangy",
+    "light"
+   ]
+  },
+  {
+   "restaurant": "Sugar & Spice Patisserie",
+   "category": "Tarts",
+   "name": "Berry Pavlova",
+   "description": "Crisp meringue with whipped cream and tart berries.",
+   "price": 229,
+   "veg": true,
+   "ingredients": "meringue, cream, strawberries, raspberries",
+   "spiceLevel": 0,
+   "servingTemp": "COLD",
+   "mood": "summer",
+   "tags": [
+    "sweet",
+    "light",
+    "tangy"
+   ]
+  },
+  {
+   "restaurant": "Sugar & Spice Patisserie",
+   "category": "Frozen",
+   "name": "Vanilla Bean Ice Cream Scoop",
+   "description": "Classic vanilla bean ice cream.",
+   "price": 99,
+   "veg": true,
+   "ingredients": "milk, cream, vanilla bean, sugar",
+   "spiceLevel": 0,
+   "servingTemp": "COLD",
+   "mood": "cooling treat",
+   "tags": [
+    "sweet",
+    "creamy"
+   ]
+  },
+  {
+   "restaurant": "Sugar & Spice Patisserie",
+   "category": "Frozen",
+   "name": "Pistachio Gelato",
+   "description": "Silky gelato made with roasted pistachio.",
+   "price": 149,
+   "veg": true,
+   "ingredients": "pistachio, milk, sugar",
+   "spiceLevel": 0,
+   "servingTemp": "COLD",
+   "mood": "cooling treat",
+   "tags": [
+    "sweet",
+    "creamy"
+   ]
+  },
+  {
+   "restaurant": "Sugar & Spice Patisserie",
+   "category": "Drinks",
+   "name": "Cardamom Hot Chocolate",
+   "description": "Thick hot chocolate warmed with cardamom and cinnamon.",
+   "price": 169,
+   "veg": true,
+   "ingredients": "dark chocolate, milk, cardamom, cinnamon",
+   "spiceLevel": 1,
+   "servingTemp": "HOT",
+   "mood": "cold evening",
+   "tags": [
+    "sweet",
+    "comfort",
+    "rich"
+   ]
+  },
+  {
+   "restaurant": "Green Bowl",
+   "category": "Bowls",
+   "name": "Quinoa Power Bowl",
+   "description": "Quinoa with roasted vegetables, chickpeas and tahini.",
+   "price": 349,
+   "veg": true,
+   "ingredients": "quinoa, chickpeas, sweet potato, kale, tahini",
+   "spiceLevel": 0,
+   "servingTemp": "ROOM",
+   "mood": "healthy lunch",
+   "tags": [
+    "light",
+    "fresh",
+    "savory"
+   ]
+  },
+  {
+   "restaurant": "Green Bowl",
+   "category": "Bowls",
+   "name": "Buddha Bowl",
+   "description": "Brown rice, avocado, edamame, carrot and sesame dressing.",
+   "price": 329,
+   "veg": true,
+   "ingredients": "brown rice, avocado, edamame, carrot, sesame",
+   "spiceLevel": 0,
+   "servingTemp": "ROOM",
+   "mood": "healthy lunch",
+   "tags": [
+    "light",
+    "fresh",
+    "savory"
+   ]
+  },
+  {
+   "restaurant": "Green Bowl",
+   "category": "Bowls",
+   "name": "Salmon Poke Bowl",
+   "description": "Cubed salmon over rice with cucumber, avocado and ponzu.",
+   "price": 449,
+   "veg": false,
+   "ingredients": "salmon, rice, cucumber, avocado, ponzu",
+   "spiceLevel": 0,
+   "servingTemp": "COLD",
+   "mood": "fresh lunch",
+   "tags": [
+    "fresh",
+    "light",
+    "savory"
+   ]
+  },
+  {
+   "restaurant": "Green Bowl",
+   "category": "Salads",
+   "name": "Greek Salad",
+   "description": "Cucumber, tomato, olives and feta with oregano dressing.",
+   "price": 279,
+   "veg": true,
+   "ingredients": "cucumber, tomato, olives, feta, oregano",
+   "spiceLevel": 0,
+   "servingTemp": "COLD",
+   "mood": "light lunch",
+   "tags": [
+    "fresh",
+    "tangy",
+    "light"
+   ]
+  },
+  {
+   "restaurant": "Green Bowl",
+   "category": "Salads",
+   "name": "Grilled Chicken Caesar Salad",
+   "description": "Romaine, grilled chicken, parmesan and creamy Caesar dressing.",
+   "price": 349,
+   "veg": false,
+   "ingredients": "romaine, chicken, parmesan, croutons, caesar dressing",
+   "spiceLevel": 0,
+   "servingTemp": "COLD",
+   "mood": "lunch",
+   "tags": [
+    "savory",
+    "creamy"
+   ]
+  },
+  {
+   "restaurant": "Green Bowl",
+   "category": "Salads",
+   "name": "Watermelon Feta Salad",
+   "description": "Cold watermelon, feta and mint with lime.",
+   "price": 249,
+   "veg": true,
+   "ingredients": "watermelon, feta, mint, lime",
+   "spiceLevel": 0,
+   "servingTemp": "COLD",
+   "mood": "summer",
+   "tags": [
+    "fresh",
+    "sweet",
+    "tangy"
+   ]
+  },
+  {
+   "restaurant": "Green Bowl",
+   "category": "Light bites",
+   "name": "Avocado Toast with Chili Flakes",
+   "description": "Smashed avocado on sourdough with chili flakes.",
+   "price": 249,
+   "veg": true,
+   "ingredients": "sourdough, avocado, chili flakes, lime",
+   "spiceLevel": 1,
+   "servingTemp": "ROOM",
+   "mood": "breakfast",
+   "tags": [
+    "creamy",
+    "light",
+    "spicy"
+   ]
+  },
+  {
+   "restaurant": "Green Bowl",
+   "category": "Light bites",
+   "name": "Falafel Wrap",
+   "description": "Crisp falafel with hummus, pickles and salad in a wrap.",
+   "price": 249,
+   "veg": true,
+   "ingredients": "falafel, hummus, pickles, lettuce, wrap",
+   "spiceLevel": 0,
+   "servingTemp": "ROOM",
+   "mood": "lunch",
+   "tags": [
+    "crunchy",
+    "savory",
+    "fresh"
+   ]
+  },
+  {
+   "restaurant": "Green Bowl",
+   "category": "Light bites",
+   "name": "Hummus Platter with Pita",
+   "description": "Creamy hummus with warm pita and crudites.",
+   "price": 229,
+   "veg": true,
+   "ingredients": "chickpeas, tahini, pita, cucumber, carrot",
+   "spiceLevel": 0,
+   "servingTemp": "ROOM",
+   "mood": "sharing",
+   "tags": [
+    "creamy",
+    "savory",
+    "light"
+   ]
+  },
+  {
+   "restaurant": "Green Bowl",
+   "category": "Light bites",
+   "name": "Sweet Potato Fries with Chipotle Dip",
+   "description": "Baked sweet potato fries with a smoky chipotle dip.",
+   "price": 219,
+   "veg": true,
+   "ingredients": "sweet potato, chipotle, yogurt",
+   "spiceLevel": 1,
+   "servingTemp": "HOT",
+   "mood": "snack",
+   "tags": [
+    "sweet",
+    "crunchy",
+    "smoky"
+   ]
+  },
+  {
+   "restaurant": "Green Bowl",
+   "category": "Mains",
+   "name": "Tofu Stir-fry with Chili Garlic",
+   "description": "Wok-tossed tofu and greens in a chili garlic sauce.",
+   "price": 299,
+   "veg": true,
+   "ingredients": "tofu, bok choy, garlic, red chili, soy",
+   "spiceLevel": 3,
+   "servingTemp": "HOT",
+   "mood": "quick dinner",
+   "tags": [
+    "spicy",
+    "savory",
+    "light"
+   ]
+  },
+  {
+   "restaurant": "Green Bowl",
+   "category": "Soups",
+   "name": "Lentil Soup",
+   "description": "Warm lemony red lentil soup.",
+   "price": 199,
+   "veg": true,
+   "ingredients": "red lentils, carrot, lemon, cumin",
+   "spiceLevel": 0,
+   "servingTemp": "HOT",
+   "mood": "cold day",
+   "tags": [
+    "comfort",
+    "savory",
+    "light"
+   ]
+  },
+  {
+   "restaurant": "Green Bowl",
+   "category": "Drinks",
+   "name": "Green Detox Smoothie",
+   "description": "Spinach, cucumber, apple and lime blended cold.",
+   "price": 179,
+   "veg": true,
+   "ingredients": "spinach, cucumber, apple, lime",
+   "spiceLevel": 0,
+   "servingTemp": "COLD",
+   "mood": "after workout",
+   "tags": [
+    "fresh",
+    "light"
+   ]
+  },
+  {
+   "restaurant": "Green Bowl",
+   "category": "Drinks",
+   "name": "Lemon Ginger Cooler",
+   "description": "Fresh lemon and ginger over ice.",
+   "price": 129,
+   "veg": true,
+   "ingredients": "lemon, ginger, mint, honey",
+   "spiceLevel": 0,
+   "servingTemp": "COLD",
+   "mood": "hot day",
+   "tags": [
+    "tangy",
+    "fresh"
+   ]
+  },
+  {
+   "restaurant": "Green Bowl",
+   "category": "Desserts",
+   "name": "Mango Chia Pudding",
+   "description": "Chilled chia pudding layered with mango.",
+   "price": 199,
+   "veg": true,
+   "ingredients": "chia, coconut milk, mango",
+   "spiceLevel": 0,
+   "servingTemp": "COLD",
+   "mood": "light sweet",
+   "tags": [
+    "sweet",
+    "light",
+    "creamy"
+   ]
+  },
+  {
+   "restaurant": "Green Bowl",
+   "category": "Desserts",
+   "name": "Berry Yogurt Parfait",
+   "description": "Greek yogurt, granola and mixed berries.",
+   "price": 179,
+   "veg": true,
+   "ingredients": "yogurt, granola, berries, honey",
+   "spiceLevel": 0,
+   "servingTemp": "COLD",
+   "mood": "breakfast",
+   "tags": [
+    "sweet",
+    "creamy",
+    "light"
+   ]
+  },
+  {
+   "restaurant": "Bangkok Street",
+   "category": "Noodles",
+   "name": "Pad Thai",
+   "description": "Rice noodles wok-fried with tamarind, peanuts and lime.",
+   "price": 349,
+   "veg": false,
+   "ingredients": "rice noodles, shrimp, tamarind, peanuts, lime",
+   "spiceLevel": 1,
+   "servingTemp": "HOT",
+   "mood": "dinner",
+   "tags": [
+    "sweet",
+    "tangy",
+    "savory"
+   ]
+  },
+  {
+   "restaurant": "Bangkok Street",
+   "category": "Curries",
+   "name": "Green Curry with Rice",
+   "description": "Coconut green curry with Thai basil and vegetables.",
+   "price": 379,
+   "veg": false,
+   "ingredients": "coconut milk, green chili, chicken, thai basil",
+   "spiceLevel": 3,
+   "servingTemp": "HOT",
+   "mood": "comfort dinner",
+   "tags": [
+    "spicy",
+    "creamy",
+    "comfort"
+   ]
+  },
+  {
+   "restaurant": "Bangkok Street",
+   "category": "Curries",
+   "name": "Red Curry Tofu",
+   "description": "Red curry with tofu and bamboo shoots.",
+   "price": 349,
+   "veg": true,
+   "ingredients": "coconut milk, red chili, tofu, bamboo shoot",
+   "spiceLevel": 3,
+   "servingTemp": "HOT",
+   "mood": "vegetarian dinner",
+   "tags": [
+    "spicy",
+    "creamy",
+    "comfort"
+   ]
+  },
+  {
+   "restaurant": "Bangkok Street",
+   "category": "Curries",
+   "name": "Massaman Curry",
+   "description": "Mild, rich peanut and potato curry with warm spices.",
+   "price": 399,
+   "veg": false,
+   "ingredients": "coconut milk, potato, peanut, cinnamon, chicken",
+   "spiceLevel": 1,
+   "servingTemp": "HOT",
+   "mood": "cozy night",
+   "tags": [
+    "creamy",
+    "rich",
+    "comfort"
+   ]
+  },
+  {
+   "restaurant": "Bangkok Street",
+   "category": "Soups",
+   "name": "Tom Yum Soup",
+   "description": "Hot and sour broth with lemongrass, lime leaf and prawns.",
+   "price": 299,
+   "veg": false,
+   "ingredients": "prawns, lemongrass, galangal, lime leaf, chili",
+   "spiceLevel": 3,
+   "servingTemp": "HOT",
+   "mood": "cold or sick day",
+   "tags": [
+    "spicy",
+    "tangy",
+    "light"
+   ]
+  },
+  {
+   "restaurant": "Bangkok Street",
+   "category": "Soups",
+   "name": "Tom Kha Gai",
+   "description": "Creamy coconut galangal soup with chicken.",
+   "price": 329,
+   "veg": false,
+   "ingredients": "coconut milk, galangal, chicken, lime",
+   "spiceLevel": 1,
+   "servingTemp": "HOT",
+   "mood": "comfort",
+   "tags": [
+    "creamy",
+    "tangy",
+    "comfort"
+   ]
+  },
+  {
+   "restaurant": "Bangkok Street",
+   "category": "Salads",
+   "name": "Som Tam Papaya Salad",
+   "description": "Shredded green papaya pounded with chili, lime, palm sugar and peanuts.",
+   "price": 249,
+   "veg": true,
+   "ingredients": "green papaya, chili, lime, palm sugar, peanuts",
+   "spiceLevel": 3,
+   "servingTemp": "COLD",
+   "mood": "bold and fresh",
+   "tags": [
+    "spicy",
+    "tangy",
+    "sweet",
+    "fresh"
+   ]
+  },
+  {
+   "restaurant": "Bangkok Street",
+   "category": "Salads",
+   "name": "Larb Salad",
+   "description": "Minced chicken tossed with lime, mint, chili and toasted rice.",
+   "price": 299,
+   "veg": false,
+   "ingredients": "chicken, lime, mint, chili, toasted rice",
+   "spiceLevel": 2,
+   "servingTemp": "ROOM",
+   "mood": "light and zesty",
+   "tags": [
+    "spicy",
+    "tangy",
+    "fresh"
+   ]
+  },
+  {
+   "restaurant": "Bangkok Street",
+   "category": "Stir-fries",
+   "name": "Thai Basil Chicken",
+   "description": "Stir-fried chicken with holy basil and fiery bird's eye chili.",
+   "price": 349,
+   "veg": false,
+   "ingredients": "chicken, holy basil, bird's eye chili, garlic",
+   "spiceLevel": 4,
+   "servingTemp": "HOT",
+   "mood": "brave appetite",
+   "tags": [
+    "spicy",
+    "savory"
+   ]
+  },
+  {
+   "restaurant": "Bangkok Street",
+   "category": "Stir-fries",
+   "name": "Sweet Chili Crispy Chicken",
+   "description": "Crispy chicken in a sticky Thai sweet-chili glaze.",
+   "price": 379,
+   "veg": false,
+   "ingredients": "chicken, sweet chili sauce, garlic, cornflour",
+   "spiceLevel": 2,
+   "servingTemp": "HOT",
+   "mood": "sweet and spicy craving",
+   "tags": [
+    "sweet",
+    "spicy",
+    "crunchy"
+   ]
+  },
+  {
+   "restaurant": "Bangkok Street",
+   "category": "Stir-fries",
+   "name": "Pineapple Fried Rice",
+   "description": "Wok-fried rice with pineapple, cashews and egg.",
+   "price": 329,
+   "veg": true,
+   "ingredients": "rice, pineapple, cashew, egg",
+   "spiceLevel": 0,
+   "servingTemp": "HOT",
+   "mood": "lunch",
+   "tags": [
+    "sweet",
+    "savory"
+   ]
+  },
+  {
+   "restaurant": "Bangkok Street",
+   "category": "Starters",
+   "name": "Crispy Spring Rolls",
+   "description": "Crisp vegetable spring rolls with sweet chili dip.",
+   "price": 199,
+   "veg": true,
+   "ingredients": "cabbage, carrot, glass noodles, spring roll wrapper",
+   "spiceLevel": 0,
+   "servingTemp": "HOT",
+   "mood": "snack",
+   "tags": [
+    "crunchy",
+    "savory"
+   ]
+  },
+  {
+   "restaurant": "Bangkok Street",
+   "category": "Starters",
+   "name": "Chicken Satay with Peanut Sauce",
+   "description": "Grilled chicken skewers with warm peanut sauce.",
+   "price": 299,
+   "veg": false,
+   "ingredients": "chicken, coconut milk, turmeric, peanut sauce",
+   "spiceLevel": 1,
+   "servingTemp": "HOT",
+   "mood": "sharing",
+   "tags": [
+    "smoky",
+    "savory",
+    "creamy"
+   ]
+  },
+  {
+   "restaurant": "Bangkok Street",
+   "category": "Desserts",
+   "name": "Mango Sticky Rice",
+   "description": "Sweet coconut sticky rice with ripe mango.",
+   "price": 229,
+   "veg": true,
+   "ingredients": "sticky rice, coconut milk, mango, palm sugar",
+   "spiceLevel": 0,
+   "servingTemp": "ROOM",
+   "mood": "dessert",
+   "tags": [
+    "sweet",
+    "creamy",
+    "comfort"
+   ]
+  },
+  {
+   "restaurant": "Bangkok Street",
+   "category": "Desserts",
+   "name": "Coconut Ice Cream",
+   "description": "Coconut ice cream with roasted peanuts.",
+   "price": 149,
+   "veg": true,
+   "ingredients": "coconut milk, cream, peanuts",
+   "spiceLevel": 0,
+   "servingTemp": "COLD",
+   "mood": "cooling treat",
+   "tags": [
+    "sweet",
+    "creamy"
+   ]
+  },
+  {
+   "restaurant": "Bangkok Street",
+   "category": "Drinks",
+   "name": "Thai Iced Tea",
+   "description": "Strong spiced tea over ice with condensed milk.",
+   "price": 129,
+   "veg": true,
+   "ingredients": "tea, condensed milk, star anise, ice",
+   "spiceLevel": 0,
+   "servingTemp": "COLD",
+   "mood": "hot day",
+   "tags": [
+    "sweet",
+    "creamy"
+   ]
+  }
+ ]
+}

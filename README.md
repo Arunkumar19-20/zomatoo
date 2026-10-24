@@ -18,6 +18,7 @@
 - [Why Cravey Is Useful](#why-cravey-is-useful)
 - [Feature Walkthrough & Screenshots](#feature-walkthrough--screenshots)
 - [How Drops Work](#how-drops-work)
+- [Craving Search](#craving-search)
 - [Architecture & Tech Stack](#architecture--tech-stack)
 - [Project Structure](#project-structure)
 - [Getting Started](#getting-started)
@@ -41,9 +42,10 @@ Cravey bridges the gap between conventional on-demand delivery and viral, limite
 1. **Curated Batch Drops**: Timed culinary flash events where a customer reserves one of a limited number of slots and gets a live countdown while paying.
 2. **Zero-Oversell Slot Invariant**: Slot accounting is enforced by single atomic SQL statements and a partial unique index, and is checked by concurrency tests against real PostgreSQL (500 customers racing for 20 slots, two app instances racing for one customer).
 3. **Fair Waitlist**: When a hold lapses or is released, the slot is handed straight to the oldest person in line, never back to the open pool where a faster tap could steal it.
-4. **Four-Role Unified Platform**: Specialized interfaces and workflows for **Customers**, **Restaurant Owners**, **Delivery Partners**, and **Platform Admins**.
-5. **Live Turn-by-Turn Tracking**: Real-time OpenStreetMap route rendering without proprietary map vendor lock-in.
-6. **Decoupled Deterministic Cart**: Offline-first, pure business logic decoupled from network synchronization for zero-latency client math.
+4. **Search by Craving**: type "something sweet but also spicy" and get the top dishes with the reason each matched, from a hybrid retrieval pipeline (embeddings + keywords + flavor tags) with no LLM. See [Craving Search](#craving-search).
+5. **Four-Role Unified Platform**: Specialized interfaces and workflows for **Customers**, **Restaurant Owners**, **Delivery Partners**, and **Platform Admins**.
+6. **Live Turn-by-Turn Tracking**: Real-time OpenStreetMap route rendering without proprietary map vendor lock-in.
+7. **Decoupled Deterministic Cart**: Offline-first, pure business logic decoupled from network synchronization for zero-latency client math.
 
 ---
 
@@ -58,7 +60,7 @@ Cravey bridges the gap between conventional on-demand delivery and viral, limite
   - **Restaurant Owner**: Live kitchen order queue, stock/menu updates, and store open/closed toggles.
   - **Delivery Partner**: Order acceptance, GPS delivery routing, status transitions, and earnings ledger.
   - **Admin**: Platform health, user privilege management, restaurant verification, and transaction analytics.
-- **Testing Rigor**: **144 backend tests** (including 500-customer and multi-instance races against real PostgreSQL via Testcontainers), **94 Flutter tests** (state, widgets, checkout flows, and contract tests parsing JSON captured from a live backend), and a [live smoke script](scripts/demo/e2e_drops_smoke.py). See the [concurrency report](docs/concurrency-report.md).
+- **Testing Rigor**: **182 backend tests** (including 500-customer and multi-instance races against real PostgreSQL via Testcontainers), **117 Flutter tests** (state, widgets, checkout flows, and contract tests parsing JSON captured from a live backend), and a [live smoke script](scripts/demo/e2e_drops_smoke.py). See the [concurrency report](docs/concurrency-report.md).
 
 ---
 
@@ -149,6 +151,40 @@ Dedicated control centers tailored for restaurant managers, delivery couriers, a
 
 ---
 
+## Craving Search
+
+The search bar understands cravings: *"something sweet but also spicy"*, *"creamy and comforting"*, *"a drink to cool down"*,
+*"spicy vegetarian under 300"*. The top matches appear under the bar with the flavors they carry and why they matched.
+
+<p align="center">
+  <img src="docs/screenshots/search_craving.jpg" alt="Dishes for a craving" width="260" />
+  <img src="docs/screenshots/owner_add_dish.jpg" alt="Owner add-dish form with suggested flavor tags" width="420" />
+</p>
+
+**It is retrieval, not generation.** Four independent rankings are merged with Reciprocal Rank Fusion: embeddings
+(BAAI/bge-small-en-v1.5 through ONNX Runtime, inside the backend), BM25 (words, plurals, typos), each part of the craving
+scored on its own, and flavor tags. Dishes that cover every requested flavor get a lift. Without the model files the
+search still works on keywords and tags and reports `mode: KEYWORD`.
+
+**The data comes from the owners.** The add-dish form asks for flavor tags (at least two, from a fixed list of 12),
+spice level, serving temperature, ingredients and mood, and suggests tags live as the owner types. A dish saved without
+tags gets automatic suggestions (marked `AUTO`; owner-confirmed ones count more). Every save updates the search index
+immediately.
+
+```bash
+scripts/search/download_model.sh            # one-time, 133 MB (MIT license); the backend finds it in backend/models
+# load the demo catalog (8 restaurants, 126 dishes with tags), as an admin:
+curl -X POST http://localhost:8080/admin/search/seed -H "Authorization: Bearer <admin token>"
+curl "http://localhost:8080/search/dishes?q=something%20sweet%20but%20also%20spicy&k=10"
+```
+
+How well it works, what was tried and what did not help: [docs/search-quality-report.md](docs/search-quality-report.md).
+In short, on the demo catalog with automatically tagged dishes the first result is relevant far more often than with
+keywords alone (MRR 0.90 vs 0.82), and good owner tags matter most (recall 0.73 to 0.89). The catalog and queries are
+synthetic, so read it as proof the pipeline works, not as a benchmark.
+
+---
+
 ## Architecture & Tech Stack
 
 ```mermaid
@@ -178,6 +214,7 @@ graph TD
 | **Backend Runtime** | Spring Boot 4.0.5, Java 26 / OpenJDK 17+ | Spring MVC REST API with scheduled sweepers (hold expiry, waitlist, refund retries) |
 | **Database & ORM** | PostgreSQL 16+, Spring Data JPA, Hibernate | Relational persistence with partial unique indexes (one live reservation / waitlist entry per customer per drop) |
 | **Schema** | Hibernate `ddl-auto: update` + `DropSchemaInitializer` | Partial unique indexes are created at start-up. The SQL in `db/migration` documents the schema; Spring Boot 4 only applies it once `spring-boot-starter-flyway` is added (not wired yet) |
+| **Search** | ONNX Runtime + bge-small-en-v1.5, in-memory BM25 and vector index | Hybrid craving search inside the backend, no extra service; the index sits behind small interfaces so pgvector can replace it |
 | **Payments** | Stripe Java SDK, `flutter_stripe` | Secure PaymentSheet and idempotent webhook processing |
 | **Integration Testing**| Testcontainers PostgreSQL | Real database integration and 50-user concurrency verification |
 
@@ -196,6 +233,7 @@ cravey/
 │   │   ├── events/               # HoldLapsedEvent, WaitlistOfferedEvent
 │   │   ├── gateway/              # StripeGateway (real) and FakeStripeGateway (test, demo)
 │   │   ├── repository/           # Spring Data repositories with atomic conditional UPDATEs
+│   │   ├── search/               # craving search: tokenizer, ONNX embedder, BM25, vector index, hybrid ranking, auto-tagger
 │   │   └── services/             # DropService, PaymentService, OrderService, schedulers, listeners
 │   ├── src/main/resources/db/migration/   # V1..V3 SQL (documentation of the schema, see above)
 │   └── src/test/                 # unit, integration and Testcontainers concurrency tests
@@ -204,8 +242,9 @@ cravey/
 │   ├── models/                   # DTOs, DropState (polling + server clock), CartState
 │   ├── repositories/ services/   # API interfaces and Dio implementations
 │   ├── screens/                  # Home, DropDetail, DropCheckout, Cart, Checkout, dashboards
-│   └── widgets/drops/            # HoldBanner, DropCard, DropsSection, CountdownText
+│   └── widgets/                  # drops/ (HoldBanner, DropCard ...), search/ (craving results), owner/ (add-dish form)
 ├── scripts/demo/                 # pay_order.sh (plays Stripe) and e2e_drops_smoke.py
+├── scripts/search/               # download_model.sh (embedding model), fetch_indian_food.sh (optional tagger check)
 ├── test/                         # Flutter tests and live-captured JSON fixtures
 ├── openapi.yaml                  # OpenAPI 3.0 contract (copy in backend/)
 └── pubspec.yaml
@@ -346,7 +385,7 @@ Cravey enforces rigorous automated testing across both client and server layers.
 # Analyze code for warnings and lints
 dart analyze
 
-# Run all 94 Flutter unit, widget, contract and characterization tests
+# Run all 117 Flutter unit, widget, contract and characterization tests
 flutter test
 ```
 
@@ -357,7 +396,7 @@ cd backend
 # Run the fast H2 suite
 ./mvnw clean test
 
-# Run everything (144 tests) including the PostgreSQL Testcontainers concurrency suites (needs Docker)
+# Run everything (182 tests) including the PostgreSQL Testcontainers concurrency suites (needs Docker)
 ./mvnw clean verify -Ppostgres
 ```
 
@@ -386,6 +425,7 @@ The REST API contract is fully documented using **OpenAPI 3.0**. View the comple
 Primary API endpoints include:
 - `POST /api/auth/**`: Registration, login, JWT refresh tokens, and email verification.
 - `GET /drops`, `POST /drops/{id}/reserve`, `DELETE /drops/reservations/{id}`, `GET /drops/reservations/mine`: drop discovery, slot holds and release.
+- `GET /search/dishes?q=&k=&veg=&maxPrice=`: craving search (public). `POST /menu-items/suggest-tags`, `GET /menu-items/flavor-tags`, `GET /menu-items/{id}/tags`: owner tag suggestions. `POST /admin/search/seed|reindex`, `GET /admin/search/status`.
 - `POST|DELETE /drops/{id}/waitlist`, `GET /drops/waitlist/mine`: FIFO waitlist with slot hand-off.
 - `GET/POST /api/cart/**`: Remote cart synchronization and validation.
 - `POST /api/orders/**`: Order creation, reservation binding, and order lifecycle status.
@@ -399,6 +439,7 @@ Primary API endpoints include:
 - Flyway migrations are not applied yet (Spring Boot 4 needs `spring-boot-starter-flyway`); the schema comes from Hibernate plus `DropSchemaInitializer`.
 - Money is stored as `double`; integer minor units would be safer.
 - Rate limiting is in memory (single instance); the client polls every few seconds instead of using push.
+- Craving search keeps its index in memory (fine up to tens of thousands of dishes on one server) and was measured on a synthetic catalog; owner tags are what make it good. The Figma design file was matched for the new screens only (colors, chips, cards); older screens were not restyled.
 - The payment flow has been exercised with the fake Stripe gateway and signed webhooks, not against Stripe's live test mode.
 - The order-tracking and multi-role screenshots were not re-captured.
 

@@ -1,0 +1,287 @@
+{
+  "query": "something sweet but also spicy",
+  "mode": "HYBRID",
+  "facets": [
+    "sweet",
+    "spicy"
+  ],
+  "flavors": [
+    "spicy",
+    "sweet"
+  ],
+  "vegOnly": false,
+  "maxPrice": null,
+  "total": 101,
+  "tookMs": 2,
+  "hits": [
+    {
+      "itemId": 92,
+      "name": "Spicy Ginger Cookie Box",
+      "description": "Crisp ginger snaps with a peppery bite.",
+      "price": 119.0,
+      "veg": true,
+      "imageUrl": null,
+      "restaurantId": 7,
+      "restaurantName": "Sugar & Spice Patisserie",
+      "restaurantOpen": true,
+      "spiceLevel": 1,
+      "servingTemp": "ROOM",
+      "tags": [
+        "crunchy",
+        "spicy",
+        "sweet"
+      ],
+      "matchedTags": [
+        "sweet",
+        "spicy"
+      ],
+      "score": 1.0,
+      "reasons": [
+        "Tagged sweet + spicy by the restaurant",
+        "Mentions spicy"
+      ]
+    },
+    {
+      "itemId": 124,
+      "name": "Sweet Chili Crispy Chicken",
+      "description": "Crispy chicken in a sticky Thai sweet-chili glaze.",
+      "price": 379.0,
+      "veg": false,
+      "imageUrl": null,
+      "restaurantId": 9,
+      "restaurantName": "Bangkok Street",
+      "restaurantOpen": true,
+      "spiceLevel": 2,
+      "servingTemp": "HOT",
+      "tags": [
+        "crunchy",
+        "spicy",
+        "sweet"
+      ],
+      "matchedTags": [
+        "sweet",
+        "spicy"
+      ],
+      "score": 0.984,
+      "reasons": [
+        "Tagged sweet + spicy by the restaurant",
+        "Mentions sweet",
+        "Spice level 2 of 4"
+      ]
+    },
+    {
+      "itemId": 26,
+      "name": "Honey Hot Chicken Tenders",
+      "description": "Crispy chicken tenders glazed in hot honey, sweet first then a slow burn.",
+      "price": 379.0,
+      "veg": false,
+      "imageUrl": null,
+      "restaurantId": 3,
+      "restaurantName": "Smokehouse 66",
+      "restaurantOpen": true,
+      "spiceLevel": 2,
+      "servingTemp": "HOT",
+      "tags": [
+        "crunchy",
+        "spicy",
+        "sweet"
+      ],
+      "matchedTags": [
+        "sweet",
+        "spicy"
+      ],
+      "score": 0.968,
+      "reasons": [
+        "Tagged sweet + spicy by the restaurant",
+        "Mentions sweet",
+        "Spice level 2 of 4"
+      ]
+    },
+    {
+      "itemId": 87,
+      "name": "Chili Chocolate Truffle",
+      "description": "Dark chocolate truffle with a slow cayenne heat.",
+      "price": 149.0,
+      "veg": true,
+      "imageUrl": null,
+      "restaurantId": 7,
+      "restaurantName": "Sugar & Spice Patisserie",
+      "restaurantOpen": true,
+      "spiceLevel": 2,
+      "servingTemp": "ROOM",
+      "tags": [
+        "rich",
+        "spicy",
+        "sweet"
+      ],
+      "matchedTags": [
+        "sweet",
+        "spicy"
+      ],
+      "score": 0.919,
+      "reasons": [
+        "Tagged sweet + spicy by the restaurant",
+        "Spice level 2 of 4"
+      ]
+    },
+    {
+      "itemId": 82,
+      "name": "Pineapple Jalapeno Cooler",
+      "description": "Sparkling pineapple with a jalapeno kick, served over ice.",
+      "price": 189.0,
+      "veg": true,
+      "imageUrl": null,
+      "restaurantId": 6,
+      "restaurantName": "Casa Fuego",
+      "restaurantOpen": true,
+      "spiceLevel": 1,
+      "servingTemp": "COLD",
+      "tags": [
+        "fresh",
+        "spicy",
+        "sweet",
+        "tangy"
+      ],
+      "matchedTags": [
+        "sweet",
+        "spicy"
+      ],
+      "score": 0.857,
+      "reasons": [
+        "Tagged sweet + spicy by the restaurant"
+      ]
+    },
+    {
+      "itemId": 76,
+      "name": "Mango Habanero Wings",
+      "description": "Crispy wings tossed in a sweet mango and habanero glaze that bites back.",
+      "price": 399.0,
+      "veg": false,
+      "imageUrl": null,
+      "restaurantId": 6,
+      "restaurantName": "Casa Fuego",
+      "restaurantOpen": true,
+      "spiceLevel": 4,
+      "servingTemp": "HOT",
+      "tags": [
+        "crunchy",
+        "spicy",
+        "sweet"
+      ],
+      "matchedTags": [
+        "sweet",
+        "spicy"
+      ],
+      "score": 0.782,
+      "reasons": [
+        "Tagged sweet + spicy by the restaurant",
+        "Mentions sweet",
+        "Spice level 4 of 4"
+      ]
+    },
+    {
+      "itemId": 67,
+      "name": "Tacos al Pastor",
+      "description": "Chili-marinated pork with grilled pineapple, onion and coriander, sweet heat in every bite.",
+      "price": 349.0,
+      "veg": false,
+      "imageUrl": null,
+      "restaurantId": 6,
+      "restaurantName": "Casa Fuego",
+      "restaurantOpen": true,
+      "spiceLevel": 2,
+      "servingTemp": "HOT",
+      "tags": [
+        "smoky",
+        "spicy",
+        "sweet"
+      ],
+      "matchedTags": [
+        "sweet",
+        "spicy"
+      ],
+      "score": 0.65,
+      "reasons": [
+        "Tagged sweet + spicy by the restaurant",
+        "Mentions sweet",
+        "Spice level 2 of 4"
+      ]
+    },
+    {
+      "itemId": 79,
+      "name": "Churros with Chocolate Sauce",
+      "description": "Cinnamon sugar churros with warm chocolate dip.",
+      "price": 199.0,
+      "veg": true,
+      "imageUrl": null,
+      "restaurantId": 6,
+      "restaurantName": "Casa Fuego",
+      "restaurantOpen": true,
+      "spiceLevel": 0,
+      "servingTemp": "HOT",
+      "tags": [
+        "crunchy",
+        "rich",
+        "sweet"
+      ],
+      "matchedTags": [
+        "sweet"
+      ],
+      "score": 0.647,
+      "reasons": [
+        "Tagged sweet by the restaurant"
+      ]
+    },
+    {
+      "itemId": 38,
+      "name": "Lamb Rogan Josh",
+      "description": "Kashmiri lamb curry with deep red chili and whole spices.",
+      "price": 499.0,
+      "veg": false,
+      "imageUrl": null,
+      "restaurantId": 4,
+      "restaurantName": "Spice Route",
+      "restaurantOpen": true,
+      "spiceLevel": 3,
+      "servingTemp": "HOT",
+      "tags": [
+        "rich",
+        "savory",
+        "spicy"
+      ],
+      "matchedTags": [
+        "spicy"
+      ],
+      "score": 0.636,
+      "reasons": [
+        "Tagged spicy by the restaurant",
+        "Spice level 3 of 4"
+      ]
+    },
+    {
+      "itemId": 98,
+      "name": "Cardamom Hot Chocolate",
+      "description": "Thick hot chocolate warmed with cardamom and cinnamon.",
+      "price": 169.0,
+      "veg": true,
+      "imageUrl": null,
+      "restaurantId": 7,
+      "restaurantName": "Sugar & Spice Patisserie",
+      "restaurantOpen": true,
+      "spiceLevel": 1,
+      "servingTemp": "HOT",
+      "tags": [
+        "comfort",
+        "rich",
+        "sweet"
+      ],
+      "matchedTags": [
+        "sweet"
+      ],
+      "score": 0.633,
+      "reasons": [
+        "Tagged sweet by the restaurant"
+      ]
+    }
+  ]
+}

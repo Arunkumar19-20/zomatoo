@@ -1,0 +1,443 @@
+[
+ {
+  "group": "combo",
+  "q": "something sweet but also spicy",
+  "allOf": [
+   "sweet",
+   "spicy"
+  ]
+ },
+ {
+  "group": "combo",
+  "q": "sweet and spicy",
+  "allOf": [
+   "sweet",
+   "spicy"
+  ]
+ },
+ {
+  "group": "combo",
+  "q": "I want something creamy and comforting",
+  "allOf": [
+   "creamy",
+   "comfort"
+  ]
+ },
+ {
+  "group": "combo",
+  "q": "crunchy but tangy",
+  "allOf": [
+   "crunchy",
+   "tangy"
+  ]
+ },
+ {
+  "group": "combo",
+  "q": "smoky and spicy",
+  "allOf": [
+   "smoky",
+   "spicy"
+  ]
+ },
+ {
+  "group": "combo",
+  "q": "light and fresh",
+  "allOf": [
+   "light",
+   "fresh"
+  ]
+ },
+ {
+  "group": "combo",
+  "q": "sweet but not too heavy",
+  "allOf": [
+   "sweet",
+   "light"
+  ]
+ },
+ {
+  "group": "combo",
+  "q": "crispy and savory snack",
+  "allOf": [
+   "crunchy",
+   "savory"
+  ]
+ },
+ {
+  "group": "combo",
+  "q": "spicy and tangy",
+  "allOf": [
+   "spicy",
+   "tangy"
+  ]
+ },
+ {
+  "group": "combo",
+  "q": "cheesy and crunchy",
+  "allOf": [
+   "creamy",
+   "crunchy"
+  ]
+ },
+ {
+  "group": "combo",
+  "q": "fresh and tangy",
+  "allOf": [
+   "fresh",
+   "tangy"
+  ]
+ },
+ {
+  "group": "combo",
+  "q": "smoky sweet bbq",
+  "allOf": [
+   "smoky",
+   "sweet"
+  ]
+ },
+ {
+  "group": "combo",
+  "q": "creamy and a little spicy",
+  "allOf": [
+   "creamy",
+   "spicy"
+  ]
+ },
+ {
+  "group": "combo",
+  "q": "rich and creamy",
+  "allOf": [
+   "rich",
+   "creamy"
+  ]
+ },
+ {
+  "group": "combo",
+  "q": "sweet and creamy",
+  "allOf": [
+   "sweet",
+   "creamy"
+  ]
+ },
+ {
+  "group": "single",
+  "q": "something spicy",
+  "allOf": [
+   "spicy"
+  ]
+ },
+ {
+  "group": "single",
+  "q": "a sweet treat",
+  "allOf": [
+   "sweet"
+  ]
+ },
+ {
+  "group": "single",
+  "q": "crunchy",
+  "allOf": [
+   "crunchy"
+  ]
+ },
+ {
+  "group": "single",
+  "q": "something creamy",
+  "allOf": [
+   "creamy"
+  ]
+ },
+ {
+  "group": "single",
+  "q": "tangy and zesty",
+  "allOf": [
+   "tangy"
+  ]
+ },
+ {
+  "group": "single",
+  "q": "smoky grilled",
+  "allOf": [
+   "smoky"
+  ]
+ },
+ {
+  "group": "single",
+  "q": "light healthy meal",
+  "allOf": [
+   "light"
+  ]
+ },
+ {
+  "group": "single",
+  "q": "rich indulgent",
+  "allOf": [
+   "rich"
+  ]
+ },
+ {
+  "group": "single",
+  "q": "comfort food",
+  "allOf": [
+   "comfort"
+  ]
+ },
+ {
+  "group": "single",
+  "q": "something refreshing",
+  "allOf": [
+   "fresh"
+  ]
+ },
+ {
+  "group": "constraint",
+  "q": "spicy vegetarian",
+  "allOf": [
+   "spicy"
+  ],
+  "veg": true
+ },
+ {
+  "group": "constraint",
+  "q": "vegetarian creamy comfort",
+  "allOf": [
+   "creamy",
+   "comfort"
+  ],
+  "veg": true
+ },
+ {
+  "group": "constraint",
+  "q": "cold sweet dessert",
+  "allOf": [
+   "sweet"
+  ],
+  "temp": "COLD"
+ },
+ {
+  "group": "constraint",
+  "q": "cold refreshing drink",
+  "categoryAny": [
+   "Drinks"
+  ],
+  "temp": "COLD"
+ },
+ {
+  "group": "constraint",
+  "q": "hot comforting soup",
+  "allOf": [
+   "comfort"
+  ],
+  "temp": "HOT",
+  "nameAny": [
+   "soup",
+   "ramen",
+   "tom kha"
+  ]
+ },
+ {
+  "group": "constraint",
+  "q": "dessert under 150",
+  "categoryAny": [
+   "Desserts",
+   "Cakes",
+   "Brownies",
+   "Waffles",
+   "Bakery",
+   "Tarts",
+   "Frozen"
+  ],
+  "maxPrice": 150
+ },
+ {
+  "group": "constraint",
+  "q": "spicy under 300",
+  "allOf": [
+   "spicy"
+  ],
+  "maxPrice": 300
+ },
+ {
+  "group": "constraint",
+  "q": "mild creamy curry",
+  "allOf": [
+   "creamy"
+  ],
+  "categoryAny": [
+   "Curries"
+  ],
+  "maxSpice": 1
+ },
+ {
+  "group": "intent",
+  "q": "something warm and cozy for a rainy day",
+  "anyOf": [
+   "comfort"
+  ],
+  "temp": "HOT"
+ },
+ {
+  "group": "intent",
+  "q": "late night snack",
+  "allOf": [
+   "crunchy"
+  ],
+  "categoryAny": [
+   "Starters",
+   "Sides",
+   "Snacks",
+   "Light bites",
+   "Chicken"
+  ]
+ },
+ {
+  "group": "intent",
+  "q": "i want to eat something healthy",
+  "anyOf": [
+   "light"
+  ]
+ },
+ {
+  "group": "intent",
+  "q": "a drink to cool down",
+  "categoryAny": [
+   "Drinks"
+  ],
+  "temp": "COLD"
+ },
+ {
+  "group": "intent",
+  "q": "heavy indulgent meal",
+  "anyOf": [
+   "rich"
+  ]
+ },
+ {
+  "group": "intent",
+  "q": "fiery hot",
+  "allOf": [
+   "spicy"
+  ],
+  "minSpice": 3
+ },
+ {
+  "group": "intent",
+  "q": "burning hot wings",
+  "allOf": [
+   "spicy"
+  ],
+  "nameAny": [
+   "wings"
+  ]
+ },
+ {
+  "group": "intent",
+  "q": "something to share with friends",
+  "moodAny": [
+   "sharing"
+  ]
+ },
+ {
+  "group": "intent",
+  "q": "street food chaat",
+  "moodAny": [
+   "street food"
+  ]
+ },
+ {
+  "group": "intent",
+  "q": "dessert",
+  "categoryAny": [
+   "Desserts",
+   "Cakes",
+   "Brownies",
+   "Waffles",
+   "Bakery",
+   "Tarts",
+   "Frozen"
+  ]
+ },
+ {
+  "group": "intent",
+  "q": "something sugary to end the meal",
+  "categoryAny": [
+   "Desserts",
+   "Cakes",
+   "Brownies",
+   "Waffles",
+   "Bakery",
+   "Tarts",
+   "Frozen"
+  ]
+ },
+ {
+  "group": "name",
+  "q": "margherita pizza",
+  "nameAny": [
+   "Margherita Pizza"
+  ]
+ },
+ {
+  "group": "name",
+  "q": "butter chicken",
+  "nameAny": [
+   "Butter Chicken"
+  ]
+ },
+ {
+  "group": "name",
+  "q": "ramen",
+  "nameAny": [
+   "Ramen"
+  ]
+ },
+ {
+  "group": "name",
+  "q": "tacos",
+  "nameAny": [
+   "Tacos"
+  ]
+ },
+ {
+  "group": "name",
+  "q": "biryani",
+  "nameAny": [
+   "Biryani"
+  ]
+ },
+ {
+  "group": "name",
+  "q": "cheesecake",
+  "nameAny": [
+   "Cheesecake"
+  ]
+ },
+ {
+  "group": "name",
+  "q": "tom yum",
+  "nameAny": [
+   "Tom Yum"
+  ]
+ },
+ {
+  "group": "name",
+  "q": "pad thai",
+  "nameAny": [
+   "Pad Thai"
+  ]
+ },
+ {
+  "group": "name",
+  "q": "margarita pizza",
+  "nameAny": [
+   "Margherita Pizza"
+  ]
+ },
+ {
+  "group": "name",
+  "q": "brownies",
+  "nameAny": [
+   "Brownie"
+  ]
+ }
+]

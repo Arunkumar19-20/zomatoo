@@ -2,6 +2,7 @@ package com.example.zomato.services;
 
 import com.example.zomato.entity.MenuItem;
 import com.example.zomato.repository.MenuItemRepository;
+import com.example.zomato.search.SearchIndexService;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -10,13 +11,19 @@ import java.util.List;
 public class MenuItemService {
 
     private final MenuItemRepository repository;
+    private final SearchIndexService searchIndex;
 
-    public MenuItemService(MenuItemRepository repository) {
+    public MenuItemService(MenuItemRepository repository, SearchIndexService searchIndex) {
         this.repository = repository;
+        this.searchIndex = searchIndex;
     }
 
+    /** Saves a dish and makes it searchable right away (owner flavor tags if sent, automatic suggestions otherwise). */
     public MenuItem save(MenuItem menuItem) {
-        return repository.save(menuItem);
+        List<String> ownerTags = SearchIndexService.validateOwnerInput(menuItem);
+        MenuItem saved = repository.save(menuItem);
+        searchIndex.onSaved(saved, ownerTags);
+        return saved;
     }
 
     public List<MenuItem> getAll() {
@@ -30,6 +37,7 @@ public class MenuItemService {
 
     public void delete(int id) {
         repository.deleteById(id);
+        searchIndex.onDeleted(id);
     }
 
     public MenuItem update(int id, MenuItem updated) {
@@ -41,13 +49,21 @@ public class MenuItemService {
         existing.setIsVeg(updated.getIsVeg());
         existing.setPrice(updated.getPrice());
         existing.setCategory(updated.getCategory());
-        return repository.save(existing);
+        existing.setSpiceLevel(updated.getSpiceLevel());
+        existing.setServingTemp(updated.getServingTemp());
+        existing.setIngredients(updated.getIngredients());
+        existing.setMood(updated.getMood());
+        existing.setFlavorTags(updated.getFlavorTags());
+        List<String> ownerTags = SearchIndexService.validateOwnerInput(existing);
+        MenuItem saved = repository.save(existing);
+        searchIndex.onSaved(saved, ownerTags);
+        return saved;
     }
 
     public void updatePrice(int itemId, float price) {
         MenuItem item = getById(itemId);
         item.setPrice(price);
-        repository.save(item);
+        searchIndex.onChanged(repository.save(item));
     }
 
     public void toggleAvailability(int itemId) {
@@ -55,6 +71,6 @@ public class MenuItemService {
         item.setIsAvailable(
                 item.getIsAvailable() == null ? true : !item.getIsAvailable()
         );
-        repository.save(item);
+        searchIndex.onChanged(repository.save(item));
     }
 }

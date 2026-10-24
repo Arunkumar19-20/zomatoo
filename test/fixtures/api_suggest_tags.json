@@ -1,0 +1,38 @@
+{
+  "mode": "SEMANTIC",
+  "suggestions": [
+    {
+      "tag": "spicy",
+      "label": "Spicy",
+      "confidence": 0.91,
+      "reasons": [
+        "mentions \"chili\"",
+        "reads like a spicy dish"
+      ]
+    },
+    {
+      "tag": "crunchy",
+      "label": "Crunchy",
+      "confidence": 0.9,
+      "reasons": [
+        "mentions \"crispy\""
+      ]
+    },
+    {
+      "tag": "sweet",
+      "label": "Sweet",
+      "confidence": 0.8,
+      "reasons": [
+        "mentions \"honey\""
+      ]
+    },
+    {
+      "tag": "creamy",
+      "label": "Creamy",
+      "confidence": 0.5,
+      "reasons": [
+        "mentions \"paneer\""
+      ]
+    }
+  ]
+}

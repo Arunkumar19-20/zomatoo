@@ -5,6 +5,9 @@ import '../services/session_provider.dart';
 import '../services/restaurant_service.dart';
 import '../services/menu_service.dart';
 import '../services/delivery_service.dart';
+import '../services/dish_search_service.dart';
+import '../services/api_client.dart';
+import '../widgets/owner/add_dish_dialog.dart';
 import '../models/models.dart';
 import '../widgets/scale_tap.dart';
 import '../widgets/role_switcher_dialog.dart';
@@ -130,98 +133,54 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
     } catch (_) {}
   }
 
-  void _showAddMenuItemDialog() {
-    final nameCtrl = TextEditingController();
-    final priceCtrl = TextEditingController();
-    final descCtrl = TextEditingController();
-    bool isVeg = true;
+  /// Collects the dish with the details craving search needs, then saves it under one of this restaurant's menu sections.
+  Future<void> _showAddMenuItemDialog() async {
+    final restaurantId = _restaurant?.id;
+    final menuSvc = MenuService();
+    var categories = <MenuCategory>[];
+    if (restaurantId != null) {
+      categories = await menuSvc.getCategoriesByRestaurant(restaurantId).catchError((_) => <MenuCategory>[]);
+    }
+    if (!mounted) return;
 
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDlgState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text('Add Dish to Database', style: TextStyle(fontWeight: FontWeight.bold)),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameCtrl,
-                  decoration: const InputDecoration(labelText: 'Dish Name', hintText: 'e.g. Kadai Paneer'),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: priceCtrl,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Price (₹)', hintText: '260'),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: descCtrl,
-                  decoration: const InputDecoration(labelText: 'Description', hintText: 'Fresh cottage cheese in bell pepper gravy'),
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    const Text('Type:', style: TextStyle(fontWeight: FontWeight.bold)),
-                    const SizedBox(width: 12),
-                    ChoiceChip(
-                      label: const Text('Veg'),
-                      selected: isVeg,
-                      selectedColor: Colors.green.shade100,
-                      onSelected: (val) => setDlgState(() => isVeg = true),
-                    ),
-                    const SizedBox(width: 8),
-                    ChoiceChip(
-                      label: const Text('Non-Veg'),
-                      selected: !isVeg,
-                      selectedColor: Colors.red.shade100,
-                      onSelected: (val) => setDlgState(() => isVeg = false),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (nameCtrl.text.isNotEmpty && priceCtrl.text.isNotEmpty) {
-                  final newDish = MenuItem(
-                    name: nameCtrl.text.trim(),
-                    price: double.tryParse(priceCtrl.text) ?? 200.0,
-                    description: descCtrl.text.trim(),
-                    isVeg: isVeg,
-                    isAvailable: true,
-                    imageUrl: 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=400&fit=crop&q=80',
-                  );
+    final input = await showAddDishDialog(context, tags: DishSearchService(), categories: categories);
+    if (input == null || !mounted) return;
 
-                  Navigator.of(ctx).pop();
-                  setState(() => _loading = true);
-
-                  try {
-                    final menuSvc = MenuService();
-                    final saved = await menuSvc.saveItem(newDish);
-                    setState(() {
-                      _menuItems.insert(0, saved);
-                      _loading = false;
-                    });
-                  } catch (_) {
-                    _loadDatabaseDetails();
-                  }
-                }
-              },
-              child: const Text('Save to DB'),
-            ),
-          ],
-        ),
-      ),
-    );
+    setState(() => _loading = true);
+    try {
+      var categoryId = input.categoryId;
+      if (categoryId == null && restaurantId != null) {
+        // a restaurant without menu sections yet: create the first one
+        final created = await menuSvc.createCategory(restaurantId, MenuCategory(name: 'Mains', displayOrder: 1));
+        categoryId = created.id;
+      }
+      final saved = await menuSvc.saveItem(MenuItem(
+        name: input.name,
+        price: input.price,
+        description: input.description,
+        isVeg: input.isVeg,
+        isAvailable: true,
+        imageUrl: 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=400&fit=crop&q=80',
+        categoryId: categoryId,
+        spiceLevel: input.spiceLevel,
+        servingTemp: input.servingTemp,
+        ingredients: input.ingredients,
+        mood: input.mood,
+        flavorTags: input.flavorTags,
+      ));
+      if (mounted) {
+        setState(() {
+          _menuItems.insert(0, saved);
+          _loading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Dish saved. Customers can find it by craving right away.')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e is ApiException ? e.message : 'Could not save the dish.')));
+      }
+      _loadDatabaseDetails();
+    }
   }
 
   @override

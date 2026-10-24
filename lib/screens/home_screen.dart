@@ -15,6 +15,9 @@ import '../services/restaurant_service.dart';
 import '../services/menu_service.dart';
 import '../services/session_provider.dart';
 import '../models/drop_state.dart';
+import '../models/dish_search_models.dart';
+import '../models/dish_search_state.dart';
+import '../widgets/search/dish_results_section.dart';
 import '../widgets/drops/drops_section.dart';
 import '../widgets/drops/hold_banner.dart';
 
@@ -146,6 +149,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _onSearchChanged(String value) {
+    // craving search (hybrid retrieval on the backend); it debounces itself
+    context.read<DishSearchState>().onQueryChanged(value);
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 300), () {
       setState(() {
@@ -267,6 +272,24 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (_) {
       if (mounted) setState(() => _loadingMore = false);
     }
+  }
+
+  /// Opens the restaurant that serves a dish from the craving results.
+  void _openDish(DishHit hit) {
+    mock.Restaurant? restaurant;
+    for (final r in _apiRestaurants) {
+      if (r.backendId == hit.restaurantId) {
+        restaurant = r;
+        break;
+      }
+    }
+    if (restaurant == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${hit.restaurantName ?? 'That restaurant'} is still loading. Try again in a moment.')),
+      );
+      return;
+    }
+    Navigator.of(context).pushNamed('/restaurant', arguments: restaurant);
   }
 
   List<mock.Restaurant> get _displayRestaurants {
@@ -420,7 +443,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           fontWeight: FontWeight.normal,
                         ),
                         decoration: InputDecoration(
-                          hintText: "Search for foods, restaurants...",
+                          hintText: "Search dishes, or describe a craving...",
                           prefixIcon: const Icon(Icons.search_rounded, color: Colors.grey),
                           suffixIcon: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -430,6 +453,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   icon: const Icon(Icons.clear, size: 20, color: Colors.grey),
                                   onPressed: () {
                                     _searchController.clear();
+                                    context.read<DishSearchState>().clear();
                                     setState(() {
                                       _searchQuery = "";
                                     });
@@ -461,6 +485,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                     ),
+                    // Top matches for a craving like "something sweet but also spicy"
+                    DishResultsSection(onOpen: _openDish),
+
                     // Categories Row
                     SizedBox(
                       height: 100,
@@ -646,7 +673,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 16),
 
                     // Restaurants list — shimmer while loading, real/mock data when ready
-                    _loading
+                    (context.watch<DishSearchState>().active && !_loading && _displayRestaurants.isEmpty)
+                        ? const SizedBox.shrink()
+                        : _loading
                         ? SizedBox(
                             height: 350,
                             child: ListView.builder(

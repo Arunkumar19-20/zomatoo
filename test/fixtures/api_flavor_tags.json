@@ -1,0 +1,50 @@
+[
+  {
+    "id": "sweet",
+    "label": "Sweet"
+  },
+  {
+    "id": "spicy",
+    "label": "Spicy"
+  },
+  {
+    "id": "sour",
+    "label": "Sour"
+  },
+  {
+    "id": "savory",
+    "label": "Savory"
+  },
+  {
+    "id": "creamy",
+    "label": "Creamy"
+  },
+  {
+    "id": "crunchy",
+    "label": "Crunchy"
+  },
+  {
+    "id": "tangy",
+    "label": "Tangy"
+  },
+  {
+    "id": "smoky",
+    "label": "Smoky"
+  },
+  {
+    "id": "light",
+    "label": "Light"
+  },
+  {
+    "id": "rich",
+    "label": "Rich"
+  },
+  {
+    "id": "comfort",
+    "label": "Comfort"
+  },
+  {
+    "id": "fresh",
+    "label": "Fresh"
+  }
+]
