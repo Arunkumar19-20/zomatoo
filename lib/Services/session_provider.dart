@@ -32,18 +32,41 @@ class SessionProvider extends ChangeNotifier {
   String get effectiveRole => _user?.role ?? _selectedRole;
 
   void setSelectedRole(String role) {
-    _selectedRole = role;
+    _selectedRole = normalizeRole(role);
     notifyListeners();
+  }
+
+  /// Normalizes role strings to standard keys: OWNER, DELIVERY, ADMIN, CUSTOMER.
+  /// Handles aliases and typos like RESTAURANT, RESTURENT, etc.
+  static String normalizeRole(String? role) {
+    if (role == null) return 'CUSTOMER';
+    final r = role.trim().toUpperCase();
+    if (r == 'OWNER' ||
+        r == 'RESTAURANT' ||
+        r == 'RESTURENT' ||
+        r == 'RESTAURANT_OWNER' ||
+        r == 'MERCHANT') {
+      return 'OWNER';
+    }
+    if (r == 'DELIVERY' ||
+        r == 'DELIVERY_PARTNER' ||
+        r == 'RIDER' ||
+        r == 'DRIVER') {
+      return 'DELIVERY';
+    }
+    if (r == 'ADMIN' || r == 'ADMINISTRATOR') {
+      return 'ADMIN';
+    }
+    return 'CUSTOMER';
   }
 
   /// Default email mapping to real users present in the PostgreSQL database.
   static String defaultEmailForRole(String role) {
-    switch (role.toUpperCase()) {
+    final normalized = normalizeRole(role);
+    switch (normalized) {
       case 'OWNER':
-      case 'RESTAURANT':
         return 'arunkumar2006.d@gmail.com';
       case 'DELIVERY':
-      case 'DELIVERY_PARTNER':
         return 'rahul.singh@gmail.com';
       case 'ADMIN':
         return 'admin1@zomato.com';
@@ -54,12 +77,11 @@ class SessionProvider extends ChangeNotifier {
   }
 
   static String defaultNameForRole(String role) {
-    switch (role.toUpperCase()) {
+    final normalized = normalizeRole(role);
+    switch (normalized) {
       case 'OWNER':
-      case 'RESTAURANT':
         return 'Arun Kumar';
       case 'DELIVERY':
-      case 'DELIVERY_PARTNER':
         return 'Rahul Singh';
       case 'ADMIN':
         return 'Admin One';
@@ -71,12 +93,11 @@ class SessionProvider extends ChangeNotifier {
 
   /// Returns the appropriate dashboard route for a given user role.
   static String routeForRole(String? role) {
-    switch (role?.toUpperCase()) {
+    final normalized = normalizeRole(role);
+    switch (normalized) {
       case 'OWNER':
-      case 'RESTAURANT':
         return '/restaurant-dashboard';
       case 'DELIVERY':
-      case 'DELIVERY_PARTNER':
         return '/delivery-dashboard';
       case 'ADMIN':
         return '/admin-dashboard';
@@ -91,10 +112,12 @@ class SessionProvider extends ChangeNotifier {
 
   /// Sign-in using real backend HS256 tokens matching the PostgreSQL database users.
   Future<void> loginAsDemo(String role, {String? email, String? name}) async {
-    final resolvedRole = role.toUpperCase();
+    final resolvedRole = normalizeRole(role);
     final resolvedEmail = email ?? defaultEmailForRole(resolvedRole);
     final resolvedName = name ?? defaultNameForRole(resolvedRole);
     final realToken = JwtHelper.generateBackendToken(resolvedEmail, resolvedRole);
+
+    debugPrint('[AUTH] loginAsDemo → role="$resolvedRole" email="$resolvedEmail"');
 
     ApiClient.instance.setToken(realToken);
 
@@ -109,33 +132,38 @@ class SessionProvider extends ChangeNotifier {
       email: resolvedEmail,
       role: resolvedRole,
     );
+    debugPrint('[AUTH] _user.role="${_user?.role}" _selectedRole="$_selectedRole"');
     notifyListeners();
 
     // Fetch real profile details from the database
     await Future.wait([
       _fetchUserProfile(),
-      _fetchCustomerProfile(),
+      // Only fetch customer profile for CUSTOMER role
+      if (resolvedRole == 'CUSTOMER') _fetchCustomerProfile(),
     ]);
+    debugPrint('[AUTH] After profile fetch → _user.role="${_user?.role}" _selectedRole="$_selectedRole"');
   }
 
   /// Called after a successful Google OAuth login.
   Future<void> login(String token, String email, String role) async {
+    final normRole = normalizeRole(role);
     ApiClient.instance.setToken(token);
 
-    _selectedRole = role;
+    _selectedRole = normRole;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('auth_token', token);
     await prefs.setString('auth_email', email);
-    await prefs.setString('auth_role', role);
+    await prefs.setString('auth_role', normRole);
 
     // Set basic user first so the UI can render immediately.
-    _user = AppUser(email: email, role: role);
+    _user = AppUser(email: email, role: normRole);
     notifyListeners();
 
     // Fetch full profile (includes name) and customer profile in parallel.
     await Future.wait([
       _fetchUserProfile(),
-      _fetchCustomerProfile(),
+      // Only fetch customer profile for CUSTOMER role
+      if (normRole == 'CUSTOMER') _fetchCustomerProfile(),
     ]);
   }
 
@@ -148,12 +176,17 @@ class SessionProvider extends ChangeNotifier {
 
     if (token != null && token.isNotEmpty) {
       ApiClient.instance.setToken(token);
-      if (role != null) _selectedRole = role;
-      _user = AppUser(email: email, role: role);
+      // IMPORTANT: set _selectedRole BEFORE _fetchUserProfile runs so its
+      // role guard (`_selectedRole.isNotEmpty ? _selectedRole : ...`) works.
+      if (role != null && role.isNotEmpty) {
+        _selectedRole = normalizeRole(role);
+      }
+      _user = AppUser(email: email, role: _selectedRole);
       notifyListeners();
       await Future.wait([
         _fetchUserProfile(),
-        _fetchCustomerProfile(),
+        // Only fetch customer profile for CUSTOMER role
+        if (_selectedRole == 'CUSTOMER') _fetchCustomerProfile(),
       ]);
     }
   }
@@ -163,22 +196,34 @@ class SessionProvider extends ChangeNotifier {
     try {
       final svc = UserService();
       final profile = await svc.getUserProfile();
-      // Merge the fetched name/userId into the existing user, keeping
-      // the role and email that came from the JWT token.
+      // IMPORTANT: Always keep the role the user explicitly chose (_selectedRole).
+      // The backend /user/profile returns the DB-stored role which may differ
+      // from the role the user selected on the role-selection screen.
+      // The JWT token we generate already encodes the correct chosen role,
+      // so we must never let the backend response override it.
+      final keptRole = _selectedRole.isNotEmpty ? _selectedRole : (_user?.role ?? profile.role);
+      debugPrint('[AUTH] _fetchUserProfile: DB role="${profile.role}" keeping="$keptRole"');
       _user = AppUser(
         userId: profile.userId,
         name: profile.name,
         email: _user?.email ?? profile.email,
-        role: _user?.role ?? profile.role,
+        role: keptRole,
       );
       notifyListeners();
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[AUTH] _fetchUserProfile error: $e');
       // Not fatal — name will fall back to email prefix in the UI.
     }
   }
 
   Future<void> _fetchCustomerProfile() async {
+    // Only valid for CUSTOMER role — other roles will get 403 from the backend
     if (!ApiClient.instance.isLoggedIn) return;
+    final role = _selectedRole.isNotEmpty ? _selectedRole : (_user?.role ?? '');
+    if (role != 'CUSTOMER') {
+      debugPrint('[AUTH] _fetchCustomerProfile skipped for role="$role"');
+      return;
+    }
     _loadingProfile = true;
     notifyListeners();
     try {
@@ -203,3 +248,4 @@ class SessionProvider extends ChangeNotifier {
     notifyListeners();
   }
 }
+

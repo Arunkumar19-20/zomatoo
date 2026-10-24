@@ -4,7 +4,12 @@ import '../widgets/primary_button.dart';
 import '../widgets/scale_tap.dart';
 
 class OnboardingScreen extends StatefulWidget {
-  const OnboardingScreen({super.key});
+  final String nextRoute;
+
+  const OnboardingScreen({
+    super.key,
+    this.nextRoute = '/login',
+  });
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
@@ -52,7 +57,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               width: 300,
               height: 300,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.1),
+                color: Colors.white.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
             ),
@@ -64,7 +69,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               width: 250,
               height: 250,
               decoration: BoxDecoration(
-                color: AppTheme.accentColor.withOpacity(0.2),
+                color: AppTheme.accentColor.withValues(alpha: 0.2),
                 shape: BoxShape.circle,
               ),
             ),
@@ -191,7 +196,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             height: 8,
                             width: _currentIndex == index ? 24 : 8,
                             decoration: BoxDecoration(
-                              color: _currentIndex == index ? Colors.white : Colors.white.withOpacity(0.4),
+                              color: _currentIndex == index ? Colors.white : Colors.white.withValues(alpha: 0.4),
                               borderRadius: BorderRadius.circular(4),
                             ),
                           ),
@@ -209,7 +214,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                               curve: Curves.easeInOut,
                             );
                           } else {
-                            Navigator.of(context).pushReplacementNamed('/role-selection');
+                            Navigator.of(context).pushReplacementNamed(widget.nextRoute);
                           }
                         },
                       ),
@@ -225,3 +230,4 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 }
+

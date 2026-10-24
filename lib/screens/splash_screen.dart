@@ -5,7 +5,24 @@ import '../theme/app_theme.dart';
 import '../Services/session_provider.dart';
 
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Gradient gradient;
+  final Color shadowColor;
+  final String unauthenticatedRoute;
+  final String? fixedRole;
+
+  const SplashScreen({
+    super.key,
+    this.title = 'Cravey',
+    this.subtitle = 'Satisfy Your Desires',
+    this.icon = Icons.restaurant_rounded,
+    this.gradient = AppTheme.primaryGradient,
+    this.shadowColor = const Color(0xFFF25C05),
+    this.unauthenticatedRoute = '/onboarding',
+    this.fixedRole,
+  });
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -39,9 +56,10 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       if (!mounted) return;
       final session = context.read<SessionProvider>();
       final isLoggedIn = session.isLoggedIn;
+      final effectiveRole = widget.fixedRole ?? session.effectiveRole;
       final destination = isLoggedIn
-          ? SessionProvider.routeForRole(session.effectiveRole)
-          : '/onboarding';
+          ? SessionProvider.routeForRole(effectiveRole)
+          : widget.unauthenticatedRoute;
       Navigator.of(context).pushReplacementNamed(destination);
     });
   }
@@ -73,18 +91,18 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                       height: 110,
                       width: 110,
                       decoration: BoxDecoration(
-                        gradient: AppTheme.primaryGradient,
+                        gradient: widget.gradient,
                         borderRadius: BorderRadius.circular(30),
                         boxShadow: [
                           BoxShadow(
-                            color: AppTheme.primaryColor.withOpacity(0.35),
+                            color: widget.shadowColor.withValues(alpha: 0.35),
                             blurRadius: 20,
                             offset: const Offset(0, 8),
                           ),
                         ],
                       ),
-                      child: const Icon(
-                        Icons.restaurant_rounded,
+                      child: Icon(
+                        widget.icon,
                         size: 55,
                         color: Colors.white,
                       ),
@@ -92,9 +110,10 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                     const SizedBox(height: 24),
                     // Wordmark
                     ShaderMask(
-                      shaderCallback: (bounds) => AppTheme.primaryGradient.createShader(bounds),
+                      shaderCallback: (bounds) => widget.gradient.createShader(bounds),
                       child: Text(
-                        "Cravey",
+                        widget.title,
+                        textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.displayMedium?.copyWith(
                               color: Colors.white,
                               fontWeight: FontWeight.w900,
@@ -104,7 +123,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      "Satisfy Your Desires",
+                      widget.subtitle,
+                      textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             color: Colors.grey.shade500,
                             letterSpacing: 2,
@@ -122,3 +142,4 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     );
   }
 }
+

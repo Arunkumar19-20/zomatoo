@@ -31,7 +31,7 @@ class FoodCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
+              color: Colors.black.withValues(alpha: 0.06),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -50,19 +50,19 @@ class FoodCard extends StatelessWidget {
                   ),
                   child: Image.network(
                     restaurant.imageUrl,
-                    height: 160,
+                    height: 135,
                     width: double.infinity,
                     fit: BoxFit.cover,
                     loadingBuilder: (context, child, loadingProgress) {
                       if (loadingProgress == null) return child;
                       return const ShimmerPlaceholder(
                         width: double.infinity,
-                        height: 160,
+                        height: 135,
                         borderRadius: 0,
                       );
                     },
                     errorBuilder: (context, error, stackTrace) => Container(
-                      height: 160,
+                      height: 135,
                       decoration: BoxDecoration(
                         color: Colors.grey.shade50,
                       ),
@@ -81,7 +81,7 @@ class FoodCard extends StatelessWidget {
             
             // Details
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               key: ValueKey(restaurant.id),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

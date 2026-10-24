@@ -1,0 +1,35 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Cravey - Customer App",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main_customer.dart"
+    },
+    {
+      "name": "Cravey Partner - Restaurant App",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main_restaurant.dart"
+    },
+    {
+      "name": "Cravey Rider - Delivery App",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main_delivery.dart"
+    },
+    {
+      "name": "Cravey Admin - Operations Portal",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main_admin.dart"
+    },
+    {
+      "name": "Cravey - All-in-One Suite (Unified)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart"
+    }
+  ]
+}

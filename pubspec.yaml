@@ -43,6 +43,9 @@ dependencies:
   flutter_map: ^7.0.2
   latlong2: ^0.9.1
   crypto: ^3.0.3
+  cached_network_image: ^3.4.1
+  smooth_page_indicator: ^1.2.0
+  flutter_rating_bar: ^4.0.1
 
 dev_dependencies:
   flutter_test:
@@ -96,3 +99,4 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+

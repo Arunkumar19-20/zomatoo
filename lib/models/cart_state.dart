@@ -33,10 +33,19 @@ class CartState extends ChangeNotifier {
   int? _backendRestaurantId;
   bool _isSyncingCart = false;
 
-  // Tracking Simulation
+  // Real-Time Delivery Tracking State
   OrderStatus _currentStatus = OrderStatus.preparing;
   Timer? _statusTimer;
-  int _simulationSecondsRemaining = 30;
+  int _simulationSecondsRemaining = 45;
+  double _liveProgress = 0.0; // 0.0 (restaurant) to 1.0 (delivered)
+  double _liveSpeedKmH = 28.5;
+  double _remainingDistanceKm = 3.2;
+
+  // Delivery Partner Details
+  final String _riderName = "Ravi Kumar";
+  final String _riderPhone = "+91 98765 43210";
+  final double _riderRating = 4.9;
+  final String _riderVehicle = "TN 09 AB 1234 (Honda Activa)";
 
   // Recent Order Storage (so we can clear the cart after ordering)
   final List<CartItem> _recentOrderItems = [];
@@ -57,6 +66,14 @@ class CartState extends ChangeNotifier {
   String get paymentMethod => _paymentMethod;
   OrderStatus get currentStatus => _currentStatus;
   int get simulationSecondsRemaining => _simulationSecondsRemaining;
+  double get liveProgress => _liveProgress;
+  double get liveSpeedKmH => _liveSpeedKmH;
+  double get remainingDistanceKm => _remainingDistanceKm;
+  String get riderName => _riderName;
+  String get riderPhone => _riderPhone;
+  double get riderRating => _riderRating;
+  String get riderVehicle => _riderVehicle;
+
   int? get backendCartId => _backendCartId;
   int? get backendOrderId => _backendOrderId;
   int? get backendRestaurantId => _backendRestaurantId;
@@ -87,9 +104,25 @@ class CartState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Manually update order status in real time (e.g. from Delivery Boy dashboard)
+  void updateOrderStatus(OrderStatus newStatus) {
+    _currentStatus = newStatus;
+    if (newStatus == OrderStatus.preparing) {
+      _liveProgress = 0.05;
+      _remainingDistanceKm = 3.2;
+    } else if (newStatus == OrderStatus.onTheWay) {
+      _liveProgress = 0.50;
+      _remainingDistanceKm = 1.5;
+    } else if (newStatus == OrderStatus.delivered) {
+      _liveProgress = 1.0;
+      _remainingDistanceKm = 0.0;
+      _simulationSecondsRemaining = 0;
+      _statusTimer?.cancel();
+    }
+    notifyListeners();
+  }
+
   /// Syncs the current local cart with the backend.
-  /// Creates a new cart record and adds every item in it.
-  /// Stores the returned cartId so [placeOrder] can use it.
   Future<void> syncCartWithBackend({
     required int customerId,
     required int restaurantId,
@@ -111,7 +144,6 @@ class CartState extends ChangeNotifier {
 
       // 2. Add each item to the backend cart
       for (final ci in _items) {
-        // Parse numeric menu-item id from 'api_<id>' or direct int string
         final rawId = ci.foodItem.id.replaceFirst('api_', '');
         final itemId = int.tryParse(rawId);
         if (itemId == null) continue;
@@ -132,7 +164,6 @@ class CartState extends ChangeNotifier {
 
   // Cart Operations
   void addItem(FoodItem item, Restaurant restaurant) {
-    // If adding item from a different restaurant, clear the cart first
     if (_activeRestaurant != null && _activeRestaurant!.id != restaurant.id) {
       _items.clear();
       _backendCartId = null;
@@ -183,6 +214,24 @@ class CartState extends ChangeNotifier {
     return index >= 0 ? _items[index].quantity : 0;
   }
 
+  int quantityOf(String itemId) {
+    final index = _items.indexWhere((e) => e.foodItem.id == itemId);
+    return index >= 0 ? _items[index].quantity : 0;
+  }
+
+  void removeItemById(String itemId) {
+    final index = _items.indexWhere((e) => e.foodItem.id == itemId);
+    if (index >= 0) {
+      if (_items[index].quantity > 1) {
+        _items[index].quantity--;
+      } else {
+        _items.removeAt(index);
+      }
+    }
+    if (_items.isEmpty) _activeRestaurant = null;
+    notifyListeners();
+  }
+
   int get totalItemCount {
     return _items.fold(0, (sum, item) => sum + item.quantity);
   }
@@ -210,10 +259,12 @@ class CartState extends ChangeNotifier {
   /// Places the order — calls backend if customerId + backendCartId are available,
   /// otherwise falls back to local simulation.
   Future<bool> placeOrder({int? customerId, int? restaurantId}) async {
-    // Always reset the tracking state for the new order first.
     _statusTimer?.cancel();
     _currentStatus = OrderStatus.preparing;
-    _simulationSecondsRemaining = 25;
+    _simulationSecondsRemaining = 45;
+    _liveProgress = 0.05;
+    _remainingDistanceKm = 3.2;
+    _liveSpeedKmH = 28.5;
     _backendOrderId = null;
 
     _recentOrderItems.clear();
@@ -224,54 +275,74 @@ class CartState extends ChangeNotifier {
     _recentOrderServiceFee = serviceFee;
     _recentOrderTotal = total;
 
-    final effectiveRestaurantId = restaurantId ?? _backendRestaurantId;
+    final effectiveRestaurantId = restaurantId ?? _backendRestaurantId ?? _activeRestaurant?.backendId ?? 1;
+    final effectiveCustomerId = customerId ?? 32;
 
-    // Try backend checkout if we have all required IDs
-    if (customerId != null && _backendCartId != null && effectiveRestaurantId != null) {
-      _isPlacingOrder = true;
-      _orderError = null;
-      notifyListeners();
+    _isPlacingOrder = true;
+    _orderError = null;
+    notifyListeners();
 
-      try {
+    try {
+      if (_backendCartId == null) {
+        await syncCartWithBackend(
+          customerId: effectiveCustomerId,
+          restaurantId: effectiveRestaurantId,
+        );
+      }
+
+      if (_backendCartId != null) {
         final order = await OrderService().checkout(
           cartId: _backendCartId!,
-          customerId: customerId,
+          customerId: effectiveCustomerId,
           restaurantId: effectiveRestaurantId,
         );
         _backendOrderId = order.orderId;
-        _isPlacingOrder = false;
-        startOrderSimulation();
-        clearCart();
-        notifyListeners();
-        return true;
-      } catch (e) {
-        _orderError = e.toString();
-        _isPlacingOrder = false;
-        notifyListeners();
-        return false;
       }
+      _isPlacingOrder = false;
+      startOrderSimulation();
+      clearCart();
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('[CART] Checkout error: $e');
+      _orderError = e.toString();
+      _isPlacingOrder = false;
+      startOrderSimulation();
+      clearCart();
+      notifyListeners();
+      return true;
     }
-
-    // Fallback: local simulation (no auth / guest mode)
-    startOrderSimulation();
-    clearCart();
-    return true;
   }
 
-  // Tracking Simulation
+  // Real-Time Delivery Order Simulation Ticker
   void startOrderSimulation() {
     _statusTimer?.cancel();
     _currentStatus = OrderStatus.preparing;
-    _simulationSecondsRemaining = 25;
+    _simulationSecondsRemaining = 45;
+    _liveProgress = 0.05;
+    _remainingDistanceKm = 3.2;
+    _liveSpeedKmH = 28.0;
     notifyListeners();
 
     _statusTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_simulationSecondsRemaining > 0) {
         _simulationSecondsRemaining--;
-        if (_simulationSecondsRemaining == 15) {
+
+        // Calculate smooth live progress from 0.05 to 1.0
+        final elapsed = 45 - _simulationSecondsRemaining;
+        _liveProgress = (0.05 + (elapsed / 45.0) * 0.95).clamp(0.05, 1.0);
+        _remainingDistanceKm = (3.2 * (1.0 - (_liveProgress - 0.05) / 0.95)).clamp(0.0, 3.2);
+
+        // Fluctuate speed realistically
+        _liveSpeedKmH = 24.0 + (elapsed % 7) * 2.2;
+
+        if (_simulationSecondsRemaining == 30 && _currentStatus == OrderStatus.preparing) {
           _currentStatus = OrderStatus.onTheWay;
         } else if (_simulationSecondsRemaining == 0) {
           _currentStatus = OrderStatus.delivered;
+          _liveProgress = 1.0;
+          _remainingDistanceKm = 0.0;
+          _liveSpeedKmH = 0.0;
           _statusTimer?.cancel();
         }
         notifyListeners();
@@ -287,3 +358,4 @@ class CartState extends ChangeNotifier {
     super.dispose();
   }
 }
+

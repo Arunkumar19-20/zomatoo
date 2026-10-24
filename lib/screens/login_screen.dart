@@ -7,7 +7,14 @@ import '../Services/session_provider.dart';
 import 'package:provider/provider.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  final String? fixedRole;
+  final String? nextRoute;
+
+  const LoginScreen({
+    super.key,
+    this.fixedRole,
+    this.nextRoute,
+  });
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -19,23 +26,79 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _isLoading = false;
 
-  String get _currentRole {
-    final arg = ModalRoute.of(context)?.settings.arguments;
-    if (arg is String && arg.isNotEmpty) return arg;
-    return context.read<SessionProvider>().selectedRole;
+  // Current role for login — defaults to CUSTOMER but syncs from arguments/provider.
+  String _role = 'CUSTOMER';
+  bool _roleInitialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.fixedRole != null && widget.fixedRole!.isNotEmpty) {
+      _role = SessionProvider.normalizeRole(widget.fixedRole);
+      _roleInitialized = true;
+      _emailController.text = SessionProvider.defaultEmailForRole(_role);
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_roleInitialized) return;
+    _roleInitialized = true;
+
+    if (widget.fixedRole != null && widget.fixedRole!.isNotEmpty) {
+      _role = SessionProvider.normalizeRole(widget.fixedRole);
+    } else {
+      final arg = ModalRoute.of(context)?.settings.arguments;
+      debugPrint('[LOGIN] didChangeDependencies: arg=$arg (${arg.runtimeType})');
+      if (arg is String && arg.trim().isNotEmpty) {
+        _role = SessionProvider.normalizeRole(arg);
+      } else {
+        _role = SessionProvider.normalizeRole(context.read<SessionProvider>().selectedRole);
+      }
+    }
+    debugPrint('[LOGIN] _role resolved to: "$_role"');
+  }
+
+  void _detectRoleFromInput(String value) {
+    if (widget.fixedRole != null) return; // Do not auto-switch role in role-locked apps
+    final v = value.trim().toLowerCase();
+    String? detected;
+    if (v.contains('restaurant') ||
+        v.contains('resturent') ||
+        v.contains('owner') ||
+        v.contains('bistro') ||
+        v == 'arunkumar2006.d@gmail.com') {
+      detected = 'OWNER';
+    } else if (v.contains('delivery') ||
+        v.contains('rider') ||
+        v == 'rahul.singh@gmail.com') {
+      detected = 'DELIVERY';
+    } else if (v.contains('admin') ||
+        v == 'admin1@zomato.com') {
+      detected = 'ADMIN';
+    }
+    if (detected != null && detected != _role) {
+      setState(() => _role = detected!);
+      context.read<SessionProvider>().setSelectedRole(detected);
+    }
   }
 
   void _navigateToDashboard(String role) {
-    final destination = SessionProvider.routeForRole(role);
-    Navigator.of(context).pushNamedAndRemoveUntil(destination, (route) => false);
+    final destination = widget.nextRoute ?? SessionProvider.routeForRole(role);
+    debugPrint('[NAV] _navigateToDashboard: role="$role" → route="$destination"');
+    Navigator.of(context)
+        .pushNamedAndRemoveUntil(destination, (route) => false);
   }
 
   /// Sign in with standard email/password or demo sign-in
   void _handleSignIn() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
-      final role = _currentRole;
       final email = _emailController.text.trim();
+      _detectRoleFromInput(email);
+      final role = _role;
+      debugPrint('[LOGIN] _handleSignIn: role="$role" email="$email"');
       await context.read<SessionProvider>().loginAsDemo(
             role,
             email: email.isNotEmpty ? email : null,
@@ -49,7 +112,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _handleQuickDemoSignIn() async {
     setState(() => _isLoading = true);
-    final role = _currentRole;
+    final role = _role;
+    debugPrint('[LOGIN] _handleQuickDemoSignIn: role="$role"');
     await context.read<SessionProvider>().loginAsDemo(role);
     if (mounted) {
       setState(() => _isLoading = false);
@@ -58,20 +122,21 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _handleGoogleSignIn() async {
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
     try {
-      final role = _currentRole;
-      final result = await AuthService.instance.loginWithGoogle(context, role: role);
+      final role = _role; // use captured, stable role
+      final result =
+          await AuthService.instance.loginWithGoogle(context, role: role);
       if (result != null && mounted) {
         await context.read<SessionProvider>().login(
               result.token,
               result.email,
-              result.role,
+              // Always honour the role the user chose on the selection screen;
+              // don't let the OAuth response override it.
+              role,
             );
         if (mounted) {
-          _navigateToDashboard(result.role);
+          _navigateToDashboard(role);
         }
       }
     } catch (e) {
@@ -81,11 +146,7 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -98,7 +159,7 @@ class _LoginScreenState extends State<LoginScreen> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 8,
               offset: const Offset(0, 3),
             ),
@@ -127,7 +188,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   IconData get _roleIcon {
-    switch (_currentRole.toUpperCase()) {
+    switch (_role.toUpperCase()) {
       case 'OWNER':
       case 'RESTAURANT':
         return Icons.storefront_rounded;
@@ -141,7 +202,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   String get _roleTitle {
-    switch (_currentRole.toUpperCase()) {
+    switch (_role.toUpperCase()) {
       case 'OWNER':
       case 'RESTAURANT':
         return "Restaurant Partner";
@@ -155,7 +216,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   String get _roleSubtitle {
-    switch (_currentRole.toUpperCase()) {
+    switch (_role.toUpperCase()) {
       case 'OWNER':
       case 'RESTAURANT':
         return "Sign in to manage kitchen orders,\nmenu items & live restaurant status";
@@ -166,6 +227,57 @@ class _LoginScreenState extends State<LoginScreen> {
       default:
         return "Sign in to continue with your food\ndelivery service";
     }
+  }
+
+  Widget _buildRoleSegment(String roleKey, String title, IconData icon) {
+    final isSelected = _role == roleKey;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() => _role = roleKey);
+          context.read<SessionProvider>().setSelectedRole(roleKey);
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 2),
+          decoration: BoxDecoration(
+            color: isSelected ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.09),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 19,
+                color: isSelected ? AppTheme.primaryColor : Colors.white.withValues(alpha: 0.9),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                  color: isSelected ? AppTheme.textDark : Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -202,62 +314,90 @@ class _LoginScreenState extends State<LoginScreen> {
                 key: _formKey,
                 child: Column(
                   children: [
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 16),
 
-                    // Role Switcher Pill
-                    Center(
-                      child: ScaleTap(
-                        onTap: () {
-                          Navigator.of(context).pushReplacementNamed('/role-selection');
-                        },
+                    if (widget.fixedRole == null) ...[
+                      // Interactive 4-Role Segmented Selector for Unified App
+                      Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+                        ),
+                        child: Row(
+                          children: [
+                            _buildRoleSegment('CUSTOMER', 'Customer', Icons.restaurant_rounded),
+                            _buildRoleSegment('OWNER', 'Restaurant', Icons.storefront_rounded),
+                            _buildRoleSegment('DELIVERY', 'Delivery', Icons.two_wheeler_rounded),
+                            _buildRoleSegment('ADMIN', 'Admin', Icons.admin_panel_settings_rounded),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Link to full role overview if desired
+                      Center(
+                        child: ScaleTap(
+                          onTap: () {
+                            Navigator.of(context).pushReplacementNamed('/role-selection');
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.85),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(_roleIcon, size: 14, color: AppTheme.primaryColor),
+                                const SizedBox(width: 6),
+                                Text(
+                                  "Signing in as $_roleTitle",
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppTheme.textDark,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                const Icon(Icons.info_outline_rounded, size: 14, color: AppTheme.primaryColor),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ] else ...[
+                      // Dedicated App Role Pill
+                      Center(
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: Colors.white.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(20),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.06),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
+                            border: Border.all(color: Colors.white.withValues(alpha: 0.4)),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(_roleIcon, size: 16, color: AppTheme.primaryColor),
+                              Icon(_roleIcon, size: 16, color: Colors.white),
                               const SizedBox(width: 8),
                               Text(
-                                "Role: $_roleTitle",
+                                "$_roleTitle App".toUpperCase(),
                                 style: const TextStyle(
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppTheme.textDark,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.primaryColor.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Text(
-                                  "Switch",
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppTheme.primaryColor,
-                                  ),
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 12,
+                                  letterSpacing: 1.0,
                                 ),
                               ),
                             ],
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 24),
+                    ],
+                    const SizedBox(height: 20),
                     
                     // Role Icon Square Badge
                     Center(
@@ -271,7 +411,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: Icon(_roleIcon, color: AppTheme.textDark, size: 40),
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
                     
                     // Welcome heading
                     Text(
@@ -296,7 +436,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         height: 1.4,
                       ),
                     ),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 28),
                     
                     // Email Input Field (White card with shadow)
                     Container(
@@ -312,6 +452,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       child: TextFormField(
                         controller: _emailController,
+                        onChanged: _detectRoleFromInput,
                         decoration: const InputDecoration(
                           hintText: "Email Address or Phone Number",
                           prefixIcon: Icon(Icons.person_outline_rounded, color: Colors.grey),
@@ -416,7 +557,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: Text(
                             "Or sign in with",
                             style: TextStyle(
-                              color: AppTheme.textDark.withOpacity(0.7),
+                              color: AppTheme.textDark.withValues(alpha: 0.7),
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
                             ),
@@ -455,7 +596,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         Text(
                           "Don't have an account? ",
                           style: TextStyle(
-                            color: AppTheme.textDark.withOpacity(0.8),
+                            color: AppTheme.textDark.withValues(alpha: 0.8),
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -489,8 +630,8 @@ class _LoginScreenState extends State<LoginScreen> {
 class WaveBackgroundPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paintLight = Paint()..color = Colors.white.withOpacity(0.12);
-    final paintAccent = Paint()..color = const Color(0xFFFFD54F).withOpacity(0.18); // Yellow
+    final paintLight = Paint()..color = Colors.white.withValues(alpha: 0.12);
+    final paintAccent = Paint()..color = const Color(0xFFFFD54F).withValues(alpha: 0.18); // Yellow
     
     // Bottom Wave blob 1
     final path1 = Path();
@@ -516,3 +657,4 @@ class WaveBackgroundPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
+
