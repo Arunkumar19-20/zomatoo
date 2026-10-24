@@ -75,6 +75,9 @@ class DishSearchResponse {
   final int tookMs;
   final List<DishHit> hits;
 
+  /// Id of the logged search, to report a tap on a result against. Null when the server did not log it (do-not-track, logging off).
+  final String? searchId;
+
   const DishSearchResponse({
     required this.query,
     required this.mode,
@@ -85,6 +88,7 @@ class DishSearchResponse {
     this.total = 0,
     this.tookMs = 0,
     this.hits = const [],
+    this.searchId,
   });
 
   factory DishSearchResponse.fromJson(Map<String, dynamic> j) => DishSearchResponse(
@@ -97,6 +101,7 @@ class DishSearchResponse {
         total: (j['total'] as num?)?.toInt() ?? 0,
         tookMs: (j['tookMs'] as num?)?.toInt() ?? 0,
         hits: (j['hits'] as List? ?? const []).map((e) => DishHit.fromJson(e as Map<String, dynamic>)).toList(),
+        searchId: j['searchId']?.toString(),
       );
 }
 

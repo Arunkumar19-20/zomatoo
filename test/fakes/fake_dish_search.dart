@@ -40,9 +40,10 @@ DishSearchResponse makeResponse(
   String mode = 'HYBRID',
   bool veg = false,
   double? maxPrice,
+  String? searchId,
 }) {
   final h = hits ?? [makeHit()];
-  return DishSearchResponse(query: q, mode: mode, facets: facets, flavors: flavors, vegOnly: veg, maxPrice: maxPrice, total: total ?? h.length, tookMs: 12, hits: h);
+  return DishSearchResponse(query: q, mode: mode, facets: facets, flavors: flavors, vegOnly: veg, maxPrice: maxPrice, total: total ?? h.length, tookMs: 12, hits: h, searchId: searchId);
 }
 
 /// Scripted /search/dishes: tests decide what each query returns and when.
@@ -50,6 +51,12 @@ class FakeDishSearchRepository implements DishSearchRepository {
   final List<(String, int)> calls = [];
   Future<DishSearchResponse> Function(String q, int k)? handler;
   ApiException? error;
+  final List<(String, int, int, String)> clicks = [];
+
+  @override
+  Future<void> reportClick(String searchId, int itemId, int rank, {String action = 'OPEN'}) async {
+    clicks.add((searchId, itemId, rank, action));
+  }
 
   @override
   Future<DishSearchResponse> search(String query, {int k = 10, bool? veg, double? maxPrice}) {

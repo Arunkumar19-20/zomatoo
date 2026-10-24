@@ -40,6 +40,21 @@ public class SearchProperties {
     @Value("${search.rate-limit-per-minute:60}")
     private int rateLimitPerMinute;
 
+    /** A dish this close in meaning to the craving counts as relevant when judging whether a craving is served. */
+    @Value("${search.log.unmet-similarity:0.62}")
+    private double unmetSimilarity;
+
+    @Value("${search.log.enabled:true}")
+    private boolean logEnabled;
+
+    /** Raw search text is deleted after this many days; the aggregates built from it stay. */
+    @Value("${search.log.retention-days:90}")
+    private int logRetentionDays;
+
+    /** Secret mixed into the anonymous session key; set SEARCH_LOG_SECRET in production. */
+    @Value("${search.log.session-secret:dev-only-change-me}")
+    private String logSessionSecret;
+
     public String modelDir() { return modelDir; }
     public int defaultK() { return defaultK; }
     public int maxK() { return maxK; }
@@ -50,6 +65,12 @@ public class SearchProperties {
     public double tagWeight() { return tagWeight; }
     public double coverageBonus() { return coverageBonus; }
     public int rateLimitPerMinute() { return rateLimitPerMinute; }
+    public double unmetSimilarity() { return unmetSimilarity; }
+    public boolean logEnabled() { return logEnabled; }
+    public int logRetentionDays() { return logRetentionDays; }
+    public String logSessionSecret() { return logSessionSecret; }
+    void setUnmetSimilarity(double v) { this.unmetSimilarity = v; }
+    void setLogEnabled(boolean v) { this.logEnabled = v; }
 
     // setters exist for the evaluation, which sweeps weights; production reads the values from configuration
     void setDenseWeight(double v) { this.denseWeight = v; }

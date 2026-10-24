@@ -94,6 +94,13 @@ class DishSearchState extends ChangeNotifier {
 
   void clear() => onQueryChanged('');
 
+  /// A result was tapped. Reported against the search that produced the list on screen, once per tap, fire and forget.
+  void reportOpen(DishHit hit, int rank) {
+    final id = _response?.searchId;
+    if (id == null) return;
+    unawaited(_repo.reportClick(id, hit.itemId, rank).catchError((_) {}));
+  }
+
   void _notify() {
     if (!_disposed) notifyListeners();
   }

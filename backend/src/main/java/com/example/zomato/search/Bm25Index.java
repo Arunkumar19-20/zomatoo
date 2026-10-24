@@ -93,6 +93,44 @@ public final class Bm25Index {
         return scored.size() > limit ? new ArrayList<>(scored.subList(0, limit)) : scored;
     }
 
+    /** Words that describe a craving without naming a dish ("fusion", "food"); they say nothing about whether the menu has it. */
+    private static final Set<String> GENERIC = Set.of("food", "foods", "meal", "dish", "dishe", "item", "something", "anything", "thing",
+            "eat", "want", "order", "good", "best", "nice", "tasty", "delicious", "fusion", "style", "type", "kind", "new", "special");
+
+    /**
+     * @param terms        distinct content words in the craving (generic words dropped)
+     * @param unknown      of those, how many the menu does not contain at all (not even as a near-miss spelling)
+     * @param fullMatches  dishes that contain every content word
+     */
+    public record FullMatch(int terms, int unknown, int fullMatches) {}
+
+    /** How many dishes carry ALL of the query's content words: "kimchi carbonara" is 0 even if each word alone is served. */
+    public synchronized FullMatch fullMatch(String query, IntPredicate filter) {
+        Set<String> terms = new java.util.LinkedHashSet<>();
+        for (String t : tokenize(query)) if (!GENERIC.contains(t)) terms.add(t);
+        if (terms.isEmpty() || docs.isEmpty()) return new FullMatch(terms.size(), 0, 0);
+        List<Set<String>> alternatives = new ArrayList<>();
+        int unknown = 0;
+        for (String t : terms) {
+            Set<String> alt = df.containsKey(t) ? Set.of(t) : nearTerms(t);
+            if (alt.isEmpty()) unknown++;
+            alternatives.add(alt);
+        }
+        if (unknown > 0) return new FullMatch(terms.size(), unknown, 0);
+        int full = 0;
+        for (var e : docs.entrySet()) {
+            if (!filter.test(e.getKey())) continue;
+            boolean all = true;
+            for (Set<String> alt : alternatives) {
+                boolean any = false;
+                for (String a : alt) if (e.getValue().tf().containsKey(a)) { any = true; break; }
+                if (!any) { all = false; break; }
+            }
+            if (all) full++;
+        }
+        return new FullMatch(terms.size(), 0, full);
+    }
+
     /** Index terms within a small edit distance, or sharing a prefix, of an unknown query term. */
     private Set<String> nearTerms(String term) {
         Set<String> out = new HashSet<>();

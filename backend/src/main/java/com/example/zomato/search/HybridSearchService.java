@@ -54,7 +54,25 @@ public class HybridSearchService {
 
     public record Hit(DishDoc doc, double score, double raw, List<String> matchedTags, List<String> reasons, boolean ownerConfirmedAll) {}
 
-    public record Result(ParsedQuery parsed, String mode, int total, List<Hit> hits, long tookMs) {}
+    /**
+     * How good the answer was, in absolute terms (the hit scores are relative to the best hit and cannot tell that).
+     * Feeds the search log, where it separates cravings the menus satisfy from cravings nobody serves yet.
+     *
+     * @param relevantCount     dishes that matched on words, on requested flavors, or on meaning above the similarity threshold
+     * @param bm25Candidates    dishes the keyword index matched at all
+     * @param terms             content words in the craving (generic words such as "fusion" dropped)
+     * @param unknownTerms      of those, how many no dish contains
+     * @param fullMatches       dishes that contain every content word
+     * @param bestSimilarity    cosine of the craving to the closest dish, null without the embedding model
+     * @param topCoverage       how fully the first hit carries the requested flavors (1.0 = all, owner-confirmed), null if none requested
+     * @param ownerCoveredTop3  how many of the first three hits carry every requested flavor with an owner-confirmed tag
+     */
+    public record Diagnostics(int relevantCount, int bm25Candidates, int terms, int unknownTerms, int fullMatches,
+                              Double bestSimilarity, Double topCoverage, int ownerCoveredTop3) {
+        public static final Diagnostics NONE = new Diagnostics(0, 0, 0, 0, 0, null, null, 0);
+    }
+
+    public record Result(ParsedQuery parsed, String mode, int total, List<Hit> hits, long tookMs, Diagnostics diagnostics) {}
 
     public Result search(Request req) { return search(req, Options.ALL); }
 
@@ -77,12 +95,18 @@ public class HybridSearchService {
         boolean semantic = index.provider().isSemantic() && index.vectors().size() > 0;
         int pool = Math.max(60, k * 6);
         List<Ranked> lists = new ArrayList<>();
+        Set<Integer> relevant = new HashSet<>();
+        Double bestSimilarity = null;
+        int bm25Candidates = 0;
+        Bm25Index.FullMatch fullMatch = new Bm25Index.FullMatch(0, 0, 0);
 
         if (semantic && opt.dense()) {
             String wholeText = parsed.normalized().isBlank() ? parsed.original() : parsed.normalized();
             float[] whole = queryVector(wholeText);
-            lists.add(new Ranked("dense", props.denseWeight(),
-                    index.vectors().search(whole, candidates::containsKey, pool).stream().map(Bm25Index.Scored::id).toList()));
+            List<Bm25Index.Scored> denseScored = index.vectors().search(whole, candidates::containsKey, pool);
+            lists.add(new Ranked("dense", props.denseWeight(), denseScored.stream().map(Bm25Index.Scored::id).toList()));
+            if (!denseScored.isEmpty()) bestSimilarity = denseScored.get(0).score();
+            for (Bm25Index.Scored d : denseScored) if (d.score() >= props.unmetSimilarity()) relevant.add(d.id());
 
             if (opt.facets() && parsed.isMultiFacet()) {
                 List<float[]> facetVectors = new ArrayList<>();
@@ -108,6 +132,9 @@ public class HybridSearchService {
             List<Bm25Index.Scored> lexical = index.bm25().search(parsed.normalized().isBlank() ? parsed.original() : parsed.normalized(),
                     candidates::containsKey, pool);
             if (!lexical.isEmpty()) lists.add(new Ranked("bm25", props.bm25Weight(), lexical.stream().map(Bm25Index.Scored::id).toList()));
+            bm25Candidates = lexical.size();
+            fullMatch = index.bm25().fullMatch(parsed.normalized().isBlank() ? parsed.original() : parsed.normalized(), candidates::containsKey);
+            lexical.forEach(l -> relevant.add(l.id()));
         }
 
         Set<Flavor> wanted = parsed.flavors();
@@ -116,6 +143,7 @@ public class HybridSearchService {
             for (DishDoc d : candidates.values()) {
                 double c = coverage(d, wanted);
                 if (c > 0) byTags.add(new Bm25Index.Scored(d.itemId(), c));
+                if (c >= 0.5) relevant.add(d.itemId());
             }
             byTags.sort(Comparator.comparingDouble(Bm25Index.Scored::score).reversed().thenComparingInt(Bm25Index.Scored::id));
             lists.add(new Ranked("tags", props.tagWeight(), byTags.stream().limit(pool).map(Bm25Index.Scored::id).toList()));
@@ -145,7 +173,10 @@ public class HybridSearchService {
                     !wanted.isEmpty() && wanted.stream().allMatch(f -> Boolean.TRUE.equals(d.ownerTags().get(f)))));
         }
         long took = (System.nanoTime() - t0) / 1_000_000;
-        return new Result(parsed, semantic && opt.dense() ? "HYBRID" : "KEYWORD", ranked.size(), hits, took);
+        Double topCoverage = wanted.isEmpty() || hits.isEmpty() ? null : coverage(hits.get(0).doc(), wanted);
+        int ownerTop3 = (int) hits.stream().limit(3).filter(Hit::ownerConfirmedAll).count();
+        Diagnostics diag = new Diagnostics(relevant.size(), bm25Candidates, fullMatch.terms(), fullMatch.unknown(), fullMatch.fullMatches(), bestSimilarity, topCoverage, ownerTop3);
+        return new Result(parsed, semantic && opt.dense() ? "HYBRID" : "KEYWORD", ranked.size(), hits, took, diag);
     }
 
     private float[] queryVector(String text) {

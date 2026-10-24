@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'api_client.dart';
 import '../models/dish_search_models.dart';
 import '../repositories/dish_search_repository.dart';
+import 'search_client_id.dart';
 
 class DishSearchService implements DishSearchRepository, MenuTagRepository {
   final Dio _dio;
@@ -15,15 +16,29 @@ class DishSearchService implements DishSearchRepository, MenuTagRepository {
   @override
   Future<DishSearchResponse> search(String query, {int k = 10, bool? veg, double? maxPrice}) async {
     try {
-      final res = await _dio.get('/search/dishes', queryParameters: {
-        'q': query,
-        'k': k,
-        if (veg != null) 'veg': veg,
-        if (maxPrice != null) 'maxPrice': maxPrice,
-      });
+      final res = await _dio.get('/search/dishes',
+          queryParameters: {
+            'q': query,
+            'k': k,
+            if (veg != null) 'veg': veg,
+            if (maxPrice != null) 'maxPrice': maxPrice,
+          },
+          options: Options(headers: {'X-Search-Client': await SearchClientId.get()}));
       return DishSearchResponse.fromJson(res.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
+    }
+  }
+
+  /// POST /search/events/{searchId}/click (public; the server accepts it only for a dish that search showed)
+  @override
+  Future<void> reportClick(String searchId, int itemId, int rank, {String action = 'OPEN'}) async {
+    try {
+      await _dio.post('/search/events/$searchId/click',
+          data: {'itemId': itemId, 'rank': rank, 'action': action},
+          options: Options(headers: {'X-Search-Client': await SearchClientId.get()}));
+    } catch (_) {
+      // analytics must never get in the way of the customer
     }
   }
 

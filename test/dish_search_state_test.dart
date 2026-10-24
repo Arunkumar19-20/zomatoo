@@ -138,5 +138,37 @@ void main() {
       expect(r.maxPrice, 300.0);
       expect(r.total, 55);
     });
+
+    group('click reporting', () {
+      testWidgets('a tap is reported against the search that produced the list, with its rank', (tester) async {
+        repo.handler = (q, k) async => makeResponse(q, searchId: 'sid-1', hits: [makeHit(id: 5), makeHit(id: 9)]);
+        state.onQueryChanged('sweet but also spicy');
+        await tester.pump(const Duration(milliseconds: 150));
+        await tester.pump();
+
+        state.reportOpen(state.response!.hits[1], 2);
+        await tester.pump();
+
+        expect(repo.clicks, [('sid-1', 9, 2, 'OPEN')]);
+      });
+
+      testWidgets('nothing is reported when the server did not log the search', (tester) async {
+        state.onQueryChanged('sweet but also spicy');
+        await tester.pump(const Duration(milliseconds: 150));
+        await tester.pump();
+
+        state.reportOpen(state.response!.hits.first, 1);
+        await tester.pump();
+
+        expect(state.response!.searchId, isNull);
+        expect(repo.clicks, isEmpty);
+      });
+
+      test('searchId is parsed from the response', () {
+        final r = DishSearchResponse.fromJson({'query': 'q', 'mode': 'HYBRID', 'hits': [], 'searchId': 'abc'});
+        expect(r.searchId, 'abc');
+        expect(DishSearchResponse.fromJson({'query': 'q', 'mode': 'HYBRID', 'hits': []}).searchId, isNull);
+      });
+    });
   });
 }

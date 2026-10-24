@@ -67,7 +67,10 @@ class DishResultsSection extends StatelessWidget {
       Text('Top ${r.hits.length} of ${r.total}', key: const ValueKey('dish-count'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade700)),
       const SizedBox(height: 8),
       for (var i = 0; i < r.hits.length; i++)
-        DishResultCard(hit: r.hits[i], rank: i + 1, onTap: onOpen == null ? null : () => onOpen!(r.hits[i])),
+        DishResultCard(hit: r.hits[i], rank: i + 1, onTap: () {
+          state.reportOpen(r.hits[i], i + 1);
+          onOpen?.call(r.hits[i]);
+        }),
       if (state.canShowMore)
         Center(
           child: TextButton(
