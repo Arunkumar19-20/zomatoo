@@ -21,6 +21,7 @@ import '../widgets/search/dish_results_section.dart';
 import '../widgets/search/trending_chips.dart';
 import '../widgets/search/search_scope_chips.dart';
 import '../widgets/search/restaurant_results_section.dart';
+import '../widgets/search/search_privacy_widgets.dart';
 import '../widgets/drops/drops_section.dart';
 import '../widgets/drops/hold_banner.dart';
 
@@ -924,6 +925,8 @@ class _HomeScreenState extends State<HomeScreen> {
               Navigator.of(ctx).pop();
               Navigator.of(context).pushNamed('/orders-history');
             }),
+            const SizedBox(height: 4),
+            const SearchPrivacyTile(),
             const SizedBox(height: 4),
             _profileItem(ctx, Icons.swap_horiz_rounded, 'Switch Role', Colors.blue.shade600, () {
               Navigator.of(ctx).pop();

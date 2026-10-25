@@ -6,6 +6,7 @@ import 'api_client.dart';
 import '../models/dish_search_models.dart';
 import '../repositories/dish_search_repository.dart';
 import 'search_client_id.dart';
+import 'search_privacy.dart';
 
 class DishSearchService implements DishSearchRepository, MenuTagRepository {
   final Dio _dio;
@@ -24,7 +25,8 @@ class DishSearchService implements DishSearchRepository, MenuTagRepository {
             if (maxPrice != null) 'maxPrice': maxPrice,
             if (type != null) 'type': type,
           },
-          options: Options(headers: {'X-Search-Client': await SearchClientId.get()}));
+          // opted out: ask not to be tracked and do not even send the anonymous id
+          options: Options(headers: SearchPrivacy.optedOut ? {'DNT': '1'} : {'X-Search-Client': await SearchClientId.get()}));
       return DishSearchResponse.fromJson(res.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
@@ -34,6 +36,7 @@ class DishSearchService implements DishSearchRepository, MenuTagRepository {
   /// POST /search/events/{searchId}/click (public; the server accepts it only for a dish that search showed)
   @override
   Future<void> reportClick(String searchId, int itemId, int rank, {String action = 'OPEN'}) async {
+    if (SearchPrivacy.optedOut) return;
     try {
       await _dio.post('/search/events/$searchId/click',
           data: {'itemId': itemId, 'rank': rank, 'action': action},

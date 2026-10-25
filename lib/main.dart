@@ -40,6 +40,7 @@ import 'services/dish_search_service.dart';
 import 'repositories/dish_search_repository.dart';
 import 'models/dish_search_state.dart';
 import 'services/insights_service.dart';
+import 'services/search_privacy.dart';
 import 'repositories/insights_repository.dart';
 import 'models/trending_state.dart';
 
@@ -69,6 +70,7 @@ void main() async {
   }
 
   await session.restoreSession();
+  await SearchPrivacy.load();
 
   runApp(
     MultiProvider(

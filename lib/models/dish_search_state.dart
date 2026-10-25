@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../repositories/dish_search_repository.dart';
 import '../services/api_client.dart';
 import '../services/search_attribution.dart';
+import '../services/search_privacy.dart';
 import 'dish_search_models.dart';
 
 /// What the customer wants the search to look at. [all] is both words and cravings; the others narrow it.
@@ -140,7 +141,7 @@ class DishSearchState extends ChangeNotifier {
   /// A result was tapped. Reported against the search that produced the list on screen, once per tap, fire and forget.
   void reportOpen(DishHit hit, int rank) {
     final id = _response?.searchId;
-    if (id == null) return;
+    if (id == null || SearchPrivacy.optedOut) return;
     // if this dish is then added to the cart, the cart add says which search led to it
     _attribution.remember(hit.itemId, id, rank);
     unawaited(_repo.reportClick(id, hit.itemId, rank).catchError((_) {}));

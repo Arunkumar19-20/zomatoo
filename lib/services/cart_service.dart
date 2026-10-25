@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'api_client.dart';
 import 'search_attribution.dart';
 import 'search_client_id.dart';
+import 'search_privacy.dart';
 import '../models/models.dart';
 import '../repositories/cart_repository.dart';
 
@@ -34,7 +35,8 @@ class CartService implements CartRepository {
   @override
   Future<CartResponseDTO> addItem({required int menuItemId, int quantity = 1}) async {
     // when this dish was opened from search results, say which search (the server checks it and keeps only the phrase, briefly)
-    final fromSearch = _attribution.peek(menuItemId);
+    // (not at all when the customer has turned search counting off)
+    final fromSearch = SearchPrivacy.optedOut ? null : _attribution.peek(menuItemId);
     try {
       final res = await _dio.post(
         '/cart/items',

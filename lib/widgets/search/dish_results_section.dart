@@ -6,6 +6,7 @@ import '../../models/dish_search_state.dart';
 import '../../theme/app_theme.dart';
 import 'dish_cart.dart';
 import 'dish_result_card.dart';
+import 'search_privacy_widgets.dart';
 
 /// "Dishes for what you are craving": the matching dishes under the search bar once the text looks like a search.
 /// Renders nothing until there is something to search for, or when the customer narrowed the search to restaurants.
@@ -24,6 +25,8 @@ class DishResultsSection extends StatelessWidget {
       key: const ValueKey('dish-results'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // said once, in plain words, with a way to turn it off
+        const SearchPrivacyNotice(),
         Text(
           'Dishes for "${state.query}"',
           maxLines: 2,
