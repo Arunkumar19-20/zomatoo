@@ -139,3 +139,74 @@ Schema: `search_trend` is new and `search_event.simulated` is added by `ddl-auto
 `PhraseMinerTest` (8), `TrendDetectorTest` (7), `TrendJobIntegrationTest` (7: admin-only and off by default, planted trends through the endpoints,
 re-run replaces the snapshot, simulated rows ignored unless on, clearing keeps real rows, 30 hammering requests plus 8 people = 9 searchers),
 `TrendSimulationRealModelTest` (real model, skipped without it). Full backend suite: 215 passing. Also run live on Postgres.
+
+---
+
+# Phase 3: telling restaurants what to do about it
+
+The nightly job now ends with `SuggestionService.generate`: for each rising phrase it works out which restaurants should hear about it and what to suggest.
+Restaurants cannot see these yet (the owner screens and endpoints are Phase 4); admins can read them at `GET /admin/search/suggestions`.
+
+## Who hears about a trend (`TrendMatcher`)
+
+| Relation | Meaning | Becomes |
+|---|---|---|
+| HAS | a dish already is the thing: all words of a dish phrase, both cuisines of a fusion, all flavors with a strong tag | STOCK_UP or MAKE_DROP |
+| CUISINE | no such dish, but the restaurant cooks a cuisine involved (declared, or at least two of its dishes point to it) | ADD_DISH |
+| PARTIAL | no cuisine link, but dishes share some of a multi-word phrase's words (a taco place and "birria taco"), or one of a flavor pair | ADD_DISH, scored lower |
+| NONE | nothing links them | nothing; the owner is not told |
+
+An Indian kitchen is never told about Korean x Italian; a one-word phrase only matches a dish that really has the word.
+A matching dish the owner switched off is reported as "turn it back on".
+
+## The three suggestions
+
+| Type | When | What the owner gets |
+|---|---|---|
+| ADD_DISH | rising, nothing on the menu, restaurant fits | a prefilled add-dish form: a dish-like name taken from how people actually typed it ("Kimchi Carbonara", not "Italian Korean fusion"), a short description, up to three flavor tags from the auto-tagger. For flavor trends, the two flavors to aim for |
+| STOCK_UP | the restaurant has the dish | guidance to prepare more, with how many of those searches showed its dish and how many were tapped |
+| MAKE_DROP | has the dish and the rise is strong (at least 20 searchers and 3x) | a prefilled Drop that matches the create-drop request: the dish and its price, slots about one day of search demand (10 to 60), tomorrow 18:00 to 21:00 |
+
+**There is no sales estimate.** Searches are not tied to orders yet (Phase 5), so a number like "expect 40 more orders" would be invented.
+The copy says so, and shows only counted things: searchers, growth, share of searches that found nothing, impressions and taps.
+
+## Limits and lifecycle
+
+- At most **3 new suggestions per owner per week**, across all their restaurants (a restaurant with no owner counts alone). Ranked by
+  `log(1+searchers) x log(1+growth) x fit x (1 + unmet share for ADD_DISH)`: big, fast, unserved demand first. The rest wait for next week if still rising.
+- A suggestion that is still open is refreshed in place on every run (new numbers, no duplicate).
+- **Dismiss** hides it for 30 days. **Snooze** hides it for 7 days, then it returns with fresh numbers. **Acted** (owner added the dish or made the Drop) also holds off for 30 days.
+- An open suggestion whose phrase has stopped rising expires after a week.
+- Dismiss, snooze and acted take the set of restaurants the caller may act on and answer "nothing" for anything else, so ids cannot be probed or changed across restaurants.
+
+## Result on simulated traffic (real model, demo catalog, [full text](search-suggestion-simulation.md))
+
+| Restaurant | Suggestion |
+|---|---|
+| Bella Napoli (Italian) | ADD_DISH "Kimchi Carbonara": 120 searchers, 22x, 100% unmet; its menu appeared in all 120 searches and was tapped 16 times |
+| Cravey Kitchen (declares Italian) | the same, 74 impressions |
+| Casa Fuego (Mexican) | MAKE_DROP "Beef Birria Tacos": 38 searchers, 20x; tapped 3 times; 10 slots at 399 |
+| Spice Route, Tokyo Ramen House, Bangkok Street and the rest | nothing |
+
+Run live on Postgres: 3 created; running again refreshed the 3 and created none.
+
+## Operations
+
+| Call | Notes |
+|---|---|
+| `POST /admin/search/suggestions/generate?asOf=` | runs now; also nightly at 03:10 right after the trend job (`InsightsJob`) |
+| `GET /admin/search/suggestions?status=NEW` | every suggestion, best first, with headline, text, evidence and the prefilled payload |
+
+`owner_suggestion` is new (created by `ddl-auto: update`). The simulator now also records taps on about one search in five so the demo has impressions and taps to show.
+
+## Open point for Phase 4: who is an owner?
+
+A signed-in user and a `RestaurantOwner` are linked only by sharing an email address (`owner@cravey.com`), and nothing in the app checks that an owner touches only
+their own restaurants (any OWNER can create a Drop for any restaurant id). The owner Insights screen must resolve the caller to their restaurants by that email and
+pass them to the service, which is why the service already takes the allowed restaurant ids. Enforcing the same for menu items and Drops is a wider change, noted here rather than slipped in.
+
+## Tests
+
+`TrendMatcherTest` (9), `SuggestionServiceIntegrationTest` (11: fusion goes to Italian kitchens only, drop versus stock guidance, impressions and taps counted from real searches,
+weekly cap per owner across restaurants and a new week lifting it, best-scoring kept, dismiss and cool-down, cross-restaurant protection, snooze and revival, acting, expiry,
+admin-only), `SuggestionSimulationRealModelTest` (real model). Full backend suite: 236 passing.

@@ -61,4 +61,13 @@ public interface SearchEventRepository extends JpaRepository<SearchEvent, Long> 
     @Modifying
     @Query("delete from SearchEvent e where e.simulated = true")
     int deleteSimulated();
+
+    /** id, normalized query, flavors, shown dish ids of finished searches since a date: for counting how often a dish was shown for a phrase */
+    @Query("select e.id, e.normalizedQuery, e.flavors, e.shownItemIds from SearchEvent e " +
+           "where e.createdAt >= :since and e.superseded = false and e.normalizedQuery is not null and (:withSimulated = true or e.simulated = false)")
+    List<Object[]> shownSince(@Param("since") LocalDateTime since, @Param("withSimulated") boolean withSimulated);
+
+    /** search event id and tapped dish id */
+    @Query("select c.searchEventId, c.itemId from SearchClick c, SearchEvent e where c.searchEventId = e.id and e.createdAt >= :since")
+    List<Object[]> clicksSince(@Param("since") LocalDateTime since);
 }

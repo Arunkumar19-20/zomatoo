@@ -1,6 +1,8 @@
 package com.example.zomato.search;
 
+import com.example.zomato.entity.SearchClick;
 import com.example.zomato.entity.SearchEvent;
+import com.example.zomato.repository.SearchClickRepository;
 import com.example.zomato.repository.SearchEventRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,10 +43,12 @@ public class SearchLogSimulator {
 
     private final HybridSearchService search;
     private final SearchEventRepository events;
+    private final SearchClickRepository clicks;
 
-    public SearchLogSimulator(HybridSearchService search, SearchEventRepository events) {
+    public SearchLogSimulator(HybridSearchService search, SearchEventRepository events, SearchClickRepository clicks) {
         this.search = search;
         this.events = events;
+        this.clicks = clicks;
             }
 
     public static List<Scenario> scenarios() {
@@ -94,6 +98,13 @@ public class SearchLogSimulator {
             }
         }
         events.saveAll(batch);
+        // about one search in five ends in a tap on the first result
+        List<SearchClick> taps = new ArrayList<>();
+        for (SearchEvent e : batch) {
+            if (e.getShownItemIds() == null || e.getShownItemIds().isBlank() || rnd.nextDouble() > 0.2) continue;
+            taps.add(new SearchClick(e.getId(), Integer.parseInt(e.getShownItemIds().split(",")[0]), 1, SearchClick.OPEN));
+        }
+        clicks.saveAll(taps);
         return new Report(days, batch.size(), searchers, scenarios().stream().map(Scenario::name).collect(Collectors.toList()));
     }
 

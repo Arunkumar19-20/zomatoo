@@ -52,10 +52,22 @@ public final class PhraseMiner {
 
     private PhraseMiner() {}
 
+    /** Content words of a text, stemmed, with spelling variants folded: how phrases and dishes are compared. */
+    public static List<String> canonicalTerms(String text) {
+        return Bm25Index.contentTerms(text).stream().map(t -> SAME_WORD.getOrDefault(t, t)).distinct().toList();
+    }
+
+    /** Cuisines that the words of a text point to. */
+    public static Set<String> cuisinesIn(String text) {
+        Set<String> out = new TreeSet<>();
+        for (String t : canonicalTerms(text)) CuisineLexicon.cuisineOf(t).ifPresent(out::add);
+        return out;
+    }
+
     /** @param normalized the cleaned-up query text stored with the search; @param flavorsCsv the flavors it was read as, e.g. "spicy,sweet" */
     public static Phrase mine(String normalized, String flavorsCsv) {
         if (normalized == null || normalized.isBlank()) return null;
-        List<String> content = Bm25Index.contentTerms(normalized).stream().map(t -> SAME_WORD.getOrDefault(t, t)).distinct().toList();
+        List<String> content = canonicalTerms(normalized);
 
         Set<String> cuisines = new TreeSet<>();
         for (String t : content) CuisineLexicon.cuisineOf(t).ifPresent(cuisines::add);

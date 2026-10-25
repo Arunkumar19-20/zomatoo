@@ -10,7 +10,6 @@ import com.example.zomato.search.TrendDetector.Status;
 import com.example.zomato.search.TrendDetector.Trend;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -74,16 +73,6 @@ public class TrendService {
             o.forms.forEach((f, n) -> forms.merge(f, n, Integer::sum));
             recentSearches += o.recentSearches;
             recentUnmet += o.recentUnmet;
-        }
-    }
-
-    @Scheduled(cron = "${search.trends.cron:0 10 3 * * *}")
-    public void nightly() {
-        try {
-            RunSummary s = run(LocalDate.now());
-            log.info("Search trends {}: {} searches, {} phrases, {}", s.asOf(), s.searchesRead(), s.phrases(), s.byStatus());
-        } catch (RuntimeException e) {
-            log.error("Search trend job failed: {}", e.getMessage(), e);
         }
     }
 
@@ -183,6 +172,12 @@ public class TrendService {
         row.setSamples(samples.length() > 400 ? samples.substring(0, 400) : samples);
         row.setComputedAt(now);
         return row;
+    }
+
+    /** Rising phrases in the snapshot taken on one day. */
+    @Transactional(readOnly = true)
+    public List<TrendView> rising(LocalDate day) {
+        return trends.findByRunDateAndStatusOrderByGrowthDesc(day, Status.RISING.name()).stream().map(TrendService::view).toList();
     }
 
     /** The latest snapshot, optionally one status only (for example RISING). */

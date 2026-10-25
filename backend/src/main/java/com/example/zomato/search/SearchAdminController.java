@@ -24,15 +24,29 @@ public class SearchAdminController {
     private final TrendService trends;
     private final SearchLogSimulator simulator;
     private final SearchProperties props;
+    private final SuggestionService suggestions;
 
     public SearchAdminController(SearchIndexService index, SeedDishLoader seeds, SearchEventService events, TrendService trends,
-                                 SearchLogSimulator simulator, SearchProperties props) {
+                                 SearchLogSimulator simulator, SearchProperties props, SuggestionService suggestions) {
         this.index = index;
         this.seeds = seeds;
         this.events = events;
         this.trends = trends;
         this.simulator = simulator;
         this.props = props;
+        this.suggestions = suggestions;
+    }
+
+    /** Works out suggestions from the latest rising phrases now (it also runs nightly after the trend job). */
+    @PostMapping("/suggestions/generate")
+    public SuggestionService.GenerateSummary generateSuggestions(@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate asOf) {
+        return suggestions.generate(asOf == null ? java.time.LocalDate.now() : asOf);
+    }
+
+    /** Every suggestion, optionally one status (NEW, DISMISSED, SNOOZED, ACTED, EXPIRED). */
+    @GetMapping("/suggestions")
+    public java.util.List<SuggestionService.View> allSuggestions(@RequestParam(required = false) String status) {
+        return suggestions.all(status);
     }
 
     /** Runs the trend job now (it also runs nightly). {@code asOf} defaults to today. */
