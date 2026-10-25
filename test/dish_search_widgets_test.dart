@@ -70,8 +70,11 @@ void main() {
       expect(find.text('Top 3 of 40'), findsOneWidget);
       expect(find.text('Honey Hot Chicken Tenders'), findsOneWidget);
       expect(find.text('Mango Habanero Wings'), findsOneWidget);
-      expect(find.text('Sweet'), findsNWidgets(3));
-      expect(find.text('Spicy'), findsNWidgets(3));
+      // a dish is described by its cuisine; taste tags belong to the Cravings filter only
+      expect(find.text('American BBQ'), findsNWidgets(3));
+      expect(find.text('Burgers'), findsNWidgets(3));
+      expect(find.text('Sweet'), findsNothing);
+      expect(find.text('Spicy'), findsNothing);
       expect(find.text('Tagged sweet + spicy by the restaurant'), findsNWidgets(2), reason: 'hits 1 and 3 share this reason');
       expect(find.text('Looks sweet + spicy from its description'), findsOneWidget);
       expect(find.text('₹379'), findsNWidgets(2));
@@ -142,11 +145,70 @@ void main() {
     });
 
     testWidgets('mild dishes show no flames and other tags are outlined, not filled', (tester) async {
-      await tester.pumpWidget(card(makeHit(spice: 1, matched: const ['sweet'], tags: const ['sweet', 'creamy', 'rich', 'comfort', 'light'])));
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: DishResultCard(hit: makeHit(spice: 1, matched: const ['sweet'], tags: const ['sweet', 'creamy', 'rich', 'comfort', 'light']), showFlavors: true)))));
       expect(find.byIcon(Icons.local_fire_department_rounded), findsNothing);
       expect(find.text('Sweet'), findsOneWidget);
       expect(find.text('Creamy'), findsOneWidget);
       expect(find.text('Light'), findsNothing, reason: 'at most 3 extra tags');
+    });
+  });
+
+  group('cuisine instead of taste tags', () {
+    Widget plain(DishHit h, {bool flavors = false}) => MaterialApp(home: Scaffold(body: SingleChildScrollView(child: DishResultCard(hit: h, showFlavors: flavors))));
+
+    testWidgets('a dish shows its restaurant\'s cuisine, at most two, and none of its taste tags', (tester) async {
+      await tester.pumpWidget(plain(makeHit(id: 4, cuisine: 'Italian, American, Comfort Food', matched: const ['creamy'], tags: const ['creamy', 'rich', 'comfort'])));
+      expect(find.text('Italian'), findsOneWidget);
+      expect(find.text('American'), findsOneWidget);
+      expect(find.text('Comfort Food'), findsNothing, reason: 'two is enough on a card');
+      expect(find.text('Creamy'), findsNothing);
+      expect(find.text('Rich'), findsNothing);
+    });
+
+    testWidgets('the Cravings filter is the one place the taste tags show, and the cuisine steps aside', (tester) async {
+      await tester.pumpWidget(plain(makeHit(id: 4, cuisine: 'Italian', matched: const ['creamy'], tags: const ['creamy', 'rich']), flavors: true));
+      expect(find.text('Creamy'), findsOneWidget);
+      expect(find.text('Rich'), findsOneWidget);
+      expect(find.text('Italian'), findsNothing);
+    });
+
+    testWidgets('a restaurant with no cuisine set simply shows no chips', (tester) async {
+      await tester.pumpWidget(plain(makeHit(id: 4, cuisine: null)));
+      expect(find.text('Smokehouse 66'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(plain(makeHit(id: 5, cuisine: ' , ,')));
+      expect(tester.takeException(), isNull);
+    });
+
+    test('cuisines are split on commas, trimmed and capped', () {
+      expect(makeHit(cuisine: 'North Indian').cuisines(), ['North Indian']);
+      expect(makeHit(cuisine: 'Italian,  American , Comfort Food').cuisines(), ['Italian', 'American']);
+      expect(makeHit(cuisine: 'Italian, American, Comfort Food').cuisines(max: 3), ['Italian', 'American', 'Comfort Food']);
+      expect(makeHit(cuisine: null).cuisines(), isEmpty);
+    });
+
+    testWidgets('in a list, the filter decides: everything shows cuisine, Cravings shows taste', (tester) async {
+      Widget list() => MultiProvider(
+            providers: [ChangeNotifierProvider<DishSearchState>.value(value: state), ChangeNotifierProvider<CartState>.value(value: cart)],
+            child: MaterialApp(home: Scaffold(body: SingleChildScrollView(child: Column(children: const [SearchScopeChips(), DishResultsSection()])))),
+          );
+      repo.handler = (q, k) => Future.value(makeResponse(q, hits: [makeHit(id: 1, cuisine: 'Italian')]));
+      await tester.pumpWidget(list());
+      await search(tester, 'pasta');
+      expect(find.text('Italian'), findsOneWidget);
+      expect(find.text('Sweet'), findsNothing);
+
+      await tester.tap(find.byKey(const ValueKey('scope-cravings')));
+      await tester.pump();
+      await tester.pump();
+      expect(find.text('Sweet'), findsOneWidget);
+      expect(find.text('Italian'), findsNothing);
+
+      await tester.tap(find.byKey(const ValueKey('scope-dishes')));
+      await tester.pump();
+      await tester.pump();
+      expect(find.text('Italian'), findsOneWidget);
+      expect(find.text('Sweet'), findsNothing);
     });
   });
 

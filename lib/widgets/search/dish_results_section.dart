@@ -89,6 +89,7 @@ class DishResultsSection extends StatelessWidget {
     return Consumer<CartState>(
       builder: (context, cart, _) => DishResultCard(
         hit: hit,
+        showFlavors: state.scope == SearchScope.cravings,
         quantity: cart.getItemQuantity(item),
         // a closed restaurant cannot take an order, so there is nothing to add
         onAdd: hit.restaurantOpen ? () => _add(context, state, cart, hit, rank) : null,

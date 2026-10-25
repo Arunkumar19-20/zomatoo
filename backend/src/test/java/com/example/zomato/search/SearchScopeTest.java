@@ -113,4 +113,18 @@ class SearchScopeTest {
         assertEquals(Scope.CRAVING, Scope.fromParam("cravings"));
         assertEquals(Scope.ALL, Scope.fromParam("restaurants"), "restaurants are not a dish search; the app filters those itself");
     }
+
+    @Test
+    void everyHitCarriesItsRestaurantsCuisineForTheCardToShow() throws Exception {
+        seeds.load();
+        JsonNode res = search("pasta", null);
+        assertFalse(res.get("hits").isEmpty());
+        for (JsonNode h : res.get("hits")) {
+            assertTrue(h.hasNonNull("cuisine") && !h.get("cuisine").asText().isBlank(), h.get("name").asText() + " has no cuisine");
+        }
+        for (JsonNode h : res.get("hits")) assertTrue(h.get("cuisine").asText().contains("Italian"), "pasta comes from Italian kitchens here: " + h.get("cuisine").asText());
+        List<String> cuisines = new ArrayList<>();
+        res.get("hits").forEach(h -> cuisines.add(h.get("cuisine").asText()));
+        assertTrue(cuisines.contains("Italian, American, Comfort Food") || cuisines.contains("Italian"), "as the owner wrote it, not reformatted: " + cuisines);
+    }
 }

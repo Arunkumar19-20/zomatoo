@@ -68,7 +68,7 @@ public class SearchController {
             return new DishHit(d.itemId(), d.name(), d.description(), d.price(), d.veg(), d.imageUrl(), d.restaurantId(),
                     d.restaurantName(), d.restaurantOpen(), d.spiceLevel(), d.servingTemp(),
                     d.tags().keySet().stream().map(Flavor::id).sorted().toList(), h.matchedTags(),
-                    Math.round(h.score() * 1000) / 1000.0, h.reasons());
+                    Math.round(h.score() * 1000) / 1000.0, h.reasons(), d.cuisine());
         }).toList();
         String searchId = null;
         try {

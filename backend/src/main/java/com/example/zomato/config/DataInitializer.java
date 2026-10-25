@@ -24,6 +24,7 @@ public class DataInitializer implements CommandLineRunner {
     private final DropRepository dropRepository;
     private final PasswordEncoder passwordEncoder;
     private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+    private final org.springframework.core.env.Environment environment;
 
     public DataInitializer(UserRepository userRepository,
                            CustomerRepository customerRepository,
@@ -34,7 +35,9 @@ public class DataInitializer implements CommandLineRunner {
                            MenuItemRepository menuItemRepository,
                            DropRepository dropRepository,
                            PasswordEncoder passwordEncoder,
-                           org.springframework.jdbc.core.JdbcTemplate jdbcTemplate) {
+                           org.springframework.jdbc.core.JdbcTemplate jdbcTemplate,
+                           org.springframework.core.env.Environment environment) {
+        this.environment = environment;
         this.userRepository = userRepository;
         this.customerRepository = customerRepository;
         this.restaurantOwnerRepository = restaurantOwnerRepository;
@@ -93,6 +96,11 @@ public class DataInitializer implements CommandLineRunner {
             customer.setUserId(savedCustomer.getUserId());
             customerRepository.save(customer);
             logger.info("[DEV] Seeded customer user: customer@cravey.com / Password123!");
+        }
+
+        // 3b. The people the app's "Quick Demo Sign-In" signs in as, so the demo button works against a fresh database
+        if (environment.acceptsProfiles(org.springframework.core.env.Profiles.of("demo", "dev"))) {
+            seedClientDemoAccounts();
         }
 
         // 4. Sample Restaurant & Menu Items
@@ -212,6 +220,51 @@ public class DataInitializer implements CommandLineRunner {
             dropRepository.save(drop3);
 
             logger.info("[DEV] Seeded 3 curated batch drops (2 Live, 1 Upcoming).");
+        }
+    }
+
+    /**
+     * The demo button in the app signs in with a token it makes itself for these emails (see SessionProvider.defaultEmailForRole), so an account has to
+     * exist for each or checkout answers "User not found". They get no usable password: nobody can log in as them with a form, only the demo button.
+     * Created only in the demo and dev profiles, never in production.
+     */
+    private void seedClientDemoAccounts() {
+        String[][] people = {
+                {"Aarav Sharma", "aarav.sharma@gmail.com", "CUSTOMER"},
+                {"Arun Kumar", "arunkumar2006.d@gmail.com", "OWNER"},
+                {"Rahul Singh", "rahul.singh@gmail.com", "DELIVERY"},
+                {"Admin One", "admin1@zomato.com", "ADMIN"},
+        };
+        for (String[] p : people) {
+            if (userRepository.findByEmail(p[1]).isPresent()) continue;
+            User u = new User(p[0], p[1], p[2]);
+            u.setPassword(passwordEncoder.encode(java.util.UUID.randomUUID().toString()));
+            u.setEmailVerified(true);
+            User saved = userRepository.save(u);
+            if ("CUSTOMER".equals(p[2])) {
+                // the app may already have made a bare customer for this email (adding to the cart creates one on the spot); a second row would make
+                // every lookup by email fail, so reuse it and just attach the account
+                var existing = customerRepository.findAll().stream().filter(c -> p[1].equalsIgnoreCase(c.getEmail())).toList();
+                if (existing.isEmpty()) {
+                    Customer c = new Customer();
+                    c.setName(p[0]);
+                    c.setEmail(p[1]);
+                    c.setAddress("123 Foodie Lane, Gourmet City");
+                    c.setUserId(saved.getUserId());
+                    customerRepository.save(c);
+                } else {
+                    for (Customer c : existing) {
+                        if (c.getUserId() == null) c.setUserId(saved.getUserId());
+                        if (c.getName() == null || c.getName().equalsIgnoreCase("CUSTOMER")) c.setName(p[0]);
+                        customerRepository.save(c);
+                    }
+                }
+            } else if ("OWNER".equals(p[2])) {
+                if (restaurantOwnerRepository.findByEmailIgnoreCase(p[1]).isEmpty()) {
+                    restaurantOwnerRepository.save(new RestaurantOwner(p[0], p[1], "+1-555-0100"));
+                }
+            }
+            logger.info("[DEV] Seeded demo-button account {} ({}), no password", p[1], p[2]);
         }
     }
 }

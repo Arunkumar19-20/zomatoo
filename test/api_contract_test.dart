@@ -99,6 +99,7 @@ void main() {
         expect(h.reasons, isNotEmpty);
         expect(h.restaurantName, isNotNull);
         expect(h.price, greaterThan(0));
+        expect(h.cuisines(), isNotEmpty, reason: '${h.name} should carry its restaurant\'s cuisine for the card');
       }
       expect(r.hits.map((h) => h.score).toList(), orderedEquals(r.hits.map((h) => h.score).toList()..sort((a, b) => b.compareTo(a))));
     });

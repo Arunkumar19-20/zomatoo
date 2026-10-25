@@ -84,7 +84,12 @@ Now a dish is shown only if it is relevant for a reason the search accepts:
 | `dish` | it contains **every** food word of the query in its name, description, ingredients or category. Flavor and mood words ("spicy", "late night") and joining words ("but", "also") are not required, so "spicy noodles" means noodle dishes and a craving sentence with no food in it behaves like everything |
 | `craving` | it carries the requested flavors or is close in meaning; a name match alone does not qualify |
 
-Restaurants is not a dish search: the app filters its own restaurant list by name, address and cuisine only.
+Restaurants is not a dish search. The app lists the restaurants that are relevant to the words typed, best first, each with the reason it is there:
+a name match ranks first, then cuisine, then a restaurant that serves a matching dish ("Serves Pasta Primavera and 2 more"), then the address. Every word of the query
+has to be found somewhere in the restaurant, so "italian pasta" is not every Italian place plus every pasta dish. Words such as "best", "near me" and "restaurants" are ignored.
+
+A dish result is described by its restaurant's cuisine ("Italian", at most two chips), not by taste tags. The taste tags (Creamy, Spicy, ...) show only under the Cravings filter,
+where taste is the point.
 
 Checked on the real model with the 126 demo dishes: "pasta" gives 6 pasta dishes and no Tiramisu, "pizza" 5, "birria tacos" with `dish` gives only Beef Birria
 Tacos (everything also shows Tacos al Pastor), "injera" gives nothing in any filter. The evaluation above is unchanged to the second decimal for every query group,

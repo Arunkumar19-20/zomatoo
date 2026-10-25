@@ -8,5 +8,7 @@ public record DishSearchResponse(String query, String mode, List<String> facets,
 
     public record DishHit(int itemId, String name, String description, float price, boolean veg, String imageUrl,
                           int restaurantId, String restaurantName, boolean restaurantOpen, Integer spiceLevel,
-                          String servingTemp, List<String> tags, List<String> matchedTags, double score, List<String> reasons) {}
+                          String servingTemp, List<String> tags, List<String> matchedTags, double score, List<String> reasons,
+                          /** the restaurant's cuisine as the owner wrote it, e.g. "Italian, American, Comfort Food" (null if not set) */
+                          String cuisine) {}
 }

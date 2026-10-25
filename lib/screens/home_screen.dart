@@ -20,6 +20,7 @@ import '../models/dish_search_state.dart';
 import '../widgets/search/dish_results_section.dart';
 import '../widgets/search/trending_chips.dart';
 import '../widgets/search/search_scope_chips.dart';
+import '../widgets/search/restaurant_results_section.dart';
 import '../widgets/drops/drops_section.dart';
 import '../widgets/drops/hold_banner.dart';
 
@@ -127,6 +128,12 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    // the search belongs to the app, not to this screen: coming back (from a restaurant, the cart) the box must show what the results are for
+    final lastQuery = context.read<DishSearchState>().query;
+    if (lastQuery.isNotEmpty) {
+      _searchController.text = lastQuery;
+      _searchQuery = lastQuery;
+    }
     _loadRestaurants(reset: true);
     // Live drops, the caller's slot hold and waitlist position stay fresh while the home screen is open.
     _dropState = context.read<DropState>()..retainPolling();
@@ -311,12 +318,10 @@ class _HomeScreenState extends State<HomeScreen> {
       bool matchesSearch = true;
       if (_searchQuery.isNotEmpty) {
         final query = _searchQuery.toLowerCase();
-        // narrowed to restaurants, a dish on the menu is not a reason to show the restaurant: only its name, address and cuisine count
-        final restaurantsOnly = context.read<DishSearchState>().scope == SearchScope.restaurants;
         matchesSearch = restaurant.name.toLowerCase().contains(query) ||
             (restaurant.address != null && restaurant.address!.toLowerCase().contains(query)) ||
             restaurant.cuisineTags.any((tag) => tag.toLowerCase().contains(query)) ||
-            (!restaurantsOnly && restaurant.menu.any((item) => item.name.toLowerCase().contains(query)));
+            restaurant.menu.any((item) => item.name.toLowerCase().contains(query));
       }
       return matchesCategory && matchesSearch;
     }).toList();
@@ -326,8 +331,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final cartCount = context.watch<CartState>().totalItemCount;
     final search = context.watch<DishSearchState>();
-    // narrowed to dishes or cravings, the restaurant carousel is not part of the answer
-    final hideRestaurants = search.active && (search.scope == SearchScope.dishes || search.scope == SearchScope.cravings);
+    // narrowed to something, the browse carousel is not part of the answer: dishes and cravings have their own list, restaurants too (below the chips)
+    final restaurantsMode = search.active && search.scope == SearchScope.restaurants;
+    final hideRestaurants = search.active && search.scope != SearchScope.all;
 
     return Scaffold(
       backgroundColor: AppTheme.scaffoldBackground,
@@ -504,8 +510,17 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SearchScopeChips(),
                     // Top matches for a craving like "something sweet but also spicy"
                     DishResultsSection(onOpen: _openDish),
+                    // The restaurants that fit the search, best first, when the search is narrowed to restaurants
+                    if (restaurantsMode)
+                      RestaurantResultsSection(
+                        query: search.query,
+                        restaurants: _apiRestaurants,
+                        loading: _loading,
+                        onOpen: (r) => Navigator.of(context).pushNamed('/restaurant', arguments: r),
+                      ),
 
                     // Categories Row
+                    if (!restaurantsMode)
                     SizedBox(
                       height: 100,
                       child: Row(
@@ -618,8 +633,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 16),
 
                     // Active drop slot hold (countdown) and limited-drop row
-                    const HoldBanner(),
-                    const DropsSection(),
+                    if (!restaurantsMode) const HoldBanner(),
+                    if (!restaurantsMode) const DropsSection(),
 
                     // Header row
                     if (!hideRestaurants)
@@ -691,7 +706,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 16),
 
                     // Restaurants list — shimmer while loading, real/mock data when ready
-                    (hideRestaurants || (search.active && search.scope != SearchScope.restaurants && !_loading && _displayRestaurants.isEmpty))
+                    (hideRestaurants || (search.active && !_loading && _displayRestaurants.isEmpty))
                         ? const SizedBox.shrink()
                         : _loading
                         ? SizedBox(

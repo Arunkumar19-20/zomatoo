@@ -23,6 +23,9 @@ class DishHit {
   /// Plain-language reasons built from real matches, never generated.
   final List<String> reasons;
 
+  /// The restaurant's cuisine as its owner wrote it, e.g. "Italian, American, Comfort Food".
+  final String? cuisine;
+
   const DishHit({
     required this.itemId,
     required this.name,
@@ -39,7 +42,12 @@ class DishHit {
     this.matchedTags = const [],
     this.score = 0,
     this.reasons = const [],
+    this.cuisine,
   });
+
+  /// The cuisines as separate words ("Italian", "American"), at most [max] of them.
+  List<String> cuisines({int max = 2}) =>
+      (cuisine ?? '').split(',').map((c) => c.trim()).where((c) => c.isNotEmpty).take(max).toList();
 
   factory DishHit.fromJson(Map<String, dynamic> j) => DishHit(
         itemId: j['itemId'] as int,
@@ -57,6 +65,7 @@ class DishHit {
         matchedTags: _strings(j['matchedTags']),
         score: (j['score'] as num?)?.toDouble() ?? 0,
         reasons: _strings(j['reasons']),
+        cuisine: j['cuisine']?.toString(),
       );
 }
 

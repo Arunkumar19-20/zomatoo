@@ -17,7 +17,11 @@ class DishResultCard extends StatelessWidget {
   final VoidCallback? onAdd;
   final VoidCallback? onRemove;
 
-  const DishResultCard({super.key, required this.hit, this.onTap, this.quantity = 0, this.onAdd, this.onRemove});
+  /// Show the taste tags (Creamy, Spicy, ...) instead of the cuisine. Only the Cravings filter is about taste; everywhere else a dish is
+  /// described by its cuisine.
+  final bool showFlavors;
+
+  const DishResultCard({super.key, required this.hit, this.onTap, this.quantity = 0, this.onAdd, this.onRemove, this.showFlavors = false});
 
   static String label(String tag) => tag.isEmpty ? tag : tag[0].toUpperCase() + tag.substring(1);
 
@@ -69,10 +73,12 @@ class DishResultCard extends StatelessWidget {
                   Wrap(
                     spacing: 6,
                     runSpacing: 4,
-                    children: [
-                      for (final t in hit.matchedTags) _chip(label(t), filled: true),
-                      for (final t in extraTags) _chip(label(t), filled: false),
-                    ],
+                    children: showFlavors
+                        ? [
+                            for (final t in hit.matchedTags) _chip(label(t), filled: true),
+                            for (final t in extraTags) _chip(label(t), filled: false),
+                          ]
+                        : [for (final c in hit.cuisines()) _cuisineChip(c)],
                   ),
                   if (hit.reasons.isNotEmpty) ...[
                     const SizedBox(height: 6),
@@ -177,6 +183,19 @@ class DishResultCard extends StatelessWidget {
         decoration: BoxDecoration(border: Border.all(color: color, width: 1.5), borderRadius: BorderRadius.circular(3)),
         child: Center(child: Container(width: 6, height: 6, decoration: BoxDecoration(color: color, shape: BoxShape.circle))),
       ),
+    );
+  }
+
+  Widget _cuisineChip(String text) {
+    return Container(
+      key: ValueKey('dish-cuisine-${hit.itemId}-$text'),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppTheme.chipOrange.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.chipOrange.withValues(alpha: 0.35)),
+      ),
+      child: Text(text, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppTheme.chipOrange)),
     );
   }
 

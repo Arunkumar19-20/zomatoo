@@ -14,6 +14,7 @@ DishHit makeHit({
   int? spice = 2,
   String restaurant = 'Smokehouse 66',
   int restaurantId = 7,
+  String? cuisine = 'American BBQ, Burgers',
   List<String> reasons = const ['Tagged sweet + spicy by the restaurant'],
   double score = 1.0,
 }) =>
@@ -30,6 +31,7 @@ DishHit makeHit({
       matchedTags: matched,
       score: score,
       reasons: reasons,
+      cuisine: cuisine,
     );
 
 DishSearchResponse makeResponse(
