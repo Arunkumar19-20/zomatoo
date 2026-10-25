@@ -61,7 +61,7 @@ public class SecurityConfig {
 
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/resend-verification").authenticated()
-                .requestMatchers("/drops/reservations/mine", "/drops/waitlist/mine").authenticated()
+                .requestMatchers("/drops/reservations/mine").authenticated()
                 .requestMatchers(
                     "/",
                     "/login",

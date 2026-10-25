@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
-import '../services/session_provider.dart';
-import '../services/restaurant_service.dart';
-import '../services/menu_service.dart';
-import '../services/delivery_service.dart';
+import '../Services/session_provider.dart';
+import '../Services/restaurant_service.dart';
+import '../Services/menu_service.dart';
+import '../Services/delivery_service.dart';
 import '../models/models.dart';
 import '../widgets/scale_tap.dart';
 import '../widgets/role_switcher_dialog.dart';

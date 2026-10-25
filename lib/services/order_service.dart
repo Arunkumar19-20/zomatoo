@@ -34,20 +34,6 @@ class OrderService implements OrderRepository {
     }
   }
 
-  /// POST /orders/checkout?reservationId= - one-item order for a held drop slot
-  @override
-  Future<OrderResponseDTO> checkoutDrop(int reservationId) async {
-    try {
-      final res = await _dio.post(
-        '/orders/checkout',
-        queryParameters: {'reservationId': reservationId},
-      );
-      return OrderResponseDTO.fromJson(res.data);
-    } on DioException catch (e) {
-      throw ApiException.fromDioException(e);
-    }
-  }
-
   /// GET /orders - Retrieves user's own order history
   @override
   Future<List<OrderResponseDTO>> getMyOrders() async {
@@ -99,11 +85,10 @@ class OrderService implements OrderRepository {
     }
   }
 
-  /// GET /orders -> the signed-in customer's own orders (the backend scopes it to the caller;
-  /// there is no /orders/customer/{id} endpoint).
-  Future<List<OrderModel>> getMyOrderHistory() async {
+  /// GET /orders/customer/{customerId} -> list of past orders for the customer
+  Future<List<OrderModel>> getOrdersByCustomer(int customerId) async {
     try {
-      final res = await _dio.get('/orders');
+      final res = await _dio.get('/orders/customer/$customerId');
       return (res.data as List).map((e) => OrderModel.fromJson(e)).toList();
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);

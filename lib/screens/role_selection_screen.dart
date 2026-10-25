@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/scale_tap.dart';
-import '../services/session_provider.dart';
+import '../Services/session_provider.dart';
 
 class RoleItem {
   final String roleKey;
@@ -81,12 +81,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
   ];
 
   void _handleContinue() {
-    debugPrint("[RoleSelection] Continuing with role: $_selectedRole");
-    try {
-      context.read<SessionProvider>().setSelectedRole(_selectedRole);
-    } catch (e) {
-      debugPrint("[RoleSelection] Warning updating SessionProvider: $e");
-    }
+    context.read<SessionProvider>().setSelectedRole(_selectedRole);
     Navigator.of(context).pushNamed('/login', arguments: _selectedRole);
   }
 

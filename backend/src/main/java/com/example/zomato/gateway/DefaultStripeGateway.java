@@ -19,7 +19,7 @@ import org.springframework.stereotype.Component;
  * Fails application startup if Stripe secret key is missing or configured with mock values.
  */
 @Component
-@Profile("!test & !demo")
+@Profile("!test")
 public class DefaultStripeGateway implements StripeGateway {
 
     private static final Logger log = LoggerFactory.getLogger(DefaultStripeGateway.class);

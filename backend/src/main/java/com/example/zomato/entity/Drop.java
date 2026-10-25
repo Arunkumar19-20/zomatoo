@@ -5,7 +5,6 @@ import java.time.LocalDateTime;
 
 /** A limited-quantity batch drop. Status is derived (see DropResponseDTO), never stored. */
 @Entity
-@org.hibernate.annotations.DynamicUpdate // never rewrite reservedSlots from a stale copy; it is owned by atomic UPDATEs
 @Table(name = "drops")
 public class Drop {
 
