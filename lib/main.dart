@@ -40,6 +40,8 @@ import 'services/dish_search_service.dart';
 import 'repositories/dish_search_repository.dart';
 import 'models/dish_search_state.dart';
 import 'services/insights_service.dart';
+import 'services/demand_gap_service.dart';
+import 'repositories/demand_gap_repository.dart';
 import 'services/search_privacy.dart';
 import 'repositories/insights_repository.dart';
 import 'models/trending_state.dart';
@@ -84,6 +86,7 @@ void main() async {
         Provider<MenuTagRepository>(create: (_) => DishSearchService()),
         Provider<TrendingRepository>(create: (_) => InsightsService()),
         Provider<OwnerInsightsRepository>(create: (_) => InsightsService()),
+        Provider<DemandGapRepository>(create: (_) => DemandGapService()),
         ChangeNotifierProvider.value(value: session),
         ChangeNotifierProvider(create: (_) => CartState()),
         ChangeNotifierProvider(

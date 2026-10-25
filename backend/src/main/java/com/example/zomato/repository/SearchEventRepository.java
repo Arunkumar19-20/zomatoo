@@ -70,4 +70,10 @@ public interface SearchEventRepository extends JpaRepository<SearchEvent, Long> 
     /** search event id and tapped dish id */
     @Query("select c.searchEventId, c.itemId from SearchClick c, SearchEvent e where c.searchEventId = e.id and e.createdAt >= :since")
     List<Object[]> clicksSince(@Param("since") LocalDateTime since);
+
+    /** time, normalized query, flavors, searcher key, area of every search that found nothing: the raw material for demand gaps */
+    @Query("select e.createdAt, e.normalizedQuery, e.flavors, e.sessionKey, e.area from SearchEvent e " +
+           "where e.createdAt >= :since and e.superseded = false and e.unmet = true and e.normalizedQuery is not null " +
+           "and (:withSimulated = true or e.simulated = false)")
+    List<Object[]> unmetSince(@Param("since") LocalDateTime since, @Param("withSimulated") boolean withSimulated);
 }

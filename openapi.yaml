@@ -785,6 +785,161 @@ paths:
                     confidence:
                       type: number
 
+  /menu-items/{id}/image:
+    post:
+      summary: Set a dish's photo (the dish's restaurant owner or an admin)
+      description: >
+        JPEG, PNG or WebP, 2 MB at most. The type is decided from the file's first bytes, not its name. The server names the file; the dish's
+        imageUrl becomes a path such as /uploads/dishes/<uuid>.jpg, which is served publicly. An earlier uploaded photo is deleted.
+      tags: [Menu]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: The dish, with its new imageUrl
+        '400':
+          description: Empty file, or not a JPEG, PNG or WebP image
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: No such dish
+        '413':
+          description: Over 2 MB
+    delete:
+      summary: Remove a dish's photo (the dish's restaurant owner or an admin)
+      tags: [Menu]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: The dish, with imageUrl null
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: No such dish
+
+  /admin/search/demand-gaps:
+    get:
+      summary: Cravings that found nothing, by cuisine, next to how many restaurants serve it (Admin only)
+      description: >
+        Searches that found nothing in the last `days` days, different wordings folded into one phrase and counted in searcher-days
+        (distinct searchers per day, summed). Phrases fewer than `min` searcher-days looked for are left out; `min` is never below 3.
+        A group's status is NO_RESTAURANT (no restaurant declares the cuisine), DISH_GAP (the cuisine is served but these dishes or
+        combinations are not found) or NO_CUISINE (cravings that name no cuisine). A fusion appears under each of its cuisines.
+      tags: [Search]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            default: 14
+            maximum: 90
+        - name: min
+          in: query
+          schema:
+            type: integer
+            default: 5
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  from:
+                    type: string
+                    format: date
+                  to:
+                    type: string
+                    format: date
+                  days:
+                    type: integer
+                  minSearcherDays:
+                    type: integer
+                  unmetSearches:
+                    type: integer
+                  phrasesShown:
+                    type: integer
+                  phrasesBelowMinimum:
+                    type: integer
+                  groups:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        cuisine:
+                          type: string
+                        label:
+                          type: string
+                        status:
+                          type: string
+                          enum: [NO_RESTAURANT, DISH_GAP, NO_CUISINE]
+                        searcherDays:
+                          type: integer
+                        restaurantsServing:
+                          type: integer
+                          nullable: true
+                        openRestaurantsServing:
+                          type: integer
+                          nullable: true
+                        gaps:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              key:
+                                type: string
+                              label:
+                                type: string
+                              kind:
+                                type: string
+                                enum: [FUSION, FLAVOR, DISH]
+                              searcherDays:
+                                type: integer
+                              activeDays:
+                                type: integer
+                              alsoCuisines:
+                                type: array
+                                items:
+                                  type: string
+                              examples:
+                                type: array
+                                items:
+                                  type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
   /admin/search/status:
     get:
       summary: Search index status (Admin only)

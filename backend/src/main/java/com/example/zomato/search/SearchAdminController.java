@@ -26,10 +26,13 @@ public class SearchAdminController {
     private final SearchProperties props;
     private final SuggestionService suggestions;
     private final OrderAttributionService attribution;
+    private final DemandGapService demandGaps;
 
     public SearchAdminController(SearchIndexService index, SeedDishLoader seeds, SearchEventService events, TrendService trends,
-                                 SearchLogSimulator simulator, SearchProperties props, SuggestionService suggestions, OrderAttributionService attribution) {
+                                 SearchLogSimulator simulator, SearchProperties props, SuggestionService suggestions, OrderAttributionService attribution,
+                                 DemandGapService demandGaps) {
         this.attribution = attribution;
+        this.demandGaps = demandGaps;
         this.index = index;
         this.seeds = seeds;
         this.events = events;
@@ -37,6 +40,15 @@ public class SearchAdminController {
         this.simulator = simulator;
         this.props = props;
         this.suggestions = suggestions;
+    }
+
+    /**
+     * What customers looked for in the last {@code days} days and found nothing, grouped by cuisine next to how many restaurants serve it.
+     * Phrases fewer than {@code min} searcher-days looked for are left out (never fewer than 3).
+     */
+    @GetMapping("/demand-gaps")
+    public DemandGapService.Report demandGaps(@RequestParam(defaultValue = "14") int days, @RequestParam(defaultValue = "5") int min) {
+        return demandGaps.report(days, min);
     }
 
     /** Counts delivered orders that came from search and drops cancelled ones, now (it also runs every ten minutes). */

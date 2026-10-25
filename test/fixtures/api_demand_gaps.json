@@ -1,0 +1,124 @@
+{
+    "from": "2026-10-12",
+    "to": "2026-10-25",
+    "days": 14,
+    "minSearcherDays": 5,
+    "unmetSearches": 724,
+    "phrasesShown": 4,
+    "phrasesBelowMinimum": 10,
+    "groups": [
+        {
+            "cuisine": "italian",
+            "label": "Italian",
+            "status": "DISH_GAP",
+            "searcherDays": 135,
+            "restaurantsServing": 2,
+            "openRestaurantsServing": 1,
+            "gaps": [
+                {
+                    "key": "fusion:italian+korean",
+                    "label": "Italian \u00d7 Korean fusion",
+                    "kind": "FUSION",
+                    "searcherDays": 135,
+                    "activeDays": 12,
+                    "alsoCuisines": [
+                        "korean"
+                    ],
+                    "examples": [
+                        "italian korean fusion pasta",
+                        "kimchi carbonara",
+                        "bulgogi pizza"
+                    ]
+                }
+            ]
+        },
+        {
+            "cuisine": "korean",
+            "label": "Korean",
+            "status": "NO_RESTAURANT",
+            "searcherDays": 135,
+            "restaurantsServing": 0,
+            "openRestaurantsServing": 0,
+            "gaps": [
+                {
+                    "key": "fusion:italian+korean",
+                    "label": "Italian \u00d7 Korean fusion",
+                    "kind": "FUSION",
+                    "searcherDays": 135,
+                    "activeDays": 12,
+                    "alsoCuisines": [
+                        "italian"
+                    ],
+                    "examples": [
+                        "italian korean fusion pasta",
+                        "kimchi carbonara",
+                        "bulgogi pizza"
+                    ]
+                }
+            ]
+        },
+        {
+            "cuisine": "other",
+            "label": "Other cravings",
+            "status": "NO_CUISINE",
+            "searcherDays": 48,
+            "restaurantsServing": null,
+            "openRestaurantsServing": null,
+            "gaps": [
+                {
+                    "key": "dish:chocolate+dubai",
+                    "label": "dubai chocolate",
+                    "kind": "DISH",
+                    "searcherDays": 48,
+                    "activeDays": 1,
+                    "alsoCuisines": [],
+                    "examples": [
+                        "dubai chocolate"
+                    ]
+                }
+            ]
+        },
+        {
+            "cuisine": "indian",
+            "label": "Indian",
+            "status": "DISH_GAP",
+            "searcherDays": 7,
+            "restaurantsServing": 1,
+            "openRestaurantsServing": 1,
+            "gaps": [
+                {
+                    "key": "dish:biryani+free",
+                    "label": "free biryani",
+                    "kind": "DISH",
+                    "searcherDays": 7,
+                    "activeDays": 7,
+                    "alsoCuisines": [],
+                    "examples": [
+                        "free biryani"
+                    ]
+                }
+            ]
+        },
+        {
+            "cuisine": "ethiopian",
+            "label": "Ethiopian",
+            "status": "NO_RESTAURANT",
+            "searcherDays": 5,
+            "restaurantsServing": 0,
+            "openRestaurantsServing": 0,
+            "gaps": [
+                {
+                    "key": "dish:ethiopian+injera",
+                    "label": "ethiopian injera",
+                    "kind": "DISH",
+                    "searcherDays": 5,
+                    "activeDays": 5,
+                    "alsoCuisines": [],
+                    "examples": [
+                        "ethiopian injera"
+                    ]
+                }
+            ]
+        }
+    ]
+}

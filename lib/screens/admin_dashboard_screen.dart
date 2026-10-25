@@ -7,6 +7,9 @@ import '../services/delivery_service.dart';
 import '../services/coupon_service.dart';
 import '../services/order_service.dart';
 import '../models/models.dart';
+import '../models/demand_gap_state.dart';
+import '../repositories/demand_gap_repository.dart';
+import '../widgets/admin/demand_gaps_tab.dart';
 import '../widgets/scale_tap.dart';
 import '../widgets/role_switcher_dialog.dart';
 
@@ -31,7 +34,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 6, vsync: this);
     _loadAllDatabaseData();
   }
 
@@ -149,7 +152,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     final session = context.watch<SessionProvider>();
     final adminName = session.user?.name ?? 'Admin One';
 
-    return Scaffold(
+    return ChangeNotifierProvider(
+      create: (ctx) => DemandGapState(repository: ctx.read<DemandGapRepository>())..load(),
+      child: Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
       body: SafeArea(
         child: Column(
@@ -274,6 +279,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                   Tab(icon: const Icon(Icons.two_wheeler_rounded), text: "Riders (${_partners.length})"),
                   Tab(icon: const Icon(Icons.discount_rounded), text: "Coupons (${_coupons.length})"),
                   Tab(icon: const Icon(Icons.receipt_long_rounded), text: "Orders (${_orders.length})"),
+                  const Tab(icon: Icon(Icons.trending_up_rounded), text: "Demand"),
                 ],
               ),
             ),
@@ -292,6 +298,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                           _buildFleetTab(),
                           _buildCouponsTab(),
                           _buildOrdersTab(),
+                          const DemandGapsTab(),
                         ],
                       ),
                     ),
@@ -299,7 +306,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
           ],
         ),
       ),
-    );
+    ));
   }
 
   // --- 1. DB Overview Tab ---
