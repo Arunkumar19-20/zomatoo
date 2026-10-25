@@ -13,11 +13,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Fake in-memory implementation of StripeGateway used in the test and demo profiles.
+ * Fake in-memory implementation of StripeGateway used in the test profile.
  * Prevents real external HTTP network calls during automated test suites.
  */
 @Component
-@Profile({"test", "demo"})
+@Profile("test")
 public class FakeStripeGateway implements StripeGateway {
 
     private final Map<String, PaymentIntent> intents = new ConcurrentHashMap<>();

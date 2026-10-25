@@ -52,6 +52,14 @@ public class DataInitializer implements CommandLineRunner {
     public void run(String... args) {
         logger.info("[DEV] Initializing seed data...");
 
+        // Ensure database partial unique index exists to enforce atomic anti-hoarding per user
+        try {
+            jdbcTemplate.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_drop_res_active_unique ON drop_reservations (drop_id, customer_email) WHERE status IN ('HELD', 'CONFIRMED')");
+            logger.info("[DEV] Enforced partial unique index idx_drop_res_active_unique on drop_reservations.");
+        } catch (Exception e) {
+            logger.warn("[DEV] Could not create partial unique index idx_drop_res_active_unique: {}", e.getMessage());
+        }
+
         // 1. Admin account
         if (userRepository.findByEmail("admin@cravey.com").isEmpty()) {
             User admin = new User("Admin", "admin@cravey.com", "ADMIN");

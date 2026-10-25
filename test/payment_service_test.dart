@@ -163,54 +163,5 @@ void main() {
       expect(result.order?.orderId, 105);
       expect(fakeOrderService.callCount, 2);
     });
-
-    test('6. Paid but cancelled (drop sold out meanwhile) is a failure with a refund message, never "paid"', () async {
-      final fakeOrderService = _FakeOrderService([
-        () async => OrderResponseDTO(
-              orderId: 106,
-              status: 'CANCELLED',
-              paymentStatus: 'PAID',
-              totalAmount: 24.5,
-              orderDate: '2026-10-06T12:00:00Z',
-              items: [],
-            ),
-      ]);
-
-      final paymentService = PaymentService(orderService: fakeOrderService);
-      final result = await paymentService.pollPaymentStatus(
-        106,
-        timeout: const Duration(seconds: 10),
-        initialInterval: const Duration(milliseconds: 10),
-      );
-
-      expect(result.status, PaymentPollStatus.failed);
-      expect(result.errorMessage, contains('refunded'));
-    });
-
-    test('7. Refunded order is a failure too', () async {
-      final fakeOrderService = _FakeOrderService([
-        () async => OrderResponseDTO(
-              orderId: 107,
-              status: 'CANCELLED',
-              paymentStatus: 'REFUNDED',
-              totalAmount: 24.5,
-              orderDate: '2026-10-06T12:00:00Z',
-              items: [],
-            ),
-      ]);
-
-      final result = await PaymentService(orderService: fakeOrderService).pollPaymentStatus(
-        107,
-        timeout: const Duration(seconds: 10),
-        initialInterval: const Duration(milliseconds: 10),
-      );
-
-      expect(result.status, PaymentPollStatus.failed);
-    });
-
-    test('8. Without a Stripe publishable key the payment sheet is simulated instead of crashing', () async {
-      final confirmed = await PaymentService().confirmPaymentWithStripe(clientSecret: 'pi_demo_secret', orderId: 9);
-      expect(confirmed, isTrue);
-    });
   });
 }

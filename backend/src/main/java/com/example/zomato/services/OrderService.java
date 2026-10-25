@@ -9,7 +9,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -342,15 +341,47 @@ public class OrderService {
 
         int cancelledCount = 0;
         for (Order o : abandonedOrders) {
-            // Drop orders live and die by their reservation hold (see DropService); the hold sweeper cancels
-            // them, so a fixed order timeout here must never cut a payment-extended hold short.
-            if (dropReservationRepo.findByOrderId(o.getOrderId())
-                    .filter(r -> r.getStatus() == ReservationStatus.HELD).isPresent()) {
-                continue;
+            Optional<Payment> paymentOpt = paymentRepo.findByOrder_OrderId(o.getOrderId());
+            if (paymentOpt.isPresent()) {
+                Payment payment = paymentOpt.get();
+                if (payment.getTransactionId() != null && !payment.getTransactionId().isBlank()) {
+                    try {
+                        com.stripe.model.PaymentIntent intent = paymentService.retrieveStripeIntent(payment.getTransactionId());
+                        if (intent != null) {
+                            String intentStatus = intent.getStatus();
+                            // Race 1: Webhook was delayed, but payment actually succeeded!
+                            if ("succeeded".equalsIgnoreCase(intentStatus)) {
+                                logger.info("Cleanup detected paid intent {} for order {}. Updating payment status to PAID instead of cancelling.",
+                                        intent.getId(), o.getOrderId());
+                                o.setPaymentStatus(PaymentStatus.PAID);
+                                payment.setStatus("SUCCESS");
+                                paymentRepo.save(payment);
+                                orderRepo.save(o);
+                                continue;
+                            }
+                            // Race 2: Payment is actively processing at the gateway! Skip cancellation to allow completion.
+                            if ("processing".equalsIgnoreCase(intentStatus)) {
+                                logger.info("Cleanup detected processing intent {} for order {}. Skipping cancellation.",
+                                        intent.getId(), o.getOrderId());
+                                continue;
+                            }
+                            // Otherwise, cancel the PaymentIntent so it cannot be paid later
+                            try {
+                                if ("requires_payment_method".equalsIgnoreCase(intentStatus)
+                                        || "requires_confirmation".equalsIgnoreCase(intentStatus)
+                                        || "requires_action".equalsIgnoreCase(intentStatus)) {
+                                    paymentService.cancelStripeIntent(payment.getTransactionId());
+                                }
+                            } catch (Exception ex) {
+                                logger.warn("Could not cancel Stripe PaymentIntent {}: {}", payment.getTransactionId(), ex.getMessage());
+                            }
+                        }
+                    } catch (Exception e) {
+                        logger.warn("Could not check Stripe intent for order {}: {}", o.getOrderId(), e.getMessage());
+                    }
+                }
             }
-            if (!settleStripeIntentBeforeCancel(o)) {
-                continue;
-            }
+
             o.setStatus("CANCELLED");
             orderRepo.save(o);
             if (dropService != null) {
@@ -359,73 +390,6 @@ public class OrderService {
             cancelledCount++;
         }
         return cancelledCount;
-    }
-
-    /**
-     * A drop hold timed out without payment: cancel the unpaid order and its PaymentIntent. The slot was already
-     * handled by DropService. Orders that were paid, or whose payment is moving at Stripe right now, are left
-     * alone - the webhook then confirms, reclaims or refunds them.
-     */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void cancelOrderForLapsedHold(int orderId) {
-        Order o = orderRepo.findById(orderId).orElse(null);
-        if (o == null || !"PLACED".equalsIgnoreCase(o.getStatus()) || o.getPaymentStatus() == PaymentStatus.PAID) {
-            return;
-        }
-        if (!settleStripeIntentBeforeCancel(o)) {
-            return;
-        }
-        o.setStatus("CANCELLED");
-        orderRepo.save(o);
-        logger.info("Order {} cancelled because its drop hold lapsed unpaid", orderId);
-    }
-
-    /**
-     * Looks at the order's PaymentIntent before an unpaid order is cancelled.
-     *
-     * @return true if the order may be cancelled (intent cancelled or none), false if it must be left alone
-     *         because the payment succeeded or is processing
-     */
-    private boolean settleStripeIntentBeforeCancel(Order o) {
-        Optional<Payment> paymentOpt = paymentRepo.findByOrder_OrderId(o.getOrderId());
-        if (paymentOpt.isEmpty()) return true;
-        Payment payment = paymentOpt.get();
-        if (payment.getTransactionId() == null || payment.getTransactionId().isBlank()) return true;
-
-        try {
-            com.stripe.model.PaymentIntent intent = paymentService.retrieveStripeIntent(payment.getTransactionId());
-            if (intent == null) return true;
-            String intentStatus = intent.getStatus();
-            // Webhook was delayed, but the payment actually succeeded: record it instead of cancelling.
-            if ("succeeded".equalsIgnoreCase(intentStatus)) {
-                logger.info("Cancel check found paid intent {} for order {}. Marking PAID instead of cancelling.",
-                        intent.getId(), o.getOrderId());
-                o.setPaymentStatus(PaymentStatus.PAID);
-                payment.setStatus("SUCCESS");
-                paymentRepo.save(payment);
-                orderRepo.save(o);
-                return false;
-            }
-            // Payment is actively processing at the gateway: let it complete.
-            if ("processing".equalsIgnoreCase(intentStatus)) {
-                logger.info("Cancel check found processing intent {} for order {}. Skipping cancellation.",
-                        intent.getId(), o.getOrderId());
-                return false;
-            }
-            // Otherwise cancel the PaymentIntent so it cannot be paid later
-            if ("requires_payment_method".equalsIgnoreCase(intentStatus)
-                    || "requires_confirmation".equalsIgnoreCase(intentStatus)
-                    || "requires_action".equalsIgnoreCase(intentStatus)) {
-                try {
-                    paymentService.cancelStripeIntent(payment.getTransactionId());
-                } catch (Exception ex) {
-                    logger.warn("Could not cancel Stripe PaymentIntent {}: {}", payment.getTransactionId(), ex.getMessage());
-                }
-            }
-        } catch (Exception e) {
-            logger.warn("Could not check Stripe intent for order {}: {}", o.getOrderId(), e.getMessage());
-        }
-        return true;
     }
 
     @Transactional
