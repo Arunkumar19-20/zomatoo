@@ -6,6 +6,7 @@ import '../services/restaurant_service.dart';
 import '../services/menu_service.dart';
 import '../services/delivery_service.dart';
 import '../services/dish_search_service.dart';
+import '../services/dish_photo_picker.dart';
 import '../services/api_client.dart';
 import '../widgets/owner/add_dish_dialog.dart';
 import '../widgets/owner/insights_tab.dart';
@@ -137,6 +138,26 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
     } catch (_) {}
   }
 
+  /// Lets the owner pick a new photo for a dish already on the menu.
+  Future<void> _changeDishPhoto(int index) async {
+    final item = _menuItems[index];
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final photo = await const GalleryDishPhotoPicker().pick();
+      if (photo == null) return;
+      if (photo.tooLarge) {
+        messenger.showSnackBar(const SnackBar(content: Text('That photo is over 2 MB. Choose a smaller one.')));
+        return;
+      }
+      final updated = await MenuService().uploadDishImage(item.id!, photo);
+      if (!mounted) return;
+      setState(() => _menuItems[index] = updated);
+      messenger.showSnackBar(const SnackBar(content: Text('Photo updated.')));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e is ApiException ? e.message : 'Could not update the photo.')));
+    }
+  }
+
   /// Collects the dish with the details craving search needs, then saves it under one of this restaurant's menu sections.
   Future<bool> _showAddMenuItemDialog({int? restaurantId, NewDishInitial? initial}) async {
     restaurantId ??= _restaurant?.id;
@@ -164,7 +185,6 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
         description: input.description,
         isVeg: input.isVeg,
         isAvailable: true,
-        imageUrl: 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=400&fit=crop&q=80',
         categoryId: categoryId,
         spiceLevel: input.spiceLevel,
         servingTemp: input.servingTemp,
@@ -172,12 +192,26 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
         mood: input.mood,
         flavorTags: input.flavorTags,
       ));
+      // the photo goes up after the dish exists; if that fails the dish is still saved and the photo can be added from the menu list
+      var dish = saved;
+      var photoFailed = false;
+      final photo = input.photo;
+      if (photo != null && saved.id != null) {
+        try {
+          dish = await menuSvc.uploadDishImage(saved.id!, photo);
+        } catch (_) {
+          photoFailed = true;
+        }
+      }
       if (mounted) {
         setState(() {
-          if (restaurantId == _restaurant?.id) _menuItems.insert(0, saved);
+          if (restaurantId == _restaurant?.id) _menuItems.insert(0, dish);
           _loading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Dish saved. Customers can find it by craving right away.')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(photoFailed
+                ? 'Dish saved, but the photo could not be uploaded. Use the camera button on the dish to try again.'
+                : 'Dish saved. Customers can find it by craving right away.')));
       }
       return true;
     } catch (e) {
@@ -524,8 +558,8 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
                       ClipRRect(
                         borderRadius: BorderRadius.circular(12),
                         child: Image.network(
-                          item.imageUrl != null && item.imageUrl!.isNotEmpty
-                              ? item.imageUrl!
+                          item.displayImageUrl != null && item.displayImageUrl!.isNotEmpty
+                              ? item.displayImageUrl!
                               : 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=400&fit=crop&q=80',
                           width: 72,
                           height: 72,
@@ -581,6 +615,13 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
                       ),
                       Column(
                         children: [
+                          IconButton(
+                            key: ValueKey('dish-photo-${item.id}'),
+                            tooltip: 'Change photo',
+                            visualDensity: VisualDensity.compact,
+                            icon: const Icon(Icons.photo_camera_outlined, size: 20),
+                            onPressed: item.id == null ? null : () => _changeDishPhoto(index),
+                          ),
                           Switch.adaptive(
                             value: isAvailable,
                             activeColor: Colors.green,

@@ -4,6 +4,8 @@
 // com.example.zomato.entity.*. Field names/types match the entities found
 // in the repo (Silviya-158/zomato-).
 
+import '../services/image_urls.dart';
+
 class Restaurant {
   final int? id;
   final String name;
@@ -112,7 +114,7 @@ class MenuItemDTO {
         price: (j['price'] as num?)?.toDouble() ?? 0,
         isVeg: j['veg'] ?? j['isVeg'],
         isAvailable: j['available'] ?? j['isAvailable'],
-        imageUrl: j['imageUrl'],
+        imageUrl: resolveImageUrl(j['imageUrl']),
       );
 
   Map<String, dynamic> toJson() => {
@@ -164,6 +166,9 @@ class MenuItem {
   final String? imageUrl;
   final int? restaurantId;
   final String? categoryName;
+
+  /// The photo as a link the app can load (an uploaded photo is stored as a path on our server); [imageUrl] stays as the server has it.
+  String? get displayImageUrl => resolveImageUrl(imageUrl);
 
   /// Captured when the owner adds the dish; this is what craving search matches on.
   final int? categoryId;
@@ -326,7 +331,7 @@ class CartItemDTO {
         price: (j['price'] as num?)?.toDouble(),
         quantity: (j['quantity'] as num?)?.toInt() ?? 1,
         subtotal: (j['subtotal'] as num?)?.toDouble(),
-        imageUrl: j['imageUrl'],
+        imageUrl: resolveImageUrl(j['imageUrl']),
         isVeg: j['isVeg'] ?? j['veg'],
       );
 
@@ -412,7 +417,7 @@ class OrderItemDTO {
         price: (j['price'] as num?)?.toDouble(),
         quantity: (j['quantity'] as num?)?.toInt() ?? 1,
         subtotal: (j['subtotal'] as num?)?.toDouble(),
-        imageUrl: j['imageUrl'],
+        imageUrl: resolveImageUrl(j['imageUrl']),
       );
 
   Map<String, dynamic> toJson() => {

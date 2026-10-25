@@ -121,7 +121,9 @@ void main() {
       final state = DishSearchState(repository: repo, debounce: const Duration(milliseconds: 5), attribution: attribution);
       addTearDown(state.dispose);
       state.onQueryChanged('pasta');
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+      while (state.loading || state.response == null) {
+        await Future<void>.delayed(const Duration(milliseconds: 5)); // wait for the answer, however busy the machine is
+      }
       state.reportOpen(state.response!.hits.first, 1);
       expect(repo.clicks, isEmpty);
       expect(attribution.peek(5), isNull);

@@ -86,7 +86,8 @@ public class SecurityConfig {
                     "/locations/**",
                     "/drops",
                     "/drops/**",
-                    "/search/**"
+                    "/search/**",
+                    "/uploads/**"
                 ).permitAll()
                 .anyRequest().authenticated()
             )

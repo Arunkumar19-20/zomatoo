@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/dish_search_models.dart';
 import '../../models/models.dart' as api;
 import '../../repositories/dish_search_repository.dart';
+import '../../services/dish_photo_picker.dart';
 import '../../theme/app_theme.dart';
 
 /// What the owner entered for a new dish.
@@ -18,6 +19,9 @@ class NewDishInput {
   final List<String> flavorTags;
   final int? categoryId;
 
+  /// The photo to upload once the dish is saved, if the owner chose one.
+  final PickedPhoto? photo;
+
   const NewDishInput({
     required this.name,
     required this.price,
@@ -29,6 +33,7 @@ class NewDishInput {
     required this.mood,
     required this.flavorTags,
     this.categoryId,
+    this.photo,
   });
 }
 
@@ -61,10 +66,11 @@ Future<NewDishInput?> showAddDishDialog(
   required MenuTagRepository tags,
   required List<api.MenuCategory> categories,
   NewDishInitial? initial,
+  DishPhotoPicker photoPicker = const GalleryDishPhotoPicker(),
 }) {
   return showDialog<NewDishInput>(
     context: context,
-    builder: (_) => AddDishDialog(tags: tags, categories: categories, initial: initial),
+    builder: (_) => AddDishDialog(tags: tags, categories: categories, initial: initial, photoPicker: photoPicker),
   );
 }
 
@@ -75,8 +81,16 @@ class AddDishDialog extends StatefulWidget {
   final List<api.MenuCategory> categories;
   final Duration suggestDebounce;
   final NewDishInitial? initial;
+  final DishPhotoPicker photoPicker;
 
-  const AddDishDialog({super.key, required this.tags, required this.categories, this.suggestDebounce = const Duration(milliseconds: 500), this.initial});
+  const AddDishDialog({
+    super.key,
+    required this.tags,
+    required this.categories,
+    this.suggestDebounce = const Duration(milliseconds: 500),
+    this.initial,
+    this.photoPicker = const GalleryDishPhotoPicker(),
+  });
 
   @override
   State<AddDishDialog> createState() => _AddDishDialogState();
@@ -98,6 +112,8 @@ class _AddDishDialogState extends State<AddDishDialog> {
   List<TagSuggestion> _suggestions = const [];
   bool _suggesting = false;
   String? _error;
+  PickedPhoto? _photo;
+  String? _photoError;
   Timer? _timer;
   int _ticket = 0;
 
@@ -157,6 +173,23 @@ class _AddDishDialogState extends State<AddDishDialog> {
     }
   }
 
+  Future<void> _pickPhoto() async {
+    try {
+      final photo = await widget.photoPicker.pick();
+      if (photo == null || !mounted) return;
+      setState(() {
+        if (photo.tooLarge) {
+          _photoError = 'That photo is over 2 MB. Choose a smaller one.';
+        } else {
+          _photo = photo;
+          _photoError = null;
+        }
+      });
+    } catch (_) {
+      if (mounted) setState(() => _photoError = 'Could not open your photos.');
+    }
+  }
+
   void _toggle(String id) {
     setState(() {
       _selected.contains(id) ? _selected.remove(id) : _selected.add(id);
@@ -185,6 +218,7 @@ class _AddDishDialogState extends State<AddDishDialog> {
       mood: _mood.text.trim(),
       flavorTags: _selected.toList(),
       categoryId: _categoryId,
+      photo: _photo,
     ));
   }
 
@@ -200,6 +234,8 @@ class _AddDishDialogState extends State<AddDishDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              _photoRow(),
+              const SizedBox(height: 14),
               TextField(key: const ValueKey('dish-name'), controller: _name, decoration: const InputDecoration(labelText: 'Dish name', hintText: 'e.g. Honey chili paneer')),
               const SizedBox(height: 10),
               TextField(key: const ValueKey('dish-price'), controller: _price, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Price (₹)', hintText: '260')),
@@ -264,6 +300,35 @@ class _AddDishDialogState extends State<AddDishDialog> {
         ),
       ],
     );
+  }
+
+  Widget _photoRow() {
+    final photo = _photo;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: photo == null
+              ? Container(key: const ValueKey('dish-photo-empty'), width: 72, height: 72, color: Colors.grey.shade200, child: const Icon(Icons.add_a_photo_outlined, color: Colors.grey))
+              : Image.memory(photo.bytes, key: const ValueKey('dish-photo-preview'), width: 72, height: 72, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(width: 72, height: 72, color: Colors.grey.shade200, child: const Icon(Icons.broken_image_outlined, color: Colors.grey))),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Wrap(spacing: 8, children: [
+            OutlinedButton.icon(
+              key: const ValueKey('dish-photo-add'),
+              onPressed: _pickPhoto,
+              icon: const Icon(Icons.photo_library_outlined, size: 18),
+              label: Text(photo == null ? 'Add photo' : 'Change photo'),
+            ),
+            if (photo != null)
+              TextButton(key: const ValueKey('dish-photo-remove'), onPressed: () => setState(() => _photo = null), child: const Text('Remove')),
+          ]),
+        ),
+      ]),
+      if (_photoError != null)
+        Padding(padding: const EdgeInsets.only(top: 6), child: Text(_photoError!, key: const ValueKey('dish-photo-error'), style: TextStyle(color: Colors.red.shade700, fontSize: 12.5))),
+    ]);
   }
 
   Widget _suggestionRow() {

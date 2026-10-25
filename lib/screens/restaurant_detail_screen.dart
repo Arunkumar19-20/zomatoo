@@ -87,7 +87,7 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
                   name: i.name,
                   description: i.description ?? '',
                   price: i.price.toDouble(),
-                  imageUrl: i.imageUrl ??
+                  imageUrl: i.displayImageUrl ??
                       'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&auto=format&fit=crop&q=60',
                   category: i.categoryName ?? (i.isVeg == true ? 'Veg' : 'Non-Veg'),
                   rating: 4.8,

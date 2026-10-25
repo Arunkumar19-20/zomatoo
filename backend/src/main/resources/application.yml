@@ -4,6 +4,11 @@ spring:
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:}
 
+  servlet:
+    multipart:
+      max-file-size: 3MB
+      max-request-size: 4MB
+
   jpa:
     hibernate:
       ddl-auto: update
@@ -51,3 +56,6 @@ stripe:
   webhook:
     secret: ${STRIPE_WEBHOOK_SECRET:}
 
+uploads:
+  # where owners' dish photos are kept (the folder is created on first upload)
+  dir: ${UPLOADS_DIR:uploads}

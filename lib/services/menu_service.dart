@@ -4,6 +4,7 @@
 import 'package:dio/dio.dart';
 import 'api_client.dart';
 import '../models/models.dart';
+import 'dish_photo_picker.dart';
 
 class MenuService {
   final Dio _dio = ApiClient.instance.dio;
@@ -119,6 +120,27 @@ class MenuService {
   Future<MenuItem> updateItem(int id, MenuItem item) async {
     try {
       final res = await _dio.put('/menu-items/$id', data: item.toJson());
+      return MenuItem.fromJson(res.data);
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
+  /// POST /menu-items/{id}/image: sets the dish's photo (replacing any earlier upload) and returns the dish.
+  Future<MenuItem> uploadDishImage(int id, PickedPhoto photo) async {
+    try {
+      final form = FormData.fromMap({'file': MultipartFile.fromBytes(photo.bytes, filename: photo.name)});
+      final res = await _dio.post('/menu-items/$id/image', data: form);
+      return MenuItem.fromJson(res.data);
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
+  /// DELETE /menu-items/{id}/image: back to no photo.
+  Future<MenuItem> removeDishImage(int id) async {
+    try {
+      final res = await _dio.delete('/menu-items/$id/image');
       return MenuItem.fromJson(res.data);
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);

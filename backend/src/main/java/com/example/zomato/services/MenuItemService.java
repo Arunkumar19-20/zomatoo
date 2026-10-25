@@ -3,7 +3,9 @@ package com.example.zomato.services;
 import com.example.zomato.entity.MenuItem;
 import com.example.zomato.repository.MenuItemRepository;
 import com.example.zomato.search.SearchIndexService;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -12,8 +14,10 @@ public class MenuItemService {
 
     private final MenuItemRepository repository;
     private final SearchIndexService searchIndex;
+    private final DishImageService images;
 
-    public MenuItemService(MenuItemRepository repository, SearchIndexService searchIndex) {
+    public MenuItemService(MenuItemRepository repository, SearchIndexService searchIndex, DishImageService images) {
+        this.images = images;
         this.repository = repository;
         this.searchIndex = searchIndex;
     }
@@ -36,6 +40,8 @@ public class MenuItemService {
     }
 
     public void delete(int id) {
+        // a deleted dish takes its uploaded photo with it
+        repository.findById(id).ifPresent(i -> { if (images != null) images.deleteIfOurs(i.getImageUrl()); });
         repository.deleteById(id);
         searchIndex.onDeleted(id);
     }
@@ -57,6 +63,17 @@ public class MenuItemService {
         List<String> ownerTags = SearchIndexService.validateOwnerInput(existing);
         MenuItem saved = repository.save(existing);
         searchIndex.onSaved(saved, ownerTags);
+        return saved;
+    }
+
+    /** Sets (or clears, with null) a dish's photo and refreshes the search index; the replaced photo file is deleted if it was an upload. */
+    public MenuItem setImage(int itemId, String imageUrl, DishImageService images) {
+        MenuItem item = repository.findById(itemId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Menu item not found"));
+        String old = item.getImageUrl();
+        item.setImageUrl(imageUrl);
+        MenuItem saved = repository.save(item);
+        searchIndex.onChanged(saved);
+        if (old != null && !old.equals(imageUrl)) images.deleteIfOurs(old);
         return saved;
     }
 

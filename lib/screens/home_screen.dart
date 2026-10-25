@@ -205,7 +205,7 @@ class _HomeScreenState extends State<HomeScreen> {
             name: it.name,
             description: it.description ?? '',
             price: it.price,
-            imageUrl: it.imageUrl ?? _restaurantImage(rId, it.name),
+            imageUrl: it.displayImageUrl ?? _restaurantImage(rId, it.name),
             category: it.categoryName ?? (it.isVeg == true ? 'Veg' : 'Non-Veg'),
             rating: 4.8,
             isVeg: it.isVeg,

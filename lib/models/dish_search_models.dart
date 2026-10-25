@@ -1,3 +1,5 @@
+import '../services/image_urls.dart';
+
 // Mirrors: DishSearchResponse (GET /search/dishes) and the tag endpoints under /menu-items
 
 class DishHit {
@@ -55,7 +57,7 @@ class DishHit {
         description: j['description']?.toString(),
         price: (j['price'] as num?)?.toDouble() ?? 0,
         veg: j['veg'] == true,
-        imageUrl: j['imageUrl']?.toString(),
+        imageUrl: resolveImageUrl(j['imageUrl']?.toString()),
         restaurantId: (j['restaurantId'] as num?)?.toInt() ?? 0,
         restaurantName: j['restaurantName']?.toString(),
         restaurantOpen: j['restaurantOpen'] != false,

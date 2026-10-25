@@ -52,3 +52,6 @@ backend/.mvn/wrapper/maven-wrapper.jar
 # Dish search: downloaded model and datasets (not committed)
 backend/models/
 data/
+
+# owners' uploaded dish photos (local runs)
+backend/uploads/

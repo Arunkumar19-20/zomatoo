@@ -28,6 +28,14 @@ class RecordingAdapter implements HttpClientAdapter {
   void close({bool force = false}) {}
 }
 
+/// Waits until the search has answered, however busy the machine is (a fixed sleep made this file flaky under load).
+Future<void> settled(DishSearchState state) async {
+  final deadline = DateTime.now().add(const Duration(seconds: 5));
+  while ((state.loading || state.response == null) && DateTime.now().isBefore(deadline)) {
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+  }
+}
+
 void main() {
   group('SearchAttribution', () {
     late DateTime now;
@@ -77,7 +85,7 @@ void main() {
       final state = DishSearchState(repository: repo, debounce: const Duration(milliseconds: 5), attribution: attribution);
       addTearDown(state.dispose);
       state.onQueryChanged('birria tacos');
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+      await settled(state);
 
       state.reportOpen(state.response!.hits[1], 2);
 
@@ -92,7 +100,7 @@ void main() {
       final state = DishSearchState(repository: repo, debounce: const Duration(milliseconds: 5), attribution: attribution);
       addTearDown(state.dispose);
       state.onQueryChanged('birria tacos');
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+      await settled(state);
       state.reportOpen(state.response!.hits.first, 1);
       expect(attribution.peek(state.response!.hits.first.itemId), isNull);
     });
