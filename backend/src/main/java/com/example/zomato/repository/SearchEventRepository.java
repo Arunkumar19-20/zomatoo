@@ -46,4 +46,19 @@ public interface SearchEventRepository extends JpaRepository<SearchEvent, Long> 
     @Modifying
     @Query("delete from SearchEvent e where e.createdAt < :cutoff")
     int deleteOlderThan(@Param("cutoff") LocalDateTime cutoff);
+
+    /** created at, normalized query, flavors, unmet, searcher key: what trend detection reads (finished queries only) */
+    @Query("select e.createdAt, e.normalizedQuery, e.flavors, e.unmet, e.sessionKey from SearchEvent e " +
+           "where e.createdAt >= :since and e.superseded = false and e.normalizedQuery is not null and (:withSimulated = true or e.simulated = false)")
+    List<Object[]> trendInputsSince(@Param("since") LocalDateTime since, @Param("withSimulated") boolean withSimulated);
+
+    @Transactional
+    @Modifying
+    @Query("delete from SearchClick c where c.searchEventId in (select e.id from SearchEvent e where e.simulated = true)")
+    int deleteSimulatedClicks();
+
+    @Transactional
+    @Modifying
+    @Query("delete from SearchEvent e where e.simulated = true")
+    int deleteSimulated();
 }

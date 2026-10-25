@@ -55,6 +55,22 @@ public class SearchProperties {
     @Value("${search.log.session-secret:dev-only-change-me}")
     private String logSessionSecret;
 
+    @Value("${search.trends.min-searchers:8}")
+    private int trendMinSearchers;
+
+    @Value("${search.trends.min-active-days:3}")
+    private int trendMinActiveDays;
+
+    @Value("${search.trends.min-growth:2.0}")
+    private double trendMinGrowth;
+
+    @Value("${search.trends.max-day-share:0.5}")
+    private double trendMaxDayShare;
+
+    /** Lets an admin generate demo search traffic. Never enable in production. */
+    @Value("${search.sim.enabled:false}")
+    private boolean simEnabled;
+
     public String modelDir() { return modelDir; }
     public int defaultK() { return defaultK; }
     public int maxK() { return maxK; }
@@ -69,6 +85,11 @@ public class SearchProperties {
     public boolean logEnabled() { return logEnabled; }
     public int logRetentionDays() { return logRetentionDays; }
     public String logSessionSecret() { return logSessionSecret; }
+    public boolean simEnabled() { return simEnabled; }
+    public TrendDetector.Params trendParams() {
+        return new TrendDetector.Params(7, 28, trendMinSearchers, trendMinActiveDays, trendMinGrowth, trendMaxDayShare, 0.25);
+    }
+    void setSimEnabled(boolean v) { this.simEnabled = v; }
     void setUnmetSimilarity(double v) { this.unmetSimilarity = v; }
     void setLogEnabled(boolean v) { this.logEnabled = v; }
 

@@ -104,6 +104,13 @@ public final class Bm25Index {
      */
     public record FullMatch(int terms, int unknown, int fullMatches) {}
 
+    /** The words of a craving that say something about the food: stemmed, stop words and generic words ("fusion", "food") dropped. */
+    public static List<String> contentTerms(String text) {
+        List<String> out = new ArrayList<>();
+        for (String t : tokenize(text)) if (!GENERIC.contains(t) && !out.contains(t)) out.add(t);
+        return out;
+    }
+
     /** How many dishes carry ALL of the query's content words: "kimchi carbonara" is 0 even if each word alone is served. */
     public synchronized FullMatch fullMatch(String query, IntPredicate filter) {
         Set<String> terms = new java.util.LinkedHashSet<>();
