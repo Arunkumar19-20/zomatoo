@@ -57,6 +57,11 @@ public final class PhraseMiner {
         return Bm25Index.contentTerms(text).stream().map(t -> SAME_WORD.getOrDefault(t, t)).distinct().toList();
     }
 
+    /** True for a (stemmed) word that describes the eater or the taste rather than naming food; a dish name search does not require it. */
+    public static boolean isFlavorOrMood(String stemmedToken) {
+        return MOOD.contains(stemmedToken) || FLAVOR_WORDS.contains(stemmedToken);
+    }
+
     /** Cuisines that the words of a text point to. */
     public static Set<String> cuisinesIn(String text) {
         Set<String> out = new TreeSet<>();

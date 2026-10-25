@@ -13,6 +13,7 @@ DishHit makeHit({
   bool open = true,
   int? spice = 2,
   String restaurant = 'Smokehouse 66',
+  int restaurantId = 7,
   List<String> reasons = const ['Tagged sweet + spicy by the restaurant'],
   double score = 1.0,
 }) =>
@@ -21,7 +22,7 @@ DishHit makeHit({
       name: name,
       price: price,
       veg: veg,
-      restaurantId: 7,
+      restaurantId: restaurantId,
       restaurantName: restaurant,
       restaurantOpen: open,
       spiceLevel: spice,
@@ -53,14 +54,18 @@ class FakeDishSearchRepository implements DishSearchRepository {
   ApiException? error;
   final List<(String, int, int, String)> clicks = [];
 
+  /// The `type` of each search, in the same order as [calls] (null = everything).
+  final List<String?> types = [];
+
   @override
   Future<void> reportClick(String searchId, int itemId, int rank, {String action = 'OPEN'}) async {
     clicks.add((searchId, itemId, rank, action));
   }
 
   @override
-  Future<DishSearchResponse> search(String query, {int k = 10, bool? veg, double? maxPrice}) {
+  Future<DishSearchResponse> search(String query, {int k = 10, bool? veg, double? maxPrice, String? type}) {
     calls.add((query, k));
+    types.add(type);
     if (error != null) return Future.error(error!);
     if (handler != null) return handler!(query, k);
     return Future.value(makeResponse(query));

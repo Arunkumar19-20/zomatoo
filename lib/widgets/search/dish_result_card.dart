@@ -2,14 +2,22 @@ import 'package:flutter/material.dart';
 import '../../models/dish_search_models.dart';
 import '../../theme/app_theme.dart';
 import '../scale_tap.dart';
+import 'dish_placeholder.dart';
 
-/// One dish in the craving results: what it is, where it is from, which of the requested flavors it carries and why it matched.
+/// One dish in the search results: what it is, where it is from, which of the requested flavors it carries and why it matched.
+/// With [onAdd] it also carries an ADD button that turns into a quantity stepper once the dish is in the cart.
 class DishResultCard extends StatelessWidget {
   final DishHit hit;
-  final int rank;
   final VoidCallback? onTap;
 
-  const DishResultCard({super.key, required this.hit, required this.rank, this.onTap});
+  /// How many of this dish are in the cart right now.
+  final int quantity;
+
+  /// Adds one to the cart. Null hides the cart control (for example where nothing can be ordered).
+  final VoidCallback? onAdd;
+  final VoidCallback? onRemove;
+
+  const DishResultCard({super.key, required this.hit, this.onTap, this.quantity = 0, this.onAdd, this.onRemove});
 
   static String label(String tag) => tag.isEmpty ? tag : tag[0].toUpperCase() + tag.substring(1);
 
@@ -86,7 +94,7 @@ class DishResultCard extends StatelessWidget {
                           const Icon(Icons.local_fire_department_rounded, size: 14, color: AppTheme.chipOrange),
                       ],
                       const Spacer(),
-                      Text('#$rank', key: ValueKey('dish-rank-${hit.itemId}'), style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                      if (onAdd != null) _cartControl(),
                     ],
                   ),
                 ],
@@ -98,6 +106,53 @@ class DishResultCard extends StatelessWidget {
     );
   }
 
+  /// ADD, or the stepper once at least one is in the cart.
+  Widget _cartControl() {
+    if (quantity <= 0) {
+      return InkWell(
+        key: ValueKey('dish-add-${hit.itemId}'),
+        borderRadius: BorderRadius.circular(10),
+        onTap: onAdd,
+        child: Container(
+          width: 78,
+          height: 32,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: AppTheme.chipOrange.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppTheme.chipOrange),
+          ),
+          child: const Text('ADD', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppTheme.chipOrange, letterSpacing: 0.5)),
+        ),
+      );
+    }
+    return Container(
+      height: 32,
+      decoration: BoxDecoration(color: AppTheme.chipOrange, borderRadius: BorderRadius.circular(10)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          InkWell(
+            key: ValueKey('dish-minus-${hit.itemId}'),
+            borderRadius: BorderRadius.circular(10),
+            onTap: onRemove,
+            child: const SizedBox(width: 32, height: 32, child: Icon(Icons.remove_rounded, color: Colors.white, size: 18)),
+          ),
+          SizedBox(
+            width: 22,
+            child: Text('$quantity', key: ValueKey('dish-qty-${hit.itemId}'), textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14)),
+          ),
+          InkWell(
+            key: ValueKey('dish-plus-${hit.itemId}'),
+            borderRadius: BorderRadius.circular(10),
+            onTap: onAdd,
+            child: const SizedBox(width: 32, height: 32, child: Icon(Icons.add_rounded, color: Colors.white, size: 18)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _image() {
     final url = hit.imageUrl;
     return ClipRRect(
@@ -105,17 +160,12 @@ class DishResultCard extends StatelessWidget {
       child: SizedBox(
         width: 84,
         height: 84,
-        child: (url == null || url.isEmpty)
-            ? _placeholder()
-            : Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _placeholder()),
+        child: (url == null || url.isEmpty) ? _placeholder() : Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _placeholder()),
       ),
     );
   }
 
-  Widget _placeholder() => Container(
-        color: AppTheme.primaryLight.withValues(alpha: 0.35),
-        child: const Center(child: Icon(Icons.restaurant_menu_rounded, color: Colors.white, size: 30)),
-      );
+  Widget _placeholder() => DishPlaceholder(name: hit.name, description: hit.description, veg: hit.veg);
 
   Widget _vegMark() {
     final color = hit.veg ? Colors.green.shade700 : Colors.red.shade700;

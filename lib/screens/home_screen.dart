@@ -19,6 +19,7 @@ import '../models/dish_search_models.dart';
 import '../models/dish_search_state.dart';
 import '../widgets/search/dish_results_section.dart';
 import '../widgets/search/trending_chips.dart';
+import '../widgets/search/search_scope_chips.dart';
 import '../widgets/drops/drops_section.dart';
 import '../widgets/drops/hold_banner.dart';
 
@@ -310,10 +311,12 @@ class _HomeScreenState extends State<HomeScreen> {
       bool matchesSearch = true;
       if (_searchQuery.isNotEmpty) {
         final query = _searchQuery.toLowerCase();
+        // narrowed to restaurants, a dish on the menu is not a reason to show the restaurant: only its name, address and cuisine count
+        final restaurantsOnly = context.read<DishSearchState>().scope == SearchScope.restaurants;
         matchesSearch = restaurant.name.toLowerCase().contains(query) ||
             (restaurant.address != null && restaurant.address!.toLowerCase().contains(query)) ||
             restaurant.cuisineTags.any((tag) => tag.toLowerCase().contains(query)) ||
-            restaurant.menu.any((item) => item.name.toLowerCase().contains(query));
+            (!restaurantsOnly && restaurant.menu.any((item) => item.name.toLowerCase().contains(query)));
       }
       return matchesCategory && matchesSearch;
     }).toList();
@@ -322,6 +325,9 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final cartCount = context.watch<CartState>().totalItemCount;
+    final search = context.watch<DishSearchState>();
+    // narrowed to dishes or cravings, the restaurant carousel is not part of the answer
+    final hideRestaurants = search.active && (search.scope == SearchScope.dishes || search.scope == SearchScope.cravings);
 
     return Scaffold(
       backgroundColor: AppTheme.scaffoldBackground,
@@ -494,6 +500,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     // Rising searches someone can order today; tapping one runs it
                     TrendingChips(onPick: _pickTrending),
+                    // Dishes, Restaurants or Cravings: narrows what the search looks at
+                    const SearchScopeChips(),
                     // Top matches for a craving like "something sweet but also spicy"
                     DishResultsSection(onOpen: _openDish),
 
@@ -614,6 +622,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     const DropsSection(),
 
                     // Header row
+                    if (!hideRestaurants)
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -654,7 +663,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
 
                     // Backend connection status banner
-                    if (_error != null)
+                    if (_error != null && !hideRestaurants)
                       Container(
                         margin: const EdgeInsets.only(bottom: 12),
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -682,7 +691,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 16),
 
                     // Restaurants list — shimmer while loading, real/mock data when ready
-                    (context.watch<DishSearchState>().active && !_loading && _displayRestaurants.isEmpty)
+                    (hideRestaurants || (search.active && search.scope != SearchScope.restaurants && !_loading && _displayRestaurants.isEmpty))
                         ? const SizedBox.shrink()
                         : _loading
                         ? SizedBox(

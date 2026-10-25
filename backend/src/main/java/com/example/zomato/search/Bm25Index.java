@@ -95,7 +95,9 @@ public final class Bm25Index {
 
     /** Words that describe a craving without naming a dish ("fusion", "food"); they say nothing about whether the menu has it. */
     private static final Set<String> GENERIC = Set.of("food", "foods", "meal", "dish", "dishe", "item", "something", "anything", "thing",
-            "eat", "want", "order", "good", "best", "nice", "tasty", "delicious", "fusion", "style", "type", "kind", "new", "special");
+            "eat", "want", "order", "good", "best", "nice", "tasty", "delicious", "fusion", "style", "type", "kind", "new", "special",
+            // words that join or soften a craving ("sweet but also spicy", "a little bit more") and name nothing on a menu
+            "but", "also", "just", "very", "really", "like", "some", "any", "little", "bit", "more", "most", "please", "maybe", "much", "lot");
 
     /**
      * @param terms        distinct content words in the craving (generic words dropped)
@@ -136,6 +138,38 @@ public final class Bm25Index {
             if (all) full++;
         }
         return new FullMatch(terms.size(), 0, full);
+    }
+
+    /** @param hadTerms whether the query had any food word left after the ignored ones; @param ids the dishes that contain all of them */
+    public record AllMatch(boolean hadTerms, Set<Integer> ids) {}
+
+    /**
+     * The dishes that contain every food word of the query (so "pasta" means dishes that say pasta, nothing merely nearby in meaning).
+     * Words for which {@code ignore} is true (flavor and mood words) are not required. A word that no dish contains, not even as a close
+     * spelling, means no dish matches.
+     */
+    public synchronized AllMatch matchAll(String query, java.util.function.Predicate<String> ignore, IntPredicate filter) {
+        Set<String> terms = new java.util.LinkedHashSet<>();
+        for (String t : tokenize(query)) if (!GENERIC.contains(t) && !ignore.test(t)) terms.add(t);
+        if (terms.isEmpty() || docs.isEmpty()) return new AllMatch(false, Set.of());
+        List<Set<String>> alternatives = new ArrayList<>();
+        for (String t : terms) {
+            Set<String> alt = df.containsKey(t) ? Set.of(t) : nearTerms(t);
+            if (alt.isEmpty()) return new AllMatch(true, Set.of());
+            alternatives.add(alt);
+        }
+        Set<Integer> ids = new HashSet<>();
+        for (var e : docs.entrySet()) {
+            if (!filter.test(e.getKey())) continue;
+            boolean all = true;
+            for (Set<String> alt : alternatives) {
+                boolean any = false;
+                for (String a : alt) if (e.getValue().tf().containsKey(a)) { any = true; break; }
+                if (!any) { all = false; break; }
+            }
+            if (all) ids.add(e.getKey());
+        }
+        return new AllMatch(true, ids);
     }
 
     /** Index terms within a small edit distance, or sharing a prefix, of an unknown query term. */

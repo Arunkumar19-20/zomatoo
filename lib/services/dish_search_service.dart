@@ -14,7 +14,7 @@ class DishSearchService implements DishSearchRepository, MenuTagRepository {
 
   /// GET /search/dishes?q=&k=&veg=&maxPrice=
   @override
-  Future<DishSearchResponse> search(String query, {int k = 10, bool? veg, double? maxPrice}) async {
+  Future<DishSearchResponse> search(String query, {int k = 10, bool? veg, double? maxPrice, String? type}) async {
     try {
       final res = await _dio.get('/search/dishes',
           queryParameters: {
@@ -22,6 +22,7 @@ class DishSearchService implements DishSearchRepository, MenuTagRepository {
             'k': k,
             if (veg != null) 'veg': veg,
             if (maxPrice != null) 'maxPrice': maxPrice,
+            if (type != null) 'type': type,
           },
           options: Options(headers: {'X-Search-Client': await SearchClientId.get()}));
       return DishSearchResponse.fromJson(res.data as Map<String, dynamic>);

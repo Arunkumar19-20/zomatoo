@@ -70,6 +70,27 @@ the ranking uses good tags, not how well it guesses.
   dishes but only 56% of the spicy ones, because that dataset calls most main courses spicy without saying why.
 - "sour" is never chosen by owners in the demo catalog (they use "tangy"), so the tagger's sour suggestions count as wrong there.
 
+## What a search returns: relevance cutoff and filters
+
+The ranking above decides the *order*. It used to decide the *membership* too, which was wrong: the meaning-based list scores every dish, so a short
+list of real matches was padded with whatever was nearest in meaning. A search for "pasta" returned the six pasta dishes and then Mushroom Risotto,
+Greek Salad, Caprese Salad and Tiramisu, under a count of "Top 10 of 101".
+
+Now a dish is shown only if it is relevant for a reason the search accepts:
+
+| Filter (`type`) | A dish is shown when |
+|---|---|
+| none (everything) | it matches the query's words, or carries the requested flavors; only if there is neither does meaning decide (this is what keeps "late night snack" working) |
+| `dish` | it contains **every** food word of the query in its name, description, ingredients or category. Flavor and mood words ("spicy", "late night") and joining words ("but", "also") are not required, so "spicy noodles" means noodle dishes and a craving sentence with no food in it behaves like everything |
+| `craving` | it carries the requested flavors or is close in meaning; a name match alone does not qualify |
+
+Restaurants is not a dish search: the app filters its own restaurant list by name, address and cuisine only.
+
+Checked on the real model with the 126 demo dishes: "pasta" gives 6 pasta dishes and no Tiramisu, "pizza" 5, "birria tacos" with `dish` gives only Beef Birria
+Tacos (everything also shows Tacos al Pastor), "injera" gives nothing in any filter. The evaluation above is unchanged to the second decimal for every query group,
+because its "full" row already runs with the cutoff: the cutoff removes irrelevant dishes from the tail, not relevant ones from the top ten.
+The log's "was this served?" verdict is untouched by it: it still judges relevance by words, flavors and meaning together, whichever filter was shown.
+
 ## Tried and not kept
 
 | idea | result |

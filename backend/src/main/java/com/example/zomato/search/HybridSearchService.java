@@ -45,11 +45,35 @@ public class HybridSearchService {
         this.props = props;
     }
 
-    public record Request(String q, int k, Boolean veg, Float maxPrice, boolean openOnly) {}
+    /**
+     * What the customer is looking for: ALL (words, flavors and, failing both, meaning), DISH (every food word of the query is in the
+     * dish's text: "pasta" means pasta dishes, nothing else) or CRAVING (taste and meaning, not names).
+     */
+    public enum Scope {
+        ALL, DISH, CRAVING;
 
-    /** Which rankings take part; used by the evaluation to show what each one contributes. */
-    public record Options(boolean dense, boolean facets, boolean bm25, boolean tags, boolean coverageBonus) {
-        public static final Options ALL = new Options(true, true, true, true, true);
+        /** The value of the {@code type} query parameter; anything unknown means ALL. */
+        public static Scope fromParam(String s) {
+            if (s == null) return ALL;
+            return switch (s.trim().toLowerCase(Locale.ROOT)) {
+                case "dish", "dishes" -> DISH;
+                case "craving", "cravings" -> CRAVING;
+                default -> ALL;
+            };
+        }
+    }
+
+    public record Request(String q, int k, Boolean veg, Float maxPrice, boolean openOnly, Scope scope) {
+        public Request(String q, int k, Boolean veg, Float maxPrice, boolean openOnly) { this(q, k, veg, maxPrice, openOnly, Scope.ALL); }
+    }
+
+    /**
+     * Which rankings take part; used by the evaluation to show what each one contributes. {@code relevantOnly} drops every dish that is not
+     * actually relevant to the query (see {@link Scope}); the evaluation's ablations leave it off so their ranking numbers stay comparable.
+     */
+    public record Options(boolean dense, boolean facets, boolean bm25, boolean tags, boolean coverageBonus, boolean relevantOnly) {
+        public Options(boolean dense, boolean facets, boolean bm25, boolean tags, boolean coverageBonus) { this(dense, facets, bm25, tags, coverageBonus, false); }
+        public static final Options ALL = new Options(true, true, true, true, true, true);
     }
 
     public record Hit(DishDoc doc, double score, double raw, List<String> matchedTags, List<String> reasons, boolean ownerConfirmedAll) {}
@@ -95,7 +119,9 @@ public class HybridSearchService {
         boolean semantic = index.provider().isSemantic() && index.vectors().size() > 0;
         int pool = Math.max(60, k * 6);
         List<Ranked> lists = new ArrayList<>();
-        Set<Integer> relevant = new HashSet<>();
+        // why each dish counts as relevant, kept apart so the scope can choose which reasons it accepts
+        Set<Integer> denseRelevant = new HashSet<>(), lexicalRelevant = new HashSet<>(), tagRelevant = new HashSet<>();
+        Bm25Index.AllMatch dishMatch = new Bm25Index.AllMatch(false, Set.of());
         Double bestSimilarity = null;
         int bm25Candidates = 0;
         Bm25Index.FullMatch fullMatch = new Bm25Index.FullMatch(0, 0, 0);
@@ -106,7 +132,7 @@ public class HybridSearchService {
             List<Bm25Index.Scored> denseScored = index.vectors().search(whole, candidates::containsKey, pool);
             lists.add(new Ranked("dense", props.denseWeight(), denseScored.stream().map(Bm25Index.Scored::id).toList()));
             if (!denseScored.isEmpty()) bestSimilarity = denseScored.get(0).score();
-            for (Bm25Index.Scored d : denseScored) if (d.score() >= props.unmetSimilarity()) relevant.add(d.id());
+            for (Bm25Index.Scored d : denseScored) if (d.score() >= props.unmetSimilarity()) denseRelevant.add(d.id());
 
             if (opt.facets() && parsed.isMultiFacet()) {
                 List<float[]> facetVectors = new ArrayList<>();
@@ -129,12 +155,15 @@ public class HybridSearchService {
         }
 
         if (opt.bm25()) {
-            List<Bm25Index.Scored> lexical = index.bm25().search(parsed.normalized().isBlank() ? parsed.original() : parsed.normalized(),
-                    candidates::containsKey, pool);
+            String text = parsed.normalized().isBlank() ? parsed.original() : parsed.normalized();
+            // every keyword match counts for relevance, however far down; only the top of the list feeds the fusion
+            List<Bm25Index.Scored> lexicalAll = index.bm25().search(text, candidates::containsKey, Math.max(pool, candidates.size()));
+            List<Bm25Index.Scored> lexical = lexicalAll.size() > pool ? lexicalAll.subList(0, pool) : lexicalAll;
             if (!lexical.isEmpty()) lists.add(new Ranked("bm25", props.bm25Weight(), lexical.stream().map(Bm25Index.Scored::id).toList()));
-            bm25Candidates = lexical.size();
-            fullMatch = index.bm25().fullMatch(parsed.normalized().isBlank() ? parsed.original() : parsed.normalized(), candidates::containsKey);
-            lexical.forEach(l -> relevant.add(l.id()));
+            bm25Candidates = lexicalAll.size();
+            fullMatch = index.bm25().fullMatch(text, candidates::containsKey);
+            lexicalAll.forEach(l -> lexicalRelevant.add(l.id()));
+            if (req.scope() == Scope.DISH) dishMatch = index.bm25().matchAll(text, PhraseMiner::isFlavorOrMood, candidates::containsKey);
         }
 
         Set<Flavor> wanted = parsed.flavors();
@@ -143,7 +172,7 @@ public class HybridSearchService {
             for (DishDoc d : candidates.values()) {
                 double c = coverage(d, wanted);
                 if (c > 0) byTags.add(new Bm25Index.Scored(d.itemId(), c));
-                if (c >= 0.5) relevant.add(d.itemId());
+                if (c >= 0.5) tagRelevant.add(d.itemId());
             }
             byTags.sort(Comparator.comparingDouble(Bm25Index.Scored::score).reversed().thenComparingInt(Bm25Index.Scored::id));
             lists.add(new Ranked("tags", props.tagWeight(), byTags.stream().limit(pool).map(Bm25Index.Scored::id).toList()));
@@ -163,6 +192,16 @@ public class HybridSearchService {
 
         List<Map.Entry<Integer, Double>> ranked = new ArrayList<>(fused.entrySet());
         ranked.sort(Map.Entry.<Integer, Double>comparingByValue().reversed().thenComparing(Map.Entry.comparingByKey()));
+
+        // the dense list returns every dish ranked by similarity, so without a cutoff "pasta" would end with whatever is nearest in meaning
+        // (tiramisu); only dishes that are relevant for a reason this scope accepts are shown
+        if (opt.relevantOnly()) {
+            Set<Integer> allowed = allowedIds(req.scope(), semantic && opt.dense(), dishMatch, lexicalRelevant, tagRelevant, denseRelevant);
+            if (allowed != null) ranked.removeIf(e -> !allowed.contains(e.getKey()));
+        }
+        Set<Integer> relevant = new HashSet<>(denseRelevant);
+        relevant.addAll(lexicalRelevant);
+        relevant.addAll(tagRelevant);
         double best = ranked.isEmpty() ? 1.0 : ranked.get(0).getValue();
 
         Set<String> queryTerms = new HashSet<>(Bm25Index.tokenize(parsed.normalized()));
@@ -177,6 +216,33 @@ public class HybridSearchService {
         int ownerTop3 = (int) hits.stream().limit(3).filter(Hit::ownerConfirmedAll).count();
         Diagnostics diag = new Diagnostics(relevant.size(), bm25Candidates, fullMatch.terms(), fullMatch.unknown(), fullMatch.fullMatches(), bestSimilarity, topCoverage, ownerTop3);
         return new Result(parsed, semantic && opt.dense() ? "HYBRID" : "KEYWORD", ranked.size(), hits, took, diag);
+    }
+
+    /**
+     * The dishes a scope may show, or null for "no restriction".
+     * ALL: dishes matching the words or the requested flavors; only when there is neither does meaning decide (mood searches such as "late night snack").
+     * DISH: dishes containing every food word of the query (flavor and mood words do not count as food words); with no food word it behaves like ALL.
+     * CRAVING: dishes carrying the requested flavors, or close in meaning; names alone do not qualify. Without the embedding model, words stand in for meaning.
+     */
+    private static Set<Integer> allowedIds(Scope scope, boolean semantic, Bm25Index.AllMatch dishMatch, Set<Integer> lexical, Set<Integer> tags, Set<Integer> dense) {
+        Set<Integer> allowed = new HashSet<>();
+        switch (scope == null ? Scope.ALL : scope) {
+            case DISH -> {
+                if (dishMatch.hadTerms()) return new HashSet<>(dishMatch.ids());
+                return allowedIds(Scope.ALL, semantic, dishMatch, lexical, tags, dense);
+            }
+            case CRAVING -> {
+                allowed.addAll(tags);
+                allowed.addAll(dense);
+                if (!semantic) allowed.addAll(lexical);
+            }
+            default -> {
+                allowed.addAll(lexical);
+                allowed.addAll(tags);
+                if (allowed.isEmpty()) allowed.addAll(dense);
+            }
+        }
+        return allowed;
     }
 
     private float[] queryVector(String text) {

@@ -2,7 +2,9 @@ import '../models/dish_search_models.dart';
 
 abstract class DishSearchRepository {
   /// "Something sweet but also spicy" in, the top-[k] dishes out.
-  Future<DishSearchResponse> search(String query, {int k = 10, bool? veg, double? maxPrice});
+  ///
+  /// [type] narrows it: `dish` (the dish's own words must match), `craving` (taste and meaning), or null for both.
+  Future<DishSearchResponse> search(String query, {int k = 10, bool? veg, double? maxPrice, String? type});
 
   /// Tells the server a result was opened. Best effort: never throws.
   Future<void> reportClick(String searchId, int itemId, int rank, {String action = 'OPEN'});

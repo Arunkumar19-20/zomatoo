@@ -171,4 +171,87 @@ void main() {
       });
     });
   });
+
+  group('search scope', () {
+    Future<void> searched(WidgetTester tester, String q) async {
+      state.onQueryChanged(q);
+      await tester.pump(const Duration(milliseconds: 150));
+      await tester.pump();
+    }
+
+    testWidgets('starts on everything and sends no type', (tester) async {
+      await searched(tester, 'pasta');
+      expect(state.scope, SearchScope.all);
+      expect(repo.types, [null]);
+    });
+
+    testWidgets('dishes and cravings send their type and search again at once, without waiting for typing to settle', (tester) async {
+      await searched(tester, 'pasta');
+      state.setScope(SearchScope.dishes);
+      await tester.pump();
+      expect(repo.types, [null, 'dish']);
+      state.setScope(SearchScope.cravings);
+      await tester.pump();
+      expect(repo.types, [null, 'dish', 'craving']);
+      expect(repo.calls.map((c) => c.$1).toSet(), {'pasta'});
+    });
+
+    testWidgets('restaurants fetches no dishes and clears the old ones', (tester) async {
+      await searched(tester, 'pasta');
+      expect(state.response, isNotNull);
+      final calls = repo.calls.length;
+      state.setScope(SearchScope.restaurants);
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(repo.calls.length, calls);
+      expect(state.response, isNull);
+      expect(state.loading, isFalse);
+
+      // typing more while on restaurants still fetches nothing and never shows a spinner for dishes
+      state.onQueryChanged('pasta bake');
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(repo.calls.length, calls);
+      expect(state.loading, isFalse);
+    });
+
+    testWidgets('an answer for the old scope never lands on the new one', (tester) async {
+      final slow = Completer<DishSearchResponse>();
+      repo.handler = (q, k) => repo.types.last == null ? slow.future : Future.value(makeResponse(q, hits: [makeHit(id: 5, name: 'Dish scoped')]));
+      await searched(tester, 'pasta');           // everything: still waiting
+      state.setScope(SearchScope.dishes);
+      await tester.pump();
+      await tester.pump();
+      expect(state.response!.hits.single.name, 'Dish scoped');
+
+      slow.complete(makeResponse('pasta', hits: [makeHit(id: 9, name: 'Late answer')]));
+      await tester.pump();
+      expect(state.response!.hits.single.name, 'Dish scoped', reason: 'the late answer for everything is ignored');
+    });
+
+    testWidgets('choosing the scope already chosen changes nothing', (tester) async {
+      await searched(tester, 'pasta');
+      state.setScope(SearchScope.dishes);
+      await tester.pump();
+      final calls = repo.calls.length;
+      state.setScope(SearchScope.dishes);
+      await tester.pump();
+      expect(repo.calls.length, calls);
+    });
+
+    testWidgets('the scope goes back to everything when the search is cleared, and showing more keeps it', (tester) async {
+      await searched(tester, 'pasta');
+      state.setScope(SearchScope.dishes);
+      await tester.pump();
+      await tester.pump();
+      expect(state.scope, SearchScope.dishes);
+      state.clear();
+      expect(state.scope, SearchScope.all);
+    });
+
+    test('the type each scope sends', () {
+      expect(SearchScope.all.apiType, isNull);
+      expect(SearchScope.dishes.apiType, 'dish');
+      expect(SearchScope.cravings.apiType, 'craving');
+      expect(SearchScope.restaurants.apiType, isNull);
+    });
+  });
 }

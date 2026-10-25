@@ -36,13 +36,17 @@ public class SearchController {
         this.log = log;
     }
 
-    /** "Something sweet but also spicy" in, the top-k dishes out (public, no login needed). */
+    /**
+     * "Something sweet but also spicy" in, the top-k dishes out (public, no login needed). Only dishes that are relevant to the query come back.
+     * {@code type} narrows what counts: {@code dish} (every food word must be in the dish's text), {@code craving} (taste and meaning), or leave it out for both.
+     */
     @GetMapping("/dishes")
     public DishSearchResponse dishes(@RequestParam(value = "q", required = false) String q,
                                      @RequestParam(value = "k", defaultValue = "0") int k,
                                      @RequestParam(value = "veg", required = false) Boolean veg,
                                      @RequestParam(value = "maxPrice", required = false) Float maxPrice,
                                      @RequestParam(value = "openOnly", defaultValue = "false") boolean openOnly,
+                                     @RequestParam(value = "type", required = false) String type,
                                      @RequestParam(value = "area", required = false) String area,
                                      @RequestHeader(value = "X-Search-Client", required = false) String clientId,
                                      @RequestHeader(value = "DNT", required = false) String doNotTrack,
@@ -58,7 +62,7 @@ public class SearchController {
             throw new DropApiException(HttpStatus.TOO_MANY_REQUESTS, "RATE_LIMIT_EXCEEDED", "Too many searches. Please wait a moment.");
         }
 
-        HybridSearchService.Result r = search.search(new HybridSearchService.Request(query, k, veg, maxPrice, openOnly));
+        HybridSearchService.Result r = search.search(new HybridSearchService.Request(query, k, veg, maxPrice, openOnly, HybridSearchService.Scope.fromParam(type)));
         List<DishHit> hits = r.hits().stream().map(h -> {
             DishDoc d = h.doc();
             return new DishHit(d.itemId(), d.name(), d.description(), d.price(), d.veg(), d.imageUrl(), d.restaurantId(),

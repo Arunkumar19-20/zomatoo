@@ -5,6 +5,27 @@ import '../services/api_client.dart';
 import '../services/search_attribution.dart';
 import 'dish_search_models.dart';
 
+/// What the customer wants the search to look at. [all] is both words and cravings; the others narrow it.
+enum SearchScope {
+  all,
+  dishes,
+  restaurants,
+  cravings;
+
+  /// The `type` the dish search understands, or null for everything. Restaurants are not a dish search at all.
+  String? get apiType {
+    switch (this) {
+      case SearchScope.dishes:
+        return 'dish';
+      case SearchScope.cravings:
+        return 'craving';
+      case SearchScope.all:
+      case SearchScope.restaurants:
+        return null;
+    }
+  }
+}
+
 /// Drives "search by craving": debounces typing, ignores answers that arrive after a newer query, and keeps the
 /// last good result on screen while the next one loads.
 class DishSearchState extends ChangeNotifier {
@@ -26,6 +47,7 @@ class DishSearchState extends ChangeNotifier {
   final int maxK;
 
   String _query = '';
+  SearchScope _scope = SearchScope.all;
   int _k = 10;
   DishSearchResponse? _response;
   bool _loading = false;
@@ -35,6 +57,7 @@ class DishSearchState extends ChangeNotifier {
   bool _disposed = false;
 
   String get query => _query;
+  SearchScope get scope => _scope;
   int get k => _k;
   DishSearchResponse? get response => _response;
   bool get loading => _loading;
@@ -58,13 +81,28 @@ class DishSearchState extends ChangeNotifier {
       _response = null;
       _error = null;
       _loading = false;
+      _scope = SearchScope.all; // a new search starts from everything
       _notify();
       return;
     }
-    _loading = true;
+    _loading = _scope != SearchScope.restaurants;
     _error = null;
     _notify();
     _timer = Timer(debounce, _run);
+  }
+
+  /// Narrows the search to dishes, restaurants or cravings (or back to everything), and searches again at once.
+  void setScope(SearchScope scope) {
+    if (scope == _scope) return;
+    _scope = scope;
+    _k = pageSize;
+    _timer?.cancel();
+    _ticket++; // an answer for the old scope must not land on the new one
+    _response = null;
+    _error = null;
+    _loading = false;
+    _notify();
+    if (active) unawaited(_run());
   }
 
   Future<void> retry() => _run();
@@ -77,12 +115,13 @@ class DishSearchState extends ChangeNotifier {
 
   Future<void> _run() async {
     if (!active) return;
+    if (_scope == SearchScope.restaurants) return; // the screen filters its own restaurant list; there are no dishes to fetch
     final ticket = ++_ticket;
     _loading = true;
     _error = null;
     _notify();
     try {
-      final r = await _repo.search(_query, k: _k);
+      final r = await _repo.search(_query, k: _k, type: _scope.apiType);
       if (ticket != _ticket) return; // a newer query took over
       _response = r;
     } catch (e) {

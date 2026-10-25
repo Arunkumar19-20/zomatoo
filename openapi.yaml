@@ -629,6 +629,10 @@ paths:
         Hybrid retrieval, no generation. "something sweet but also spicy" is split into facets, then embeddings, keywords
         (BM25, typos tolerated), per-facet scores and flavor tags are merged with Reciprocal Rank Fusion. Filters found in the
         text ("vegetarian", "under 300") are applied. Without the embedding model installed the response has `mode: KEYWORD`.
+
+        Only relevant dishes come back: a dish matches the words of the query, or carries the requested flavors, or (when
+        nothing matches either) is close in meaning. A search for "pasta" returns pasta dishes, not whatever is nearest in
+        meaning, and `total` counts the dishes that matched, not the whole menu.
       tags: [Search]
       parameters:
         - name: q
@@ -658,6 +662,15 @@ paths:
           schema:
             type: boolean
             default: false
+        - name: type
+          in: query
+          description: |
+            Narrows what counts as a match. `dish`: every food word of the query must be in the dish's own text (name, description,
+            ingredients, category); flavor and mood words ("spicy", "late night") are not required. `craving`: taste and meaning, not
+            names. Omit for both. Anything else means both.
+          schema:
+            type: string
+            enum: [dish, craving]
       responses:
         '200':
           content:
