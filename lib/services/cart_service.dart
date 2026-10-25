@@ -3,13 +3,19 @@
 
 import 'package:dio/dio.dart';
 import 'api_client.dart';
+import 'search_attribution.dart';
+import 'search_client_id.dart';
 import '../models/models.dart';
 import '../repositories/cart_repository.dart';
 
 class CartService implements CartRepository {
   final Dio _dio;
 
-  CartService({Dio? dio}) : _dio = dio ?? ApiClient.instance.dio;
+  final SearchAttribution _attribution;
+
+  CartService({Dio? dio, SearchAttribution? attribution})
+      : _dio = dio ?? ApiClient.instance.dio,
+        _attribution = attribution ?? SearchAttribution.instance;
 
   // ---- Modern Authenticated Endpoints (CartController) ----
 
@@ -27,11 +33,20 @@ class CartService implements CartRepository {
   /// POST /cart/items - Adds menu item to cart
   @override
   Future<CartResponseDTO> addItem({required int menuItemId, int quantity = 1}) async {
+    // when this dish was opened from search results, say which search (the server checks it and keeps only the phrase, briefly)
+    final fromSearch = _attribution.peek(menuItemId);
     try {
-      final res = await _dio.post('/cart/items', data: {
-        'menuItemId': menuItemId,
-        'quantity': quantity,
-      });
+      final res = await _dio.post(
+        '/cart/items',
+        data: {
+          'menuItemId': menuItemId,
+          'quantity': quantity,
+          if (fromSearch != null) 'searchId': fromSearch.searchId,
+          if (fromSearch != null) 'searchRank': fromSearch.rank,
+        },
+        options: fromSearch == null ? null : Options(headers: {'X-Search-Client': await SearchClientId.get()}),
+      );
+      if (fromSearch != null) _attribution.forget(menuItemId);
       return CartResponseDTO.fromJson(res.data);
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);

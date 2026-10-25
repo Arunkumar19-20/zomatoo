@@ -36,6 +36,7 @@ public class OrderService {
     private final DropReservationRepository dropReservationRepo;
     private final DropService dropService;
     private final MenuItemRepository menuItemRepo;
+    private final com.example.zomato.search.OrderAttributionService attribution;
 
     public OrderService(CartItemRepository cartItemRepo, CartRepository cartRepo,
                         OrderRepository orderRepo, OrderItemRepository orderItemRepo,
@@ -45,7 +46,9 @@ public class OrderService {
                         @Lazy PaymentService paymentService,
                         DropReservationRepository dropReservationRepo,
                         DropService dropService,
-                        MenuItemRepository menuItemRepo) {
+                        MenuItemRepository menuItemRepo,
+                        com.example.zomato.search.OrderAttributionService attribution) {
+        this.attribution = attribution;
         this.cartItemRepo = cartItemRepo;
         this.cartRepo = cartRepo;
         this.orderRepo = orderRepo;
@@ -126,6 +129,9 @@ public class OrderService {
         savedOrder.setTotalAmount(total);
         savedOrder.setOrderItems(orderItems);
         Order finalOrder = orderRepo.save(savedOrder);
+
+        // remember which search phrases led to these items until the order is delivered (then it becomes an anonymous count)
+        attribution.holdForOrder(finalOrder, cartItems);
 
         cartItemRepo.deleteByCartId(cart.getId());
 

@@ -34,6 +34,27 @@ SuggestionType suggestionTypeFrom(String s) {
   }
 }
 
+/// What search has really brought a restaurant, projected a week ahead at the same rate. Built only from counted delivered orders.
+class SuggestionEstimate {
+  final int weeklyOrders;
+  final int weeklyRevenue;
+  final int ordersObserved;
+  final int tapsObserved;
+
+  /// PHRASE (this phrase has enough history) or RESTAURANT (falls back to the restaurant's overall rate from search).
+  final String basis;
+
+  const SuggestionEstimate({required this.weeklyOrders, this.weeklyRevenue = 0, this.ordersObserved = 0, this.tapsObserved = 0, this.basis = 'PHRASE'});
+
+  factory SuggestionEstimate.fromJson(Map<String, dynamic> j) => SuggestionEstimate(
+        weeklyOrders: (j['weeklyOrders'] as num?)?.toInt() ?? 0,
+        weeklyRevenue: (j['weeklyRevenue'] as num?)?.toInt() ?? 0,
+        ordersObserved: (j['ordersObserved'] as num?)?.toInt() ?? 0,
+        tapsObserved: (j['tapsObserved'] as num?)?.toInt() ?? 0,
+        basis: (j['basis'] ?? 'PHRASE').toString(),
+      );
+}
+
 /// The form to prefill and the evidence behind a suggestion.
 class SuggestionPayload {
   final String? suggestedName;
@@ -48,6 +69,9 @@ class SuggestionPayload {
   final DateTime? suggestedEndsAt;
   final List<String> exampleSearches;
 
+  /// Null when there are not enough counted orders to base one on (and always for "add a dish").
+  final SuggestionEstimate? estimate;
+
   const SuggestionPayload({
     this.suggestedName,
     this.description,
@@ -60,6 +84,7 @@ class SuggestionPayload {
     this.suggestedStartsAt,
     this.suggestedEndsAt,
     this.exampleSearches = const [],
+    this.estimate,
   });
 
   factory SuggestionPayload.fromJson(Map<String, dynamic>? j) {
@@ -76,6 +101,7 @@ class SuggestionPayload {
       suggestedStartsAt: DateTime.tryParse(j['suggestedStartsAt']?.toString() ?? ''),
       suggestedEndsAt: DateTime.tryParse(j['suggestedEndsAt']?.toString() ?? ''),
       exampleSearches: _strings(j['exampleSearches']),
+      estimate: j['estimate'] == null ? null : SuggestionEstimate.fromJson(j['estimate'] as Map<String, dynamic>),
     );
   }
 }
@@ -157,16 +183,51 @@ class OwnerRestaurantRef {
   const OwnerRestaurantRef(this.id, this.name);
 }
 
+class PhraseOrders {
+  final String label;
+  final int orders;
+  final int revenue;
+  const PhraseOrders(this.label, this.orders, this.revenue);
+}
+
+/// Delivered orders that search brought in, counted without knowing who ordered.
+class SearchOrders {
+  final int days;
+  final int orders;
+  final int units;
+  final int revenue;
+
+  /// Only phrases with enough orders behind them.
+  final List<PhraseOrders> topPhrases;
+
+  const SearchOrders({this.days = 28, this.orders = 0, this.units = 0, this.revenue = 0, this.topPhrases = const []});
+
+  factory SearchOrders.fromJson(Map<String, dynamic>? j) {
+    if (j == null) return const SearchOrders();
+    return SearchOrders(
+      days: (j['days'] as num?)?.toInt() ?? 28,
+      orders: (j['orders'] as num?)?.toInt() ?? 0,
+      units: (j['units'] as num?)?.toInt() ?? 0,
+      revenue: (j['revenue'] as num?)?.toInt() ?? 0,
+      topPhrases: (j['topPhrases'] as List? ?? const [])
+          .map((e) => PhraseOrders((e['label'] ?? '').toString(), (e['orders'] as num?)?.toInt() ?? 0, (e['revenue'] as num?)?.toInt() ?? 0))
+          .toList(),
+    );
+  }
+}
+
 class OwnerInsights {
   final List<OwnerRestaurantRef> restaurants;
   final List<OwnerSuggestion> suggestions;
   final List<RisingPhrase> rising;
+  final SearchOrders searchOrders;
 
-  const OwnerInsights({this.restaurants = const [], this.suggestions = const [], this.rising = const []});
+  const OwnerInsights({this.restaurants = const [], this.suggestions = const [], this.rising = const [], this.searchOrders = const SearchOrders()});
 
   factory OwnerInsights.fromJson(Map<String, dynamic> j) => OwnerInsights(
         restaurants: (j['restaurants'] as List? ?? const []).map((e) => OwnerRestaurantRef((e['id'] as num).toInt(), (e['name'] ?? '').toString())).toList(),
         suggestions: (j['suggestions'] as List? ?? const []).map((e) => OwnerSuggestion.fromJson(e as Map<String, dynamic>)).toList(),
         rising: (j['rising'] as List? ?? const []).map((e) => RisingPhrase.fromJson(e as Map<String, dynamic>)).toList(),
+        searchOrders: SearchOrders.fromJson(j['searchOrders'] as Map<String, dynamic>?),
       );
 }

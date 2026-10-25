@@ -62,6 +62,7 @@ class _OwnerInsightsTabState extends State<OwnerInsightsTab> {
           Text('From what customers searched in the last 7 days. We only count searches, never who made them.',
               style: TextStyle(fontSize: 12.5, color: Colors.grey.shade600)),
           const SizedBox(height: 12),
+          if (state.searchOrders.orders > 0) _SearchOrdersBanner(orders: state.searchOrders),
           if (state.loading && !state.loadedOnce) const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator(color: AppTheme.chipOrange))),
           if (state.error != null && !state.loadedOnce) _errorBox(state),
           if (state.loadedOnce && state.suggestions.isEmpty)
@@ -156,6 +157,7 @@ class _SuggestionCard extends StatelessWidget {
             _fact('${_times(s.growth)} usual'),
             if (s.type == SuggestionType.addDish && s.unmetShare >= 0.5) _fact('${(s.unmetShare * 100).round()}% found nothing'),
             if (s.impressions > 0) _fact('shown ${s.impressions}×, tapped ${s.taps}×'),
+            if (s.payload.estimate != null) _fact('about ${s.payload.estimate!.weeklyOrders} orders a week', key: ValueKey('suggestion-estimate-${s.id}')),
           ]),
           if (s.type == SuggestionType.addDish && s.payload.suggestedName != null) ...[
             const SizedBox(height: 10),
@@ -178,11 +180,42 @@ class _SuggestionCard extends StatelessWidget {
     );
   }
 
-  Widget _fact(String text) => Container(
+  Widget _fact(String text, {Key? key}) => Container(
+        key: key,
         padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
         decoration: BoxDecoration(color: const Color(0xFFF4F1EE), borderRadius: BorderRadius.circular(10)),
         child: Text(text, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppTheme.textBrown)),
       );
+}
+
+/// What search has brought in, so the suggestions below can be weighed against something real.
+class _SearchOrdersBanner extends StatelessWidget {
+  final SearchOrders orders;
+  const _SearchOrdersBanner({required this.orders});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const ValueKey('search-orders'),
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(color: const Color(0xFFF1F8E9), borderRadius: BorderRadius.circular(14), border: Border.all(color: AppTheme.freshGreen.withOpacity(0.5))),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Search brought you ${orders.orders} delivered order${orders.orders == 1 ? '' : 's'} (₹${orders.revenue}) in the last ${orders.days} days',
+              style: const TextStyle(fontWeight: FontWeight.w800, color: AppTheme.textBrown, fontSize: 14)),
+          for (final p in orders.topPhrases)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text('${p.label}: ${p.orders} orders, ₹${p.revenue}', key: ValueKey('search-orders-${p.label}'), style: TextStyle(fontSize: 12.5, color: Colors.grey.shade800)),
+            ),
+          const SizedBox(height: 4),
+          Text('Counted once the order is delivered. We never see who ordered or what they typed.', style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600)),
+        ],
+      ),
+    );
+  }
 }
 
 class _RisingRow extends StatelessWidget {

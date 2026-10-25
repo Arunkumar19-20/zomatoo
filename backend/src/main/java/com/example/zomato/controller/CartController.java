@@ -32,8 +32,12 @@ public class CartController {
 
     @PostMapping("/items")
     public ResponseEntity<CartResponseDTO> addItem(Authentication authentication,
-                                                   @Valid @RequestBody AddToCartRequest request) {
-        return ResponseEntity.ok(service.addItemToCart(authentication.getName(), request));
+                                                   @Valid @RequestBody AddToCartRequest request,
+                                                   @org.springframework.web.bind.annotation.RequestHeader(value = "X-Search-Client", required = false) String searchClient,
+                                                   @org.springframework.web.bind.annotation.RequestHeader(value = "DNT", required = false) String doNotTrack,
+                                                   jakarta.servlet.http.HttpServletRequest http) {
+        var searcher = new com.example.zomato.search.SearchEventService.Context(searchClient, http.getRemoteAddr(), null, "1".equals(doNotTrack));
+        return ResponseEntity.ok(service.addItemToCart(authentication.getName(), request, searcher));
     }
 
     @PutMapping("/items/{itemId}")

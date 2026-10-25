@@ -121,6 +121,33 @@ void main() {
     });
   });
 
+  group('parsing estimates and search orders', () {
+    test('an estimate and the search-orders summary parse', () {
+      final ins = OwnerInsights.fromJson({
+        'restaurants': [],
+        'suggestions': [
+          {
+            'id': 1, 'restaurantId': 6, 'type': 'MAKE_DROP', 'headline': 'h', 'body': 'b',
+            'payload': {'dishId': 68, 'dishName': 'x', 'estimate': {'weeklyOrders': 14, 'weeklyRevenue': 5586, 'ordersObserved': 28, 'tapsObserved': 80, 'basis': 'RESTAURANT'}},
+          },
+        ],
+        'rising': [],
+        'searchOrders': {'days': 28, 'orders': 9, 'units': 12, 'revenue': 3591, 'topPhrases': [{'label': 'Birria Taco', 'orders': 6, 'revenue': 2394}]},
+      });
+      final e = ins.suggestions.single.payload.estimate!;
+      expect(e.weeklyOrders, 14);
+      expect(e.basis, 'RESTAURANT');
+      expect(ins.searchOrders.orders, 9);
+      expect(ins.searchOrders.topPhrases.single.label, 'Birria Taco');
+    });
+
+    test('an older server that sends neither still parses', () {
+      final ins = OwnerInsights.fromJson({'restaurants': [], 'suggestions': [], 'rising': []});
+      expect(ins.searchOrders.orders, 0);
+      expect(OwnerSuggestion.fromJson({'id': 1, 'restaurantId': 2, 'type': 'STOCK_UP'}).payload.estimate, isNull);
+    });
+  });
+
   group('parsing', () {
     test('a suggestion with every field parses', () {
       final s = OwnerSuggestion.fromJson({

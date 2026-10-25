@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../repositories/dish_search_repository.dart';
 import '../services/api_client.dart';
+import '../services/search_attribution.dart';
 import 'dish_search_models.dart';
 
 /// Drives "search by craving": debounces typing, ignores answers that arrive after a newer query, and keeps the
@@ -13,9 +14,12 @@ class DishSearchState extends ChangeNotifier {
     this.minChars = 3,
     this.pageSize = 10,
     this.maxK = 30,
-  }) : _repo = repository;
+    SearchAttribution? attribution,
+  })  : _repo = repository,
+        _attribution = attribution ?? SearchAttribution.instance;
 
   final DishSearchRepository _repo;
+  final SearchAttribution _attribution;
   final Duration debounce;
   final int minChars;
   final int pageSize;
@@ -98,6 +102,8 @@ class DishSearchState extends ChangeNotifier {
   void reportOpen(DishHit hit, int rank) {
     final id = _response?.searchId;
     if (id == null) return;
+    // if this dish is then added to the cart, the cart add says which search led to it
+    _attribution.remember(hit.itemId, id, rank);
     unawaited(_repo.reportClick(id, hit.itemId, rank).catchError((_) {}));
   }
 

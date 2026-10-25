@@ -41,7 +41,16 @@ public class OwnerInsightsController {
     /** A phrase rising across all searches, shown to owners with the numbers customers do not see. */
     public record RisingPhrase(String label, String kind, int recentSearchers, double growth, double unmetShare, List<String> exampleSearches) {}
 
-    public record Insights(List<RestaurantRef> restaurants, List<View> suggestions, List<RisingPhrase> rising) {}
+    /** Delivered orders that search brought in over the last [days] days, counted without ever knowing who ordered. */
+    public record SearchOrders(int days, long orders, long units, long revenue, List<PhraseLine> topPhrases) {}
+
+    /** Phrases are listed only once at least {@value #MIN_ORDERS_PER_PHRASE} orders stand behind them. */
+    public record PhraseLine(String label, long orders, long revenue) {}
+
+    public record Insights(List<RestaurantRef> restaurants, List<View> suggestions, List<RisingPhrase> rising, SearchOrders searchOrders) {}
+
+    static final int ATTRIBUTION_DAYS = 28;
+    static final int MIN_ORDERS_PER_PHRASE = 3;
 
     /** Optional changes when creating the suggested Drop; anything left out keeps the suggestion's value. */
     public record DropOverrides(String title, Integer totalSlots) {}
@@ -52,9 +61,11 @@ public class OwnerInsightsController {
     private final RestaurantOwnerRepository owners;
     private final DropService drops;
     private final SearchIndexService index;
+    private final OrderAttributionService attribution;
 
     public OwnerInsightsController(SuggestionService suggestions, TrendService trends, RestaurantRepository restaurants,
-                                   RestaurantOwnerRepository owners, DropService drops, SearchIndexService index) {
+                                   RestaurantOwnerRepository owners, DropService drops, SearchIndexService index, OrderAttributionService attribution) {
+        this.attribution = attribution;
         this.suggestions = suggestions;
         this.trends = trends;
         this.restaurants = restaurants;
@@ -70,7 +81,22 @@ public class OwnerInsightsController {
         List<RisingPhrase> rising = trends.latest("RISING").stream()
                 .sorted(Comparator.comparingDouble(TrendService.TrendView::growth).reversed())
                 .map(t -> new RisingPhrase(t.label(), t.kind(), t.recentSearchers(), t.growth(), t.unmetShare(), t.samples())).toList();
-        return new Insights(mine.stream().map(r -> new RestaurantRef(r.getId(), r.getName())).toList(), suggestions.openFor(ids), rising);
+        return new Insights(mine.stream().map(r -> new RestaurantRef(r.getId(), r.getName())).toList(), suggestions.openFor(ids), rising, searchOrders(ids));
+    }
+
+    private SearchOrders searchOrders(Set<Integer> ids) {
+        LocalDate since = LocalDate.now().minusDays(ATTRIBUTION_DAYS - 1);
+        OrderAttributionService.Totals t = attribution.totalsFor(ids, since);
+        java.util.Map<String, String> labels = new java.util.HashMap<>();
+        trends.latest(null).forEach(v -> labels.put(v.key(), v.label()));
+        List<PhraseLine> top = attribution.byPhrase(ids, since).stream().filter(p -> p.orders() >= MIN_ORDERS_PER_PHRASE).limit(5)
+                .map(p -> new PhraseLine(labels.getOrDefault(p.phraseKey(), humanize(p.phraseKey())), p.orders(), Math.round(p.revenue()))).toList();
+        return new SearchOrders(ATTRIBUTION_DAYS, t.orders(), t.units(), Math.round(t.revenue()), top);
+    }
+
+    /** "dish:birria+taco" becomes "birria taco" for phrases that are not in the latest trend snapshot. */
+    static String humanize(String key) {
+        return key.substring(key.indexOf(':') + 1).replace('+', ' ');
     }
 
     @PostMapping("/{id}/dismiss")

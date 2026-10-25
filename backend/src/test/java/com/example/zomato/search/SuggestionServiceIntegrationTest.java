@@ -136,7 +136,7 @@ class SuggestionServiceIntegrationTest {
 
         View stock = forRestaurant("Bella Napoli").stream().filter(v -> v.trendKey().equals("dish:pizza")).findFirst().orElseThrow();
         assertEquals("STOCK_UP", stock.type());
-        assertTrue(stock.body().contains("no sales estimate"), "must not promise a sales number it cannot know");
+        assertTrue(stock.body().contains("No sales estimate yet"), "without counted orders it must not invent a sales number");
     }
 
     @Test

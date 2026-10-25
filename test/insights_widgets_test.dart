@@ -224,5 +224,39 @@ void main() {
       expect(find.byKey(const ValueKey('suggestion-1')), findsOneWidget);
       expect(find.text('server down'), findsOneWidget);
     });
+
+    testWidgets('an estimate shows as a fact on the card, and is absent when there is none', (tester) async {
+      repo.data = OwnerInsights(suggestions: [
+        makeSuggestion(
+          id: 2,
+          type: SuggestionType.makeDrop,
+          payload: const SuggestionPayload(dishId: 68, dishName: 'Beef Birria Tacos', price: 399, suggestedSlots: 10, estimate: SuggestionEstimate(weeklyOrders: 14, weeklyRevenue: 5586, ordersObserved: 28, tapsObserved: 80)),
+        ),
+        makeSuggestion(id: 3, type: SuggestionType.stockUp),
+      ]);
+      await open(tester);
+      expect(find.byKey(const ValueKey('suggestion-estimate-2')), findsOneWidget);
+      expect(find.text('about 14 orders a week'), findsOneWidget);
+      expect(find.byKey(const ValueKey('suggestion-estimate-3')), findsNothing);
+    });
+
+    testWidgets('the search-orders banner shows only when search has brought orders, with the phrases that have enough', (tester) async {
+      await open(tester);
+      expect(find.byKey(const ValueKey('search-orders')), findsNothing);
+
+      repo.data = const OwnerInsights(searchOrders: SearchOrders(days: 28, orders: 9, units: 12, revenue: 3591, topPhrases: [PhraseOrders('Birria Taco', 6, 2394)]));
+      await state.load();
+      await tester.pump();
+      expect(find.byKey(const ValueKey('search-orders')), findsOneWidget);
+      expect(find.textContaining('9 delivered orders (₹3591) in the last 28 days'), findsOneWidget);
+      expect(find.byKey(const ValueKey('search-orders-Birria Taco')), findsOneWidget);
+      expect(find.textContaining('never see who ordered'), findsOneWidget);
+    });
+
+    testWidgets('one order reads in the singular', (tester) async {
+      repo.data = const OwnerInsights(searchOrders: SearchOrders(orders: 1, revenue: 399));
+      await open(tester);
+      expect(find.textContaining('1 delivered order (₹399)'), findsOneWidget);
+    });
   });
 }

@@ -4,6 +4,8 @@ import com.example.zomato.dto.AddToCartRequest;
 import com.example.zomato.dto.CartResponseDTO;
 import com.example.zomato.entity.*;
 import com.example.zomato.repository.*;
+import com.example.zomato.search.OrderAttributionService;
+import com.example.zomato.search.SearchEventService;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,11 +21,14 @@ public class CartService {
     private final CartItemRepository cartItemRepository;
     private final CustomerService customerService;
     private final MenuItemRepository menuItemRepository;
+    private final OrderAttributionService attribution;
 
     public CartService(CartRepository cartRepository,
                        CartItemRepository cartItemRepository,
                        CustomerService customerService,
-                       MenuItemRepository menuItemRepository) {
+                       MenuItemRepository menuItemRepository,
+                       OrderAttributionService attribution) {
+        this.attribution = attribution;
         this.cartRepository = cartRepository;
         this.cartItemRepository = cartItemRepository;
         this.customerService = customerService;
@@ -57,6 +62,12 @@ public class CartService {
 
     @Transactional
     public CartResponseDTO addItemToCart(String userEmail, AddToCartRequest request) {
+        return addItemToCart(userEmail, request, null);
+    }
+
+    /** @param searcher who is searching (anonymous client id), when the app sent one; used only to check the add really came from that person's search */
+    @Transactional
+    public CartResponseDTO addItemToCart(String userEmail, AddToCartRequest request, SearchEventService.Context searcher) {
         Cart cart = getOrCreateCartForUser(userEmail);
 
         MenuItem item = menuItemRepository.findById(request.getMenuItemId())
@@ -85,12 +96,19 @@ public class CartService {
             cartRepository.save(cart);
         }
 
+        // if the dish came from a search, remember the phrase (not the query) so a delivered order can be counted in aggregate
+        Optional<String> phrase = searcher == null ? Optional.empty() : attribution.phraseForCartAdd(request.getSearchId(), item.getId(), request.getSearchRank(), searcher);
+
         Optional<CartItem> existingItemOpt = cartItemRepository.findByCartIdAndItem_Id(cart.getId(), item.getId());
         int addQty = (request.getQuantity() != null && request.getQuantity() > 0) ? request.getQuantity() : 1;
 
         if (existingItemOpt.isPresent()) {
             CartItem existing = existingItemOpt.get();
             existing.setQuantity(existing.getQuantity() + addQty);
+            phrase.ifPresent(k -> {
+                existing.setSearchAttribution(k);
+                existing.setSearchAttributionAt(java.time.LocalDateTime.now());
+            });
             cartItemRepository.save(existing);
         } else {
             CartItem cartItem = new CartItem();
@@ -98,6 +116,10 @@ public class CartService {
             cartItem.setItem(item);
             cartItem.setPrice(item.getPrice() != null ? item.getPrice().doubleValue() : 0.0);
             cartItem.setQuantity(addQty);
+            phrase.ifPresent(k -> {
+                cartItem.setSearchAttribution(k);
+                cartItem.setSearchAttributionAt(java.time.LocalDateTime.now());
+            });
             cartItemRepository.save(cartItem);
         }
 

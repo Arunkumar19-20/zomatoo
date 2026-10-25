@@ -5,6 +5,10 @@
             "name": "Cravey Kitchen"
         },
         {
+            "id": 2,
+            "name": "Bella Napoli"
+        },
+        {
             "id": 3,
             "name": "Smokehouse 66"
         },
@@ -17,6 +21,10 @@
             "name": "Tokyo Ramen House"
         },
         {
+            "id": 6,
+            "name": "Casa Fuego"
+        },
+        {
             "id": 7,
             "name": "Sugar & Spice Patisserie"
         },
@@ -27,14 +35,6 @@
         {
             "id": 9,
             "name": "Bangkok Street"
-        },
-        {
-            "id": 2,
-            "name": "Bella Napoli"
-        },
-        {
-            "id": 6,
-            "name": "Casa Fuego"
         }
     ],
     "suggestions": [
@@ -75,10 +75,11 @@
                     "kimchi carbonara",
                     "bulgogi pizza",
                     "gochujang pizza"
-                ]
+                ],
+                "estimate": null
             },
             "snoozedUntil": null,
-            "createdAt": "2026-10-25T08:16:27.120268"
+            "createdAt": "2026-10-25T08:55:38.15688"
         },
         {
             "id": 1,
@@ -117,10 +118,11 @@
                     "kimchi carbonara",
                     "bulgogi pizza",
                     "gochujang pizza"
-                ]
+                ],
+                "estimate": null
             },
             "snoozedUntil": null,
-            "createdAt": "2026-10-25T08:16:27.083117"
+            "createdAt": "2026-10-25T08:55:38.136766"
         },
         {
             "id": 3,
@@ -131,14 +133,14 @@
             "trendKey": "dish:birria+taco",
             "trendLabel": "Birria Taco",
             "headline": "Turn Beef Birria Tacos into a Drop",
-            "body": "38 people searched for it in the last 7 days, 20\u00d7 its usual level (about 1 a week before). Your Beef Birria Tacos showed up in 38 of those searches and was tapped 3 times. A limited Drop of 10 slots sells a known amount instead of risking waste, and rewards the people who searched.",
-            "score": 8.785,
-            "recentSearchers": 38,
+            "body": "39 people searched for it in the last 7 days, 20\u00d7 its usual level (about 1 a week before). Your Beef Birria Tacos showed up in 39 of those searches and was tapped 12 times. A limited Drop of 10 slots sells a known amount instead of risking waste, and rewards the people who searched. Over the last 4 weeks 7 delivered orders came from 13 taps on your dishes for this search, so expect about 6 orders (around \u20b93420) a week at this rate. A rough guide, not a promise.",
+            "score": 8.846,
+            "recentSearchers": 39,
             "baselineSearchers": 1,
-            "growth": 19.88,
+            "growth": 20.38,
             "unmetShare": 0.0,
-            "impressions": 38,
-            "taps": 3,
+            "impressions": 39,
+            "taps": 12,
             "payload": {
                 "suggestedName": null,
                 "description": null,
@@ -155,10 +157,17 @@
                     "cheesy birria tacos",
                     "birria tacos",
                     "taco birria"
-                ]
+                ],
+                "estimate": {
+                    "weeklyOrders": 6,
+                    "weeklyRevenue": 3420,
+                    "ordersObserved": 7,
+                    "tapsObserved": 13,
+                    "basis": "PHRASE"
+                }
             },
             "snoozedUntil": null,
-            "createdAt": "2026-10-25T08:16:27.121547"
+            "createdAt": "2026-10-25T08:55:38.157713"
         }
     ],
     "rising": [
@@ -178,8 +187,8 @@
         {
             "label": "Birria Taco",
             "kind": "DISH",
-            "recentSearchers": 38,
-            "growth": 19.88,
+            "recentSearchers": 39,
+            "growth": 20.38,
             "unmetShare": 0.0,
             "exampleSearches": [
                 "birria taco",
@@ -188,5 +197,38 @@
                 "taco birria"
             ]
         }
-    ]
+    ],
+    "searchOrders": {
+        "days": 28,
+        "orders": 69,
+        "units": 98,
+        "revenue": 34192,
+        "topPhrases": [
+            {
+                "label": "Burger",
+                "orders": 12,
+                "revenue": 5593
+            },
+            {
+                "label": "Pizza",
+                "orders": 11,
+                "revenue": 7633
+            },
+            {
+                "label": "Birria Taco",
+                "orders": 9,
+                "revenue": 4677
+            },
+            {
+                "label": "Comfort + Creamy",
+                "orders": 7,
+                "revenue": 3690
+            },
+            {
+                "label": "Spicy + Sweet",
+                "orders": 7,
+                "revenue": 1071
+            }
+        ]
+    }
 }

@@ -167,8 +167,7 @@ A matching dish the owner switched off is reported as "turn it back on".
 | STOCK_UP | the restaurant has the dish | guidance to prepare more, with how many of those searches showed its dish and how many were tapped |
 | MAKE_DROP | has the dish and the rise is strong (at least 20 searchers and 3x) | a prefilled Drop that matches the create-drop request: the dish and its price, slots about one day of search demand (10 to 60), tomorrow 18:00 to 21:00 |
 
-**There is no sales estimate.** Searches are not tied to orders yet (Phase 5), so a number like "expect 40 more orders" would be invented.
-The copy says so, and shows only counted things: searchers, growth, share of searches that found nothing, impressions and taps.
+**Phase 3 showed no sales estimate**, because searches were not tied to orders. Phase 5 changes that, but only where there is counted history; see below. Without it the copy still says so, and shows only counted things: searchers, growth, share of searches that found nothing, impressions and taps.
 
 ## Limits and lifecycle
 
@@ -274,3 +273,55 @@ Backend `OwnerInsightsIntegrationTest` (11: each owner sees only their own, no-r
 dismiss/snooze/acted, drop uses the suggestion's restaurant and dish and closes it, bounds and wrong type refused, chips show only orderable phrases and no numbers, tapping a chip always finds the dish,
 chip vanishes when the dish is off, cap and ordering). Flutter: `insights_state_test` (12), `insights_widgets_test` (12), a prefill test in `add_dish_dialog_test`, two contract tests on the live fixtures.
 Full suites: backend 247, Flutter 147.
+
+
+---
+
+# Phase 5: counting the orders search brings in
+
+Phase 3 could say how often a dish was shown and tapped, but not whether anyone ordered it. Phase 5 counts delivered orders that came from search, so owners see what search is worth
+and the suggestions can carry an estimate built from real history. The hard part is doing that without joining a person's order to what they typed.
+
+## How it stays anonymous
+
+| Step | What is kept | For how long |
+|---|---|---|
+| **Cart add** from a search result | the app sends the search id; the server checks the search really showed that dish to this searcher recently (same checks as a tap, honours do-not-track). The cart item then holds only the **phrase key**, like `dish:birria+taco`. Never the query, never the search id | until checkout, or 24 h |
+| **Checkout** | a pending row: order id, restaurant, dish, phrase key, quantity, amount | until the order is settled; dropped after 3 days at most |
+| **Delivered** (and paid) | a **daily count** per day, phrase, restaurant and dish: orders, units, revenue. **No order id, customer or search id.** The pending row is deleted | 400 days |
+| Cancelled, refunded, unpaid and stale | discarded without counting | |
+
+The order and a phrase meet in exactly one place (the pending row), for the hours an order is in flight. What lasts is a count. Counting at *delivery* rather than payment means a refund can never leave a
+sale behind that nobody could find to undo. The cart response never echoes the phrase, a test checks the counts table has no identifying fields, and the raw search text is still deleted at 90 days while the counts remain.
+
+An add that does not check out (a different searcher, a dish the search never showed, do-not-track, no search, an unknown search id, a mood search with no phrase) is simply not attributed; the add works as usual.
+Only the cart path is covered: Drop reservations are a separate flow and are not attributed.
+
+## Where it shows up
+
+- **Owner Insights banner:** "Search brought you 69 delivered orders (₹34192) in the last 28 days", with the phrases that have at least 3 orders behind them (a phrase with fewer is not listed).
+- **Stock-up and Drop suggestions** gain an estimate, shown as "about 6 orders a week" and explained in the text:
+  this week's taps times the rate of delivered orders per tap over the last 4 weeks. It needs at least 3 counted orders and 10 taps behind it. If this phrase is too new, it falls back to the restaurant's own rate across all its search-driven
+  orders, and says so. With less than that there is **no estimate**, and the card says "No sales estimate yet" instead of inventing one. "Add a dish" suggestions never get one: the dish does not exist yet, so there is no history.
+- `POST /admin/search/attribution/settle` (admin) counts what is ready now; it also runs every ten minutes. A nightly job clears old cart attributions.
+
+## Checked live (Postgres, the real app, the real flow)
+
+The Flutter app in the browser: searched "birria tacos", tapped Beef Birria Tacos, added it from Casa Fuego's menu. The database then showed OPEN and ADD_TO_CART taps on the search, and the cart item held only `dish:birria+taco`.
+Checkout created one pending row. Settling while the order was placed, paid, confirmed or out for delivery counted nothing ("still waiting"); after DELIVERED it counted 1, deleted the pending row, and left a daily row with no order, customer or search id.
+The owner then saw 1 order, 399 revenue, and no per-phrase line (below 3 orders).
+
+With simulated history on top, the owner screen showed the banner and, on Casa Fuego's Drop card, "about 6 orders a week": 7 delivered orders from 13 taps over 4 weeks, times 12 taps this week.
+
+## Honest limits
+
+- The simulator's tap and order rates are invented (the planted dish converts at 60% so the estimate path has something to show). Real rates will differ, which is why an estimate needs counted history and the thresholds are properties to tune.
+- Attribution is last touch within the cart window: it says the search led to the add, not that the customer would not have ordered anyway.
+- An estimate projects this week's taps at the past rate. It does not account for a trend growing or fading, and the card calls it "a rough guide, not a promise".
+
+## Tests
+
+Backend `OrderAttributionIntegrationTest` (10: delivered order becomes an anonymous count, counts table has no identifying fields, units do not inflate orders and several orders add up, six kinds of add that are not attributed, mood search,
+cancelled/refunded/stale discarded, 24 h window and nightly purge, settling twice counts once, no trace without a search, admin-only settle) and `AttributionEstimateIntegrationTest` (5: real estimate with counted orders and its arithmetic, no estimate and an honest message without,
+never for add-a-dish, owners see only their own restaurants' orders, simulated counts invisible when simulation is off). Flutter: `search_attribution_test` (11: the registry and its expiry, a tap remembers the search, the cart add sends the context only when it should and not twice),
+estimate and banner widget tests, parsing tests, and the contract test now pins the live fixture's estimate and search orders. Full suites: backend 262, Flutter 163.

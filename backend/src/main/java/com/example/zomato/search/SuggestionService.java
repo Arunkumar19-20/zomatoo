@@ -52,6 +52,10 @@ public class SuggestionService {
     static final int SNOOZE_DAYS = 7;
     static final int DROP_MIN_SEARCHERS = 20;
     static final double DROP_MIN_GROWTH = 3.0;
+    /** An estimate needs this much counted history behind it, or it is not shown. */
+    static final int ESTIMATE_MIN_ORDERS = 3;
+    static final int ESTIMATE_MIN_TAPS = 10;
+    static final int ESTIMATE_DAYS = 28;
 
     public enum Type { ADD_DISH, STOCK_UP, MAKE_DROP }
 
@@ -59,7 +63,18 @@ public class SuggestionService {
 
     /** The form to prefill and the evidence behind the suggestion, stored as JSON. */
     public record Payload(String suggestedName, String description, List<String> flavorTags, Integer dishId, String dishName, Double price,
-                          Boolean dishAvailable, Integer suggestedSlots, String suggestedStartsAt, String suggestedEndsAt, List<String> exampleSearches) {}
+                          Boolean dishAvailable, Integer suggestedSlots, String suggestedStartsAt, String suggestedEndsAt, List<String> exampleSearches,
+                          Estimate estimate) {
+        Payload withEstimate(Estimate e) {
+            return new Payload(suggestedName, description, flavorTags, dishId, dishName, price, dishAvailable, suggestedSlots, suggestedStartsAt, suggestedEndsAt, exampleSearches, e);
+        }
+    }
+
+    /**
+     * What search has actually brought this restaurant, projected one week ahead at the same rate. Only built from counted delivered orders:
+     * {@code basis} is PHRASE when this very phrase has enough history, RESTAURANT when it falls back to all of the restaurant's search-driven orders.
+     */
+    public record Estimate(int weeklyOrders, long weeklyRevenue, long ordersObserved, int tapsObserved, String basis) {}
 
     public record View(long id, int restaurantId, String restaurantName, String type, String status, String trendKey, String trendLabel, String headline,
                        String body, double score, int recentSearchers, int baselineSearchers, double growth, double unmetShare, int impressions,
@@ -79,10 +94,12 @@ public class SuggestionService {
     private final SearchIndexService index;
     private final TrendService trends;
     private final SearchProperties props;
+    private final OrderAttributionService attribution;
     private final ObjectMapper json = new ObjectMapper();
 
     public SuggestionService(OwnerSuggestionRepository suggestions, RestaurantRepository restaurants, SearchEventRepository events,
-                             SearchIndexService index, TrendService trends, SearchProperties props) {
+                             SearchIndexService index, TrendService trends, SearchProperties props, OrderAttributionService attribution) {
+        this.attribution = attribution;
         this.suggestions = suggestions;
         this.restaurants = restaurants;
         this.events = events;
@@ -98,7 +115,9 @@ public class SuggestionService {
         List<TrendView> rising = trends.rising(runDate);
         Map<Integer, List<DishDoc>> menus = index.allDocs().stream().collect(Collectors.groupingBy(DishDoc::restaurantId));
         Map<Integer, Restaurant> byId = restaurants.findAllById(menus.keySet()).stream().collect(Collectors.toMap(Restaurant::getId, r -> r));
-        Map<String, Map<Integer, Evidence>> evidence = evidenceFor(rising, runDate);
+        Set<String> keys = rising.stream().map(TrendView::key).collect(Collectors.toSet());
+        Counts last7 = countsFor(keys, runDate.minusDays(6).atStartOfDay());
+        Counts last28 = countsFor(keys, runDate.minusDays(ESTIMATE_DAYS - 1).atStartOfDay());
 
         List<Candidate> candidates = new ArrayList<>();
         for (TrendView t : rising) {
@@ -107,8 +126,9 @@ public class SuggestionService {
                 if (r == null) continue;
                 Match m = TrendMatcher.assess(t, e.getValue());
                 if (m.fit() == Fit.NONE) continue;
-                Evidence ev = evidence.getOrDefault(t.key(), Map.of()).getOrDefault(r.getId(), new Evidence(0, 0));
-                candidates.add(candidate(r, t, m, e.getValue(), ev, runDate));
+                Evidence ev = last7.byPhrase().getOrDefault(t.key(), Map.of()).getOrDefault(r.getId(), new Evidence(0, 0));
+                int taps28 = last28.byPhrase().getOrDefault(t.key(), Map.of()).getOrDefault(r.getId(), new Evidence(0, 0)).taps();
+                candidates.add(candidate(r, t, m, e.getValue(), ev, taps28, last28.restaurantTaps().getOrDefault(r.getId(), 0), runDate));
             }
         }
 
@@ -187,7 +207,7 @@ public class SuggestionService {
         s.setUpdatedAt(LocalDateTime.now());
     }
 
-    private Candidate candidate(Restaurant r, TrendView t, Match m, List<DishDoc> menu, Evidence ev, LocalDate runDate) {
+    private Candidate candidate(Restaurant r, TrendView t, Match m, List<DishDoc> menu, Evidence ev, int taps28, int restaurantTaps28, LocalDate runDate) {
         boolean has = m.fit() == Fit.HAS;
         boolean strong = t.recentSearchers() >= DROP_MIN_SEARCHERS && t.growth() >= DROP_MIN_GROWTH;
         Type type = !has ? Type.ADD_DISH : (strong && !m.dishes().isEmpty() ? Type.MAKE_DROP : Type.STOCK_UP);
@@ -197,8 +217,30 @@ public class SuggestionService {
             case STOCK_UP -> stockUp(m, t);
             case MAKE_DROP -> makeDrop(m, t, runDate);
         };
+        if (type != Type.ADD_DISH) payload = payload.withEstimate(estimate(t, r.getId(), ev, taps28, restaurantTaps28, runDate));
         return new Candidate(r, r.getOwner() == null ? null : r.getOwner().getOwnerId(), t, m, type, score, ev, payload, headline(type, t, payload),
                 body(type, t, m, ev, payload, r));
+    }
+
+    /**
+     * Orders per tap, from delivered orders search really brought in over the last four weeks, applied to this week's taps. Needs at least
+     * {@value #ESTIMATE_MIN_ORDERS} counted orders and {@value #ESTIMATE_MIN_TAPS} taps behind it; a new phrase falls back to the restaurant's own rate across
+     * all search-driven orders. Without that history there is no estimate: nothing is invented.
+     */
+    private Estimate estimate(TrendView t, int restaurantId, Evidence week, int taps28, int restaurantTaps28, LocalDate runDate) {
+        LocalDate since = runDate.minusDays(ESTIMATE_DAYS - 1);
+        OrderAttributionService.Totals totals = attribution.totalsForPhrase(restaurantId, t.key(), since);
+        int taps = taps28;
+        String basis = "PHRASE";
+        if (totals.orders() < ESTIMATE_MIN_ORDERS || taps < ESTIMATE_MIN_TAPS) {
+            totals = attribution.totalsFor(Set.of(restaurantId), since);
+            taps = restaurantTaps28;
+            basis = "RESTAURANT";
+            if (totals.orders() < ESTIMATE_MIN_ORDERS || taps < ESTIMATE_MIN_TAPS) return null;
+        }
+        int weekly = (int) Math.round(week.taps() * ((double) totals.orders() / taps));
+        if (weekly < 1) return null;
+        return new Estimate(weekly, Math.round(weekly * totals.averageOrderValue()), totals.orders(), taps, basis);
     }
 
     // ------------------------------------------------------------------ the three suggestions
@@ -221,19 +263,19 @@ public class SuggestionService {
         } else {
             tags = index.autoTagger().suggest(name, description, null, null).stream().map(s -> s.flavor().id()).limit(3).toList();
         }
-        return new Payload(name, description, tags, null, null, null, null, null, null, null, t.samples());
+        return new Payload(name, description, tags, null, null, null, null, null, null, null, t.samples(), null);
     }
 
     private Payload stockUp(Match m, TrendView t) {
         DishDoc d = !m.dishes().isEmpty() ? bestDish(m.dishes()) : bestDish(m.unavailable());
-        return new Payload(null, null, List.of(), d.itemId(), d.name(), (double) d.price(), d.available(), null, null, null, t.samples());
+        return new Payload(null, null, List.of(), d.itemId(), d.name(), (double) d.price(), d.available(), null, null, null, t.samples(), null);
     }
 
     private Payload makeDrop(Match m, TrendView t, LocalDate runDate) {
         DishDoc d = bestDish(m.dishes());
         int slots = (int) Math.max(10, Math.min(60, Math.round(t.recentSearchers() / 7.0)));
         LocalDateTime start = runDate.plusDays(1).atTime(18, 0);
-        return new Payload(null, null, List.of(), d.itemId(), d.name(), (double) d.price(), true, slots, start.toString(), start.plusHours(3).toString(), t.samples());
+        return new Payload(null, null, List.of(), d.itemId(), d.name(), (double) d.price(), true, slots, start.toString(), start.plusHours(3).toString(), t.samples(), null);
     }
 
     private static DishDoc bestDish(List<DishDoc> dishes) {
@@ -274,10 +316,19 @@ public class SuggestionService {
             case STOCK_UP -> demand + (Boolean.FALSE.equals(p.dishAvailable())
                     ? " Your " + p.dishName() + " is switched off right now; turning it back on would put it in front of them."
                     : " Your " + p.dishName() + " showed up in " + ev.impressions() + " of those searches and was tapped " + ev.taps() + " times. Prepare more than usual.")
-                    + " This is guidance only: searches are not yet linked to orders, so there is no sales estimate.";
+                    + estimateText(p.estimate());
             case MAKE_DROP -> demand + " Your " + p.dishName() + " showed up in " + ev.impressions() + " of those searches and was tapped " + ev.taps()
-                    + " times. A limited Drop of " + p.suggestedSlots() + " slots sells a known amount instead of risking waste, and rewards the people who searched.";
+                    + " times. A limited Drop of " + p.suggestedSlots() + " slots sells a known amount instead of risking waste, and rewards the people who searched."
+                    + estimateText(p.estimate());
         };
+    }
+
+    /** The sentence about expected orders: counted history if there is enough of it, otherwise an honest "no estimate". */
+    private static String estimateText(Estimate e) {
+        if (e == null) return " No sales estimate yet: there are not enough delivered orders from search to base one on.";
+        return " Over the last 4 weeks " + e.ordersObserved() + " delivered orders came from " + e.tapsObserved() + " taps"
+                + (e.basis().equals("RESTAURANT") ? " on your dishes from searches like this (this phrase is new, so this is your overall rate)" : " on your dishes for this search")
+                + ", so expect about " + e.weeklyOrders() + " orders (around ₹" + e.weeklyRevenue() + ") a week at this rate. A rough guide, not a promise.";
     }
 
     private static String cuisineNames(TrendView t, Restaurant r) {
@@ -291,14 +342,18 @@ public class SuggestionService {
 
     // ------------------------------------------------------------------ impressions and taps
 
-    /** For each rising phrase, how many recent searches showed each restaurant's dishes and how many of those were tapped. */
-    private Map<String, Map<Integer, Evidence>> evidenceFor(List<TrendView> rising, LocalDate runDate) {
-        Set<String> keys = rising.stream().map(TrendView::key).collect(Collectors.toSet());
-        LocalDateTime since = runDate.minusDays(6).atStartOfDay();
+    private record Counts(Map<String, Map<Integer, Evidence>> byPhrase, Map<Integer, Integer> restaurantTaps) {}
+
+    /**
+     * Since a date: for each rising phrase, how many searches showed each restaurant's dishes and how many were tapped; and, for each restaurant,
+     * how many taps came from searches that count as a phrase at all (the base for its overall rate of orders per tap).
+     */
+    private Counts countsFor(Set<String> keys, LocalDateTime since) {
         Map<Long, Set<Integer>> tapped = new HashMap<>();
         for (Object[] c : events.clicksSince(since)) tapped.computeIfAbsent(((Number) c[0]).longValue(), k -> new HashSet<>()).add(((Number) c[1]).intValue());
 
         Map<String, Map<Integer, int[]>> counts = new HashMap<>();
+        Map<Integer, Integer> restaurantTaps = new HashMap<>();
         Map<String, PhraseMiner.Phrase> mined = new HashMap<>();
         for (Object[] row : events.shownSince(since, props.simEnabled())) {
             String normalized = (String) row[1];
@@ -306,7 +361,7 @@ public class SuggestionService {
             String shown = (String) row[3];
             if (shown == null || shown.isBlank()) continue;
             PhraseMiner.Phrase p = mined.computeIfAbsent(normalized + "\u0001" + flavors, k -> PhraseMiner.mine(normalized, flavors));
-            if (p == null || !keys.contains(p.key())) continue;
+            if (p == null) continue;
             long eventId = ((Number) row[0]).longValue();
             Set<Integer> taps = tapped.getOrDefault(eventId, Set.of());
             Set<Integer> restaurantsShown = new HashSet<>();
@@ -318,6 +373,8 @@ public class SuggestionService {
                     if (taps.contains(item)) restaurantsTapped.add(d.restaurantId());
                 });
             }
+            for (int rid : restaurantsTapped) restaurantTaps.merge(rid, 1, Integer::sum);
+            if (!keys.contains(p.key())) continue;
             Map<Integer, int[]> perRestaurant = counts.computeIfAbsent(p.key(), k -> new HashMap<>());
             for (int rid : restaurantsShown) perRestaurant.computeIfAbsent(rid, k -> new int[2])[0]++;
             for (int rid : restaurantsTapped) perRestaurant.computeIfAbsent(rid, k -> new int[2])[1]++;
@@ -328,7 +385,7 @@ public class SuggestionService {
             m.forEach((rid, c) -> inner.put(rid, new Evidence(c[0], c[1])));
             out.put(k, inner);
         });
-        return out;
+        return new Counts(out, restaurantTaps);
     }
 
     // ------------------------------------------------------------------ what owners and admins do with them

@@ -1,7 +1,9 @@
 package com.example.zomato.search;
 
+import com.example.zomato.entity.SearchAttributionDaily;
 import com.example.zomato.entity.SearchClick;
 import com.example.zomato.entity.SearchEvent;
+import com.example.zomato.repository.SearchAttributionDailyRepository;
 import com.example.zomato.repository.SearchClickRepository;
 import com.example.zomato.repository.SearchEventRepository;
 import org.springframework.stereotype.Service;
@@ -44,8 +46,12 @@ public class SearchLogSimulator {
     private final HybridSearchService search;
     private final SearchEventRepository events;
     private final SearchClickRepository clicks;
+    private final SearchAttributionDailyRepository attribution;
+    private final SearchIndexService index;
 
-    public SearchLogSimulator(HybridSearchService search, SearchEventRepository events, SearchClickRepository clicks) {
+    public SearchLogSimulator(HybridSearchService search, SearchEventRepository events, SearchClickRepository clicks, SearchAttributionDailyRepository attribution, SearchIndexService index) {
+        this.attribution = attribution;
+        this.index = index;
         this.search = search;
         this.events = events;
         this.clicks = clicks;
@@ -98,19 +104,52 @@ public class SearchLogSimulator {
             }
         }
         events.saveAll(batch);
-        // about one search in five ends in a tap on the first result
+        // about one search in five ends in a tap on the first result (more for the dish people really want)
+        Map<String, String> scenarioOf = new HashMap<>();
+        scenarios().forEach(sc -> sc.queries().forEach(q -> scenarioOf.put(q, sc.name())));
         List<SearchClick> taps = new ArrayList<>();
         for (SearchEvent e : batch) {
-            if (e.getShownItemIds() == null || e.getShownItemIds().isBlank() || rnd.nextDouble() > 0.2) continue;
+            if (e.getShownItemIds() == null || e.getShownItemIds().isBlank() || rnd.nextDouble() > TAP_RATE.getOrDefault(scenarioOf.get(e.getRawQuery()), DEFAULT_TAP_RATE)) continue;
             taps.add(new SearchClick(e.getId(), Integer.parseInt(e.getShownItemIds().split(",")[0]), 1, SearchClick.OPEN));
         }
         clicks.saveAll(taps);
+        saveOrders(batch, taps, rnd);
         return new Report(days, batch.size(), searchers, scenarios().stream().map(Scenario::name).collect(Collectors.toList()));
+    }
+
+    /** Share of searches that end in a tap on the first result. */
+    private static final Map<String, Double> TAP_RATE = Map.of("planted: birria tacos, worded several ways", 0.45);
+    private static final double DEFAULT_TAP_RATE = 0.2;
+
+    /** Share of tapped results that end in a delivered order, by scenario. Birria is the dish people really want. */
+    private static final Map<String, Double> ORDER_RATE = Map.of("planted: birria tacos, worded several ways", 0.6, "steady favourites", 0.22);
+    private static final double DEFAULT_ORDER_RATE = 0.12;
+
+    /** Delivered orders from taps, as the daily counts the real flow produces (no order or customer ids exist for simulated ones either). */
+    private void saveOrders(List<SearchEvent> events, List<SearchClick> taps, Random rnd) {
+        Map<Long, SearchEvent> byId = new HashMap<>();
+        events.forEach(e -> byId.put(e.getId(), e));
+        Map<String, String> scenarioOf = new HashMap<>();
+        scenarios().forEach(sc -> sc.queries().forEach(q -> scenarioOf.put(q, sc.name())));
+        Map<String, SearchAttributionDaily> rows = new HashMap<>();
+        for (SearchClick tap : taps) {
+            SearchEvent e = byId.get(tap.getSearchEventId());
+            PhraseMiner.Phrase phrase = PhraseMiner.mine(e.getNormalizedQuery(), e.getFlavors());
+            var dish = index.doc(tap.getItemId());
+            if (phrase == null || dish.isEmpty()) continue;
+            if (rnd.nextDouble() > ORDER_RATE.getOrDefault(scenarioOf.get(e.getRawQuery()), DEFAULT_ORDER_RATE)) continue;
+            int qty = 1 + rnd.nextInt(2);
+            var day = e.getCreatedAt().toLocalDate();
+            String k = day + "|" + phrase.key() + "|" + tap.getItemId();
+            rows.computeIfAbsent(k, x -> new SearchAttributionDaily(day, phrase.key(), dish.get().restaurantId(), tap.getItemId(), true)).add(1, qty, qty * (double) dish.get().price());
+        }
+        attribution.saveAll(rows.values());
     }
 
     /** Removes everything this simulator made. */
     @Transactional
     public int clear() {
+        attribution.deleteSimulated();
         events.deleteSimulatedClicks();
         return events.deleteSimulated();
     }

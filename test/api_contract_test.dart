@@ -149,5 +149,16 @@ void main() {
     expect(drop.payload.suggestedSlots, greaterThanOrEqualTo(10));
     expect(drop.payload.suggestedStartsAt, isNotNull);
     expect(drop.payload.suggestedEndsAt!.isAfter(drop.payload.suggestedStartsAt!), isTrue);
+
+    // what search has brought in, and an estimate built only from counted orders
+    expect(ins.searchOrders.orders, greaterThan(0));
+    expect(ins.searchOrders.revenue, greaterThan(0));
+    expect(ins.searchOrders.topPhrases.every((p) => p.orders >= 3), isTrue, reason: 'a phrase is listed only with enough orders behind it');
+    final e = drop.payload.estimate!;
+    expect(e.weeklyOrders, greaterThanOrEqualTo(1));
+    expect(e.ordersObserved, greaterThanOrEqualTo(3));
+    expect(e.tapsObserved, greaterThanOrEqualTo(10));
+    expect(['PHRASE', 'RESTAURANT'], contains(e.basis));
+    expect(add.payload.estimate, isNull, reason: 'a dish that does not exist yet has no sales history');
   });
 }

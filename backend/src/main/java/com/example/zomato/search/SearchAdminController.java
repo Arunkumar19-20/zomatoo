@@ -25,9 +25,11 @@ public class SearchAdminController {
     private final SearchLogSimulator simulator;
     private final SearchProperties props;
     private final SuggestionService suggestions;
+    private final OrderAttributionService attribution;
 
     public SearchAdminController(SearchIndexService index, SeedDishLoader seeds, SearchEventService events, TrendService trends,
-                                 SearchLogSimulator simulator, SearchProperties props, SuggestionService suggestions) {
+                                 SearchLogSimulator simulator, SearchProperties props, SuggestionService suggestions, OrderAttributionService attribution) {
+        this.attribution = attribution;
         this.index = index;
         this.seeds = seeds;
         this.events = events;
@@ -35,6 +37,12 @@ public class SearchAdminController {
         this.simulator = simulator;
         this.props = props;
         this.suggestions = suggestions;
+    }
+
+    /** Counts delivered orders that came from search and drops cancelled ones, now (it also runs every ten minutes). */
+    @PostMapping("/attribution/settle")
+    public OrderAttributionService.SettleSummary settleAttribution() {
+        return attribution.settle();
     }
 
     /** Works out suggestions from the latest rising phrases now (it also runs nightly after the trend job). */

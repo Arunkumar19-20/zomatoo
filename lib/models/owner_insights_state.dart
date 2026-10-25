@@ -18,6 +18,7 @@ class OwnerInsightsState extends ChangeNotifier {
 
   List<OwnerSuggestion> get suggestions => _data.suggestions;
   List<RisingPhrase> get rising => _data.rising;
+  SearchOrders get searchOrders => _data.searchOrders;
   List<OwnerRestaurantRef> get restaurants => _data.restaurants;
   bool get loading => _loading;
   bool get loadedOnce => _loadedOnce;
@@ -52,7 +53,7 @@ class OwnerInsightsState extends ChangeNotifier {
 
   Future<String?> _remove(OwnerSuggestion s, Future<void> Function() call) async {
     final before = _data;
-    _data = OwnerInsights(restaurants: before.restaurants, suggestions: before.suggestions.where((x) => x.id != s.id).toList(), rising: before.rising);
+    _data = OwnerInsights(restaurants: before.restaurants, suggestions: before.suggestions.where((x) => x.id != s.id).toList(), rising: before.rising, searchOrders: before.searchOrders);
     _notify();
     try {
       await call();
