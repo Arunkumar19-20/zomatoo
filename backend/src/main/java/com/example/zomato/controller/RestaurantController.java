@@ -19,8 +19,10 @@ import java.util.List;
 public class RestaurantController {
 
     private final RestaurantService service;
+    private final com.example.zomato.security.OwnershipService ownership;
 
-    public RestaurantController(RestaurantService service) {
+    public RestaurantController(RestaurantService service, com.example.zomato.security.OwnershipService ownership) {
+        this.ownership = ownership;
         this.service = service;
     }
 
@@ -46,19 +48,23 @@ public class RestaurantController {
 
     @PreAuthorize("hasAnyRole('OWNER', 'ADMIN')")
     @PostMapping
-    public RestaurantDTO create(@RequestBody Restaurant restaurant) {
+    public RestaurantDTO create(@RequestBody Restaurant restaurant, org.springframework.security.core.Authentication auth) {
+        // an owner can only create a restaurant under their own owner record, never under someone else's or none
+        if (!ownership.isAdmin(auth)) restaurant.setOwner(ownership.ownerRecordOf(auth));
         return service.createRestaurant(restaurant);
     }
 
     @PreAuthorize("hasAnyRole('OWNER', 'ADMIN')")
     @PutMapping("/{id}")
-    public RestaurantDTO update(@PathVariable int id, @RequestBody Restaurant restaurant) {
+    public RestaurantDTO update(@PathVariable int id, @RequestBody Restaurant restaurant, org.springframework.security.core.Authentication auth) {
+        ownership.requireRestaurant(auth, id);
         return service.updateRestaurant(id, restaurant);
     }
 
     @PreAuthorize("hasAnyRole('OWNER', 'ADMIN')")
     @DeleteMapping("/{id}")
-    public void delete(@PathVariable int id) {
+    public void delete(@PathVariable int id, org.springframework.security.core.Authentication auth) {
+        ownership.requireRestaurant(auth, id);
         service.deleteRestaurant(id);
     }
 
@@ -79,19 +85,22 @@ public class RestaurantController {
 
     @PreAuthorize("hasAnyRole('OWNER', 'ADMIN')")
     @PutMapping("/{id}/status")
-    public void updateStatus(@PathVariable int id, @RequestParam Boolean isOpen) {
+    public void updateStatus(@PathVariable int id, @RequestParam Boolean isOpen, org.springframework.security.core.Authentication auth) {
+        ownership.requireRestaurant(auth, id);
         service.updateStatus(id, isOpen);
     }
 
     @PreAuthorize("hasAnyRole('OWNER', 'ADMIN')")
     @PostMapping("/menu-item")
-    public void addMenuItem(@RequestBody MenuItem item) {
+    public void addMenuItem(@RequestBody MenuItem item, org.springframework.security.core.Authentication auth) {
+        ownership.requireCategoryOf(auth, item);
         service.addMenuItem(item);
     }
 
     @PreAuthorize("hasAnyRole('OWNER', 'ADMIN')")
     @DeleteMapping("/menu-item/{itemId}")
-    public void removeMenuItem(@PathVariable int itemId) {
+    public void removeMenuItem(@PathVariable int itemId, org.springframework.security.core.Authentication auth) {
+        ownership.requireMenuItem(auth, itemId);
         service.removeMenuItem(itemId);
     }
 }

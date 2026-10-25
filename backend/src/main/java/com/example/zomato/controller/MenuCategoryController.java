@@ -14,8 +14,10 @@ import java.util.List;
 public class MenuCategoryController {
 
     private final MenuCategoryService service;
+    private final com.example.zomato.security.OwnershipService ownership;
 
-    public MenuCategoryController(MenuCategoryService service) {
+    public MenuCategoryController(MenuCategoryService service, com.example.zomato.security.OwnershipService ownership) {
+        this.ownership = ownership;
         this.service = service;
     }
 
@@ -36,31 +38,36 @@ public class MenuCategoryController {
 
     @PreAuthorize("hasAnyRole('OWNER', 'ADMIN')")
     @PostMapping("/{restaurantId}")
-    public MenuCategory create(@PathVariable int restaurantId, @RequestBody MenuCategory category) {
+    public MenuCategory create(@PathVariable int restaurantId, @RequestBody MenuCategory category, org.springframework.security.core.Authentication auth) {
+        ownership.requireRestaurant(auth, restaurantId);
         return service.createCategory(restaurantId, category);
     }
 
     @PreAuthorize("hasAnyRole('OWNER', 'ADMIN')")
     @PutMapping("/{id}")
-    public MenuCategory update(@PathVariable int id, @RequestBody MenuCategory category) {
+    public MenuCategory update(@PathVariable int id, @RequestBody MenuCategory category, org.springframework.security.core.Authentication auth) {
+        ownership.requireCategory(auth, id);
         return service.updateCategory(id, category);
     }
 
     @PreAuthorize("hasAnyRole('OWNER', 'ADMIN')")
     @DeleteMapping("/{id}")
-    public void delete(@PathVariable int id) {
+    public void delete(@PathVariable int id, org.springframework.security.core.Authentication auth) {
+        ownership.requireCategory(auth, id);
         service.deleteCategory(id);
     }
 
     @PreAuthorize("hasAnyRole('OWNER', 'ADMIN')")
     @PostMapping("/add-item")
-    public void addItem(@RequestBody MenuItem item) {
+    public void addItem(@RequestBody MenuItem item, org.springframework.security.core.Authentication auth) {
+        ownership.requireCategoryOf(auth, item);
         service.addItem(item);
     }
 
     @PreAuthorize("hasAnyRole('OWNER', 'ADMIN')")
     @DeleteMapping("/remove-item/{itemId}")
-    public void removeItem(@PathVariable int itemId) {
+    public void removeItem(@PathVariable int itemId, org.springframework.security.core.Authentication auth) {
+        ownership.requireMenuItem(auth, itemId);
         service.removeItem(itemId);
     }
 }

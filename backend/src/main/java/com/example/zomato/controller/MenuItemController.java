@@ -13,14 +13,17 @@ import java.util.List;
 public class MenuItemController {
 
     private final MenuItemService service;
+    private final com.example.zomato.security.OwnershipService ownership;
 
-    public MenuItemController(MenuItemService service) {
+    public MenuItemController(MenuItemService service, com.example.zomato.security.OwnershipService ownership) {
+        this.ownership = ownership;
         this.service = service;
     }
 
     @PreAuthorize("hasAnyRole('OWNER', 'ADMIN')")
     @PostMapping
-    public MenuItem save(@RequestBody MenuItem item) {
+    public MenuItem save(@RequestBody MenuItem item, org.springframework.security.core.Authentication auth) {
+        ownership.requireCategoryOf(auth, item);
         return service.save(item);
     }
 
@@ -36,25 +39,30 @@ public class MenuItemController {
 
     @PreAuthorize("hasAnyRole('OWNER', 'ADMIN')")
     @DeleteMapping("/{id}")
-    public void delete(@PathVariable int id) {
+    public void delete(@PathVariable int id, org.springframework.security.core.Authentication auth) {
+        ownership.requireMenuItem(auth, id);
         service.delete(id);
     }
 
     @PreAuthorize("hasAnyRole('OWNER', 'ADMIN')")
     @PutMapping("/{id}")
-    public MenuItem update(@PathVariable int id, @RequestBody MenuItem item) {
+    public MenuItem update(@PathVariable int id, @RequestBody MenuItem item, org.springframework.security.core.Authentication auth) {
+        ownership.requireMenuItem(auth, id);
+        if (item.getCategory() != null && item.getCategory().getId() != null) ownership.requireCategoryOf(auth, item);   // and not moved into someone else's menu
         return service.update(id, item);
     }
 
     @PreAuthorize("hasAnyRole('OWNER', 'ADMIN')")
     @PutMapping("/{id}/price")
-    public void updatePrice(@PathVariable int id, @RequestParam float price) {
+    public void updatePrice(@PathVariable int id, @RequestParam float price, org.springframework.security.core.Authentication auth) {
+        ownership.requireMenuItem(auth, id);
         service.updatePrice(id, price);
     }
 
     @PreAuthorize("hasAnyRole('OWNER', 'ADMIN')")
     @PutMapping("/{id}/toggle")
-    public void toggleAvailability(@PathVariable int id) {
+    public void toggleAvailability(@PathVariable int id, org.springframework.security.core.Authentication auth) {
+        ownership.requireMenuItem(auth, id);
         service.toggleAvailability(id);
     }
 }

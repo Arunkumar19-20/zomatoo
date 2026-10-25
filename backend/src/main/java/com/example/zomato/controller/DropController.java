@@ -21,8 +21,10 @@ public class DropController {
 
     private final DropService service;
     private final com.example.zomato.security.RateLimitingService rateLimitingService;
+    private final com.example.zomato.security.OwnershipService ownership;
 
-    public DropController(DropService service, com.example.zomato.security.RateLimitingService rateLimitingService) {
+    public DropController(DropService service, com.example.zomato.security.RateLimitingService rateLimitingService, com.example.zomato.security.OwnershipService ownership) {
+        this.ownership = ownership;
         this.service = service;
         this.rateLimitingService = rateLimitingService;
     }
@@ -35,19 +37,23 @@ public class DropController {
 
     @PreAuthorize("hasAnyRole('OWNER', 'ADMIN')")
     @PostMapping
-    public ResponseEntity<DropResponseDTO> create(@Valid @RequestBody CreateDropRequestDTO dto) {
+    public ResponseEntity<DropResponseDTO> create(@Valid @RequestBody CreateDropRequestDTO dto, org.springframework.security.core.Authentication auth) {
+        ownership.requireRestaurant(auth, dto.restaurantId());
         return ResponseEntity.status(HttpStatus.CREATED).body(service.createDrop(dto));
     }
 
     @PreAuthorize("hasAnyRole('OWNER', 'ADMIN')")
     @PutMapping("/{id}")
-    public DropResponseDTO update(@PathVariable int id, @RequestBody CreateDropRequestDTO dto) {
+    public DropResponseDTO update(@PathVariable int id, @RequestBody CreateDropRequestDTO dto, org.springframework.security.core.Authentication auth) {
+        ownership.requireDrop(auth, id);
+        if (dto.restaurantId() != null) ownership.requireRestaurant(auth, dto.restaurantId());   // and not moved to someone else's restaurant
         return service.updateDrop(id, dto);
     }
 
     @PreAuthorize("hasAnyRole('OWNER', 'ADMIN')")
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable int id) {
+    public ResponseEntity<Void> delete(@PathVariable int id, org.springframework.security.core.Authentication auth) {
+        ownership.requireDrop(auth, id);
         service.deleteDrop(id);
         return ResponseEntity.noContent().build();
     }
