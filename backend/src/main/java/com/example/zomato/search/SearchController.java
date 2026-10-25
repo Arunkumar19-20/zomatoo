@@ -25,8 +25,11 @@ public class SearchController {
     private final SearchProperties props;
     private final RateLimitingService rateLimiter;
     private final SearchEventService log;
+    private final TrendingService trending;
 
-    public SearchController(HybridSearchService search, SearchProperties props, RateLimitingService rateLimiter, SearchEventService log) {
+    public SearchController(HybridSearchService search, SearchProperties props, RateLimitingService rateLimiter, SearchEventService log,
+                            TrendingService trending) {
+        this.trending = trending;
         this.search = search;
         this.props = props;
         this.rateLimiter = rateLimiter;
@@ -73,6 +76,12 @@ public class SearchController {
         return new DishSearchResponse(query, r.mode(), r.parsed().facets().stream().map(f -> f.text()).toList(),
                 r.parsed().flavors().stream().map(Flavor::id).sorted().toList(), r.parsed().vegOnly(), r.parsed().maxPrice(),
                 r.total(), r.tookMs(), hits, searchId);
+    }
+
+    /** Rising cravings someone can order today, for the chips under the search bar. Public; shows phrases only, never counts or people. */
+    @GetMapping("/trending")
+    public List<TrendingService.Chip> trending(@RequestParam(value = "limit", defaultValue = "6") int limit) {
+        return trending.chips(limit);
     }
 
     public record ClickRequest(int itemId, int rank, String action) {}

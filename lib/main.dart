@@ -39,6 +39,9 @@ import 'models/drop_state.dart';
 import 'services/dish_search_service.dart';
 import 'repositories/dish_search_repository.dart';
 import 'models/dish_search_state.dart';
+import 'services/insights_service.dart';
+import 'repositories/insights_repository.dart';
+import 'models/trending_state.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -77,10 +80,15 @@ void main() async {
         Provider<DropRepository>(create: (_) => DropService()),
         Provider<DishSearchRepository>(create: (_) => DishSearchService()),
         Provider<MenuTagRepository>(create: (_) => DishSearchService()),
+        Provider<TrendingRepository>(create: (_) => InsightsService()),
+        Provider<OwnerInsightsRepository>(create: (_) => InsightsService()),
         ChangeNotifierProvider.value(value: session),
         ChangeNotifierProvider(create: (_) => CartState()),
         ChangeNotifierProvider(
           create: (ctx) => DishSearchState(repository: ctx.read<DishSearchRepository>()),
+        ),
+        ChangeNotifierProvider(
+          create: (ctx) => TrendingState(repository: ctx.read<TrendingRepository>()),
         ),
         ChangeNotifierProvider(
           create: (ctx) => DropState(

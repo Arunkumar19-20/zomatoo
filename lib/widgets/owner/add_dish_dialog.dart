@@ -48,14 +48,23 @@ const List<FlavorInfo> kFallbackFlavors = [
   FlavorInfo('fresh', 'Fresh'),
 ];
 
+/// Values to start the form with, for example from an Insights suggestion. The owner can change all of them.
+class NewDishInitial {
+  final String? name;
+  final String? description;
+  final List<String> flavorTags;
+  const NewDishInitial({this.name, this.description, this.flavorTags = const []});
+}
+
 Future<NewDishInput?> showAddDishDialog(
   BuildContext context, {
   required MenuTagRepository tags,
   required List<api.MenuCategory> categories,
+  NewDishInitial? initial,
 }) {
   return showDialog<NewDishInput>(
     context: context,
-    builder: (_) => AddDishDialog(tags: tags, categories: categories),
+    builder: (_) => AddDishDialog(tags: tags, categories: categories, initial: initial),
   );
 }
 
@@ -65,8 +74,9 @@ class AddDishDialog extends StatefulWidget {
   final MenuTagRepository tags;
   final List<api.MenuCategory> categories;
   final Duration suggestDebounce;
+  final NewDishInitial? initial;
 
-  const AddDishDialog({super.key, required this.tags, required this.categories, this.suggestDebounce = const Duration(milliseconds: 500)});
+  const AddDishDialog({super.key, required this.tags, required this.categories, this.suggestDebounce = const Duration(milliseconds: 500), this.initial});
 
   @override
   State<AddDishDialog> createState() => _AddDishDialogState();
@@ -95,9 +105,16 @@ class _AddDishDialogState extends State<AddDishDialog> {
   void initState() {
     super.initState();
     _categoryId = widget.categories.isNotEmpty ? widget.categories.first.id : null;
+    final initial = widget.initial;
+    if (initial != null) {
+      _name.text = initial.name ?? '';
+      _desc.text = initial.description ?? '';
+      _selected.addAll(initial.flavorTags);
+    }
     for (final c in [_name, _desc, _ingredients]) {
       c.addListener(_scheduleSuggest);
     }
+    if (initial != null) _scheduleSuggest();
     widget.tags.flavorTags().then((v) {
       if (mounted && v.isNotEmpty) setState(() => _vocabulary = v);
     }).catchError((_) {});

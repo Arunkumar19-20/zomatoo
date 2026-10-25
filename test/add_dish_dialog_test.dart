@@ -17,7 +17,7 @@ void main() {
     closed = false;
   });
 
-  Future<void> open(WidgetTester tester, {List<api.MenuCategory>? categories}) async {
+  Future<void> open(WidgetTester tester, {List<api.MenuCategory>? categories, NewDishInitial? initial}) async {
     tester.view.physicalSize = const Size(900, 2200);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
@@ -27,7 +27,7 @@ void main() {
           body: Center(
             child: ElevatedButton(
               onPressed: () async {
-                result = await showAddDishDialog(context, tags: tags, categories: categories ?? [api.MenuCategory(id: 3, name: 'Mains')]);
+                result = await showAddDishDialog(context, tags: tags, categories: categories ?? [api.MenuCategory(id: 3, name: 'Mains')], initial: initial);
                 closed = true;
               },
               child: const Text('open'),
@@ -145,5 +145,22 @@ void main() {
     expect(result!.servingTemp, 'COLD');
     expect(result!.mood, 'sharing');
     expect(result!.isVeg, isFalse);
+  });
+
+  testWidgets('an Insights suggestion prefills the name, description and flavors, and the owner only has to add a price', (tester) async {
+    await open(tester, initial: const NewDishInitial(name: 'Kimchi Carbonara', description: 'Our take on Kimchi Carbonara.', flavorTags: ['sweet', 'crunchy']));
+    expect(find.widgetWithText(TextField, 'Kimchi Carbonara'), findsOneWidget);
+    expect(find.widgetWithText(TextField, 'Our take on Kimchi Carbonara.'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('dish-save')));
+    await tester.pump();
+    expect(find.text('Enter a dish name and a price.'), findsOneWidget, reason: 'the price is never guessed');
+
+    await tester.enterText(find.byKey(const ValueKey('dish-price')), '420');
+    await tester.tap(find.byKey(const ValueKey('dish-save')));
+    await tester.pumpAndSettle();
+    expect(result?.name, 'Kimchi Carbonara');
+    expect(result?.price, 420);
+    expect(result?.flavorTags.toSet(), {'sweet', 'crunchy'});
   });
 }

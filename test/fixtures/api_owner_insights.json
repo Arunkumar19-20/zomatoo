@@ -1,0 +1,192 @@
+{
+    "restaurants": [
+        {
+            "id": 1,
+            "name": "Cravey Kitchen"
+        },
+        {
+            "id": 3,
+            "name": "Smokehouse 66"
+        },
+        {
+            "id": 4,
+            "name": "Spice Route"
+        },
+        {
+            "id": 5,
+            "name": "Tokyo Ramen House"
+        },
+        {
+            "id": 7,
+            "name": "Sugar & Spice Patisserie"
+        },
+        {
+            "id": 8,
+            "name": "Green Bowl"
+        },
+        {
+            "id": 9,
+            "name": "Bangkok Street"
+        },
+        {
+            "id": 2,
+            "name": "Bella Napoli"
+        },
+        {
+            "id": 6,
+            "name": "Casa Fuego"
+        }
+    ],
+    "suggestions": [
+        {
+            "id": 2,
+            "restaurantId": 2,
+            "restaurantName": "Bella Napoli",
+            "type": "ADD_DISH",
+            "status": "NEW",
+            "trendKey": "fusion:italian+korean",
+            "trendLabel": "Italian \u00d7 Korean fusion",
+            "headline": "\"Italian \u00d7 Korean fusion\" is trending and not on your menu",
+            "body": "120 people searched for it in the last 7 days, 22\u00d7 its usual level (about 4 a week before). 100% of those searches found no dish that matches. You serve Italian, so it fits your menu. Your menu showed up in 120 of those searches and was tapped 16 times, so they are already looking at kitchens like yours. Suggested dish: Kimchi Carbonara.",
+            "score": 18.4,
+            "recentSearchers": 120,
+            "baselineSearchers": 15,
+            "growth": 22.14,
+            "unmetShare": 1.0,
+            "impressions": 120,
+            "taps": 16,
+            "payload": {
+                "suggestedName": "Kimchi Carbonara",
+                "description": "Our take on Kimchi Carbonara: Italian meets Korean.",
+                "flavorTags": [
+                    "creamy",
+                    "spicy",
+                    "rich"
+                ],
+                "dishId": null,
+                "dishName": null,
+                "price": null,
+                "dishAvailable": null,
+                "suggestedSlots": null,
+                "suggestedStartsAt": null,
+                "suggestedEndsAt": null,
+                "exampleSearches": [
+                    "italian korean fusion pasta",
+                    "kimchi carbonara",
+                    "bulgogi pizza",
+                    "gochujang pizza"
+                ]
+            },
+            "snoozedUntil": null,
+            "createdAt": "2026-10-25T08:16:27.120268"
+        },
+        {
+            "id": 1,
+            "restaurantId": 1,
+            "restaurantName": "Cravey Kitchen",
+            "type": "ADD_DISH",
+            "status": "NEW",
+            "trendKey": "fusion:italian+korean",
+            "trendLabel": "Italian \u00d7 Korean fusion",
+            "headline": "\"Italian \u00d7 Korean fusion\" is trending and not on your menu",
+            "body": "120 people searched for it in the last 7 days, 22\u00d7 its usual level (about 4 a week before). 100% of those searches found no dish that matches. You serve Italian, so it fits your menu. Your menu showed up in 74 of those searches and was tapped 0 times, so they are already looking at kitchens like yours. Suggested dish: Kimchi Carbonara.",
+            "score": 18.4,
+            "recentSearchers": 120,
+            "baselineSearchers": 15,
+            "growth": 22.14,
+            "unmetShare": 1.0,
+            "impressions": 74,
+            "taps": 0,
+            "payload": {
+                "suggestedName": "Kimchi Carbonara",
+                "description": "Our take on Kimchi Carbonara: Italian meets Korean.",
+                "flavorTags": [
+                    "creamy",
+                    "spicy",
+                    "rich"
+                ],
+                "dishId": null,
+                "dishName": null,
+                "price": null,
+                "dishAvailable": null,
+                "suggestedSlots": null,
+                "suggestedStartsAt": null,
+                "suggestedEndsAt": null,
+                "exampleSearches": [
+                    "italian korean fusion pasta",
+                    "kimchi carbonara",
+                    "bulgogi pizza",
+                    "gochujang pizza"
+                ]
+            },
+            "snoozedUntil": null,
+            "createdAt": "2026-10-25T08:16:27.083117"
+        },
+        {
+            "id": 3,
+            "restaurantId": 6,
+            "restaurantName": "Casa Fuego",
+            "type": "MAKE_DROP",
+            "status": "NEW",
+            "trendKey": "dish:birria+taco",
+            "trendLabel": "Birria Taco",
+            "headline": "Turn Beef Birria Tacos into a Drop",
+            "body": "38 people searched for it in the last 7 days, 20\u00d7 its usual level (about 1 a week before). Your Beef Birria Tacos showed up in 38 of those searches and was tapped 3 times. A limited Drop of 10 slots sells a known amount instead of risking waste, and rewards the people who searched.",
+            "score": 8.785,
+            "recentSearchers": 38,
+            "baselineSearchers": 1,
+            "growth": 19.88,
+            "unmetShare": 0.0,
+            "impressions": 38,
+            "taps": 3,
+            "payload": {
+                "suggestedName": null,
+                "description": null,
+                "flavorTags": [],
+                "dishId": 68,
+                "dishName": "Beef Birria Tacos",
+                "price": 399.0,
+                "dishAvailable": true,
+                "suggestedSlots": 10,
+                "suggestedStartsAt": "2026-10-26T18:00",
+                "suggestedEndsAt": "2026-10-26T21:00",
+                "exampleSearches": [
+                    "birria taco",
+                    "cheesy birria tacos",
+                    "birria tacos",
+                    "taco birria"
+                ]
+            },
+            "snoozedUntil": null,
+            "createdAt": "2026-10-25T08:16:27.121547"
+        }
+    ],
+    "rising": [
+        {
+            "label": "Italian \u00d7 Korean fusion",
+            "kind": "FUSION",
+            "recentSearchers": 120,
+            "growth": 22.14,
+            "unmetShare": 1.0,
+            "exampleSearches": [
+                "italian korean fusion pasta",
+                "kimchi carbonara",
+                "bulgogi pizza",
+                "gochujang pizza"
+            ]
+        },
+        {
+            "label": "Birria Taco",
+            "kind": "DISH",
+            "recentSearchers": 38,
+            "growth": 19.88,
+            "unmetShare": 0.0,
+            "exampleSearches": [
+                "birria taco",
+                "cheesy birria tacos",
+                "birria tacos",
+                "taco birria"
+            ]
+        }
+    ]
+}

@@ -18,6 +18,7 @@ import '../models/drop_state.dart';
 import '../models/dish_search_models.dart';
 import '../models/dish_search_state.dart';
 import '../widgets/search/dish_results_section.dart';
+import '../widgets/search/trending_chips.dart';
 import '../widgets/drops/drops_section.dart';
 import '../widgets/drops/hold_banner.dart';
 
@@ -146,6 +147,12 @@ class _HomeScreenState extends State<HomeScreen> {
         _hasMore) {
       _loadMoreRestaurants();
     }
+  }
+
+  void _pickTrending(String query) {
+    _searchController.text = query;
+    _searchController.selection = TextSelection.collapsed(offset: query.length);
+    _onSearchChanged(query);
   }
 
   void _onSearchChanged(String value) {
@@ -485,6 +492,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                     ),
+                    // Rising searches someone can order today; tapping one runs it
+                    TrendingChips(onPick: _pickTrending),
                     // Top matches for a craving like "something sweet but also spicy"
                     DishResultsSection(onOpen: _openDish),
 

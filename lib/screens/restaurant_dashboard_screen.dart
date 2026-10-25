@@ -8,6 +8,10 @@ import '../services/delivery_service.dart';
 import '../services/dish_search_service.dart';
 import '../services/api_client.dart';
 import '../widgets/owner/add_dish_dialog.dart';
+import '../widgets/owner/insights_tab.dart';
+import '../models/insights_models.dart';
+import '../models/owner_insights_state.dart';
+import '../repositories/insights_repository.dart';
 import '../models/models.dart';
 import '../widgets/scale_tap.dart';
 import '../widgets/role_switcher_dialog.dart';
@@ -32,7 +36,7 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _loadDatabaseDetails();
   }
 
@@ -134,17 +138,17 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
   }
 
   /// Collects the dish with the details craving search needs, then saves it under one of this restaurant's menu sections.
-  Future<void> _showAddMenuItemDialog() async {
-    final restaurantId = _restaurant?.id;
+  Future<bool> _showAddMenuItemDialog({int? restaurantId, NewDishInitial? initial}) async {
+    restaurantId ??= _restaurant?.id;
     final menuSvc = MenuService();
     var categories = <MenuCategory>[];
     if (restaurantId != null) {
       categories = await menuSvc.getCategoriesByRestaurant(restaurantId).catchError((_) => <MenuCategory>[]);
     }
-    if (!mounted) return;
+    if (!mounted) return false;
 
-    final input = await showAddDishDialog(context, tags: DishSearchService(), categories: categories);
-    if (input == null || !mounted) return;
+    final input = await showAddDishDialog(context, tags: DishSearchService(), categories: categories, initial: initial);
+    if (input == null || !mounted) return false;
 
     setState(() => _loading = true);
     try {
@@ -170,18 +174,26 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
       ));
       if (mounted) {
         setState(() {
-          _menuItems.insert(0, saved);
+          if (restaurantId == _restaurant?.id) _menuItems.insert(0, saved);
           _loading = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Dish saved. Customers can find it by craving right away.')));
       }
+      return true;
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e is ApiException ? e.message : 'Could not save the dish.')));
       }
       _loadDatabaseDetails();
+      return false;
     }
   }
+
+  /// An Insights suggestion's add-dish button: the normal form, prefilled, for the restaurant the suggestion is about.
+  Future<bool> _addDishFromSuggestion(OwnerSuggestion s) => _showAddMenuItemDialog(
+        restaurantId: s.restaurantId,
+        initial: NewDishInitial(name: s.payload.suggestedName, description: s.payload.description, flavorTags: s.payload.flavorTags),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -190,7 +202,10 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
     final restaurantTitle = _restaurant?.name ?? 'Spice Garden Bistro';
     final restaurantAddress = _restaurant?.address ?? 'Bellandur, Bangalore';
 
-    return Scaffold(
+    return ChangeNotifierProvider(
+      // loaded up front so the tab can show how many suggestions are waiting
+      create: (ctx) => OwnerInsightsState(repository: ctx.read<OwnerInsightsRepository>())..load(),
+      child: Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
       body: SafeArea(
         child: Column(
@@ -320,7 +335,14 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
                 tabs: [
                   Tab(icon: const Icon(Icons.receipt_long_rounded), text: "Live Orders (${_deliveries.length})"),
                   Tab(icon: const Icon(Icons.restaurant_menu_rounded), text: "Menu Dishes (${_menuItems.length})"),
-                  const Tab(icon: Icon(Icons.insights_rounded), text: "Store Info"),
+                  Tab(
+                    icon: const Icon(Icons.trending_up_rounded),
+                    child: Builder(builder: (ctx) {
+                      final n = ctx.watch<OwnerInsightsState>().suggestions.length;
+                      return Text(n > 0 ? "Insights ($n)" : "Insights", key: const ValueKey('insights-tab-label'));
+                    }),
+                  ),
+                  const Tab(icon: Icon(Icons.storefront_rounded), text: "Store Info"),
                 ],
               ),
             ),
@@ -334,12 +356,14 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
                       children: [
                         _buildLiveOrdersTab(),
                         _buildMenuDishesTab(),
+                        OwnerInsightsTab(onAddDish: _addDishFromSuggestion),
                         _buildStoreInfoTab(),
                       ],
                     ),
             ),
           ],
         ),
+      ),
       ),
     );
   }

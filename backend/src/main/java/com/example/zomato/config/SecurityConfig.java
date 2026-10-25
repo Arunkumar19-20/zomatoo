@@ -108,7 +108,7 @@ public class SecurityConfig {
                     if (path.startsWith("/api/") || path.startsWith("/orders") || path.startsWith("/payment")
                             || path.startsWith("/cart") || path.startsWith("/admin") || path.startsWith("/restaurants")
                             || path.startsWith("/categories") || path.startsWith("/menu-items") || path.startsWith("/locations")
-                            || path.startsWith("/coupon") || path.startsWith("/drops") || path.startsWith("/search")) {
+                            || path.startsWith("/coupon") || path.startsWith("/drops") || path.startsWith("/search") || path.startsWith("/owner")) {
                         res.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                         res.setContentType("application/json");
                         res.getWriter().write("{\"error\":\"Unauthorized\",\"message\":\"" + ex.getMessage() + "\"}");

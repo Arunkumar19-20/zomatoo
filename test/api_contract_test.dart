@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tomatoo/models/dish_search_models.dart';
+import 'package:tomatoo/models/insights_models.dart';
 import 'package:tomatoo/models/drop_models.dart';
 import 'package:tomatoo/models/models.dart';
 import 'package:tomatoo/services/api_client.dart';
@@ -117,5 +118,36 @@ void main() {
       expect(vocab, hasLength(12));
       expect(vocab.map((f) => f.id).toSet(), kFallbackIds);
     });
+  });
+
+  test('TrendingChip reads a live /search/trending response', () {
+    final chips = (rawFixture('api_trending') as List).map((e) => TrendingChip.fromJson(e as Map<String, dynamic>)).toList();
+    expect(chips, isNotEmpty);
+    expect(chips.first.label, 'Birria Taco');
+    expect(chips.first.query, isNotEmpty);
+    expect(chips.first.dishCount, greaterThan(0));
+    // customers get no counts: only what the chip needs
+    expect((rawFixture('api_trending') as List).first.keys.toSet(), {'label', 'query', 'kind', 'dishCount'});
+  });
+
+  test('OwnerInsights reads a live /owner/insights response, every suggestion type', () {
+    final ins = OwnerInsights.fromJson(fixture('api_owner_insights'));
+    expect(ins.restaurants, isNotEmpty);
+    expect(ins.rising.map((r) => r.label), containsAll(['Italian × Korean fusion', 'Birria Taco']));
+    final types = ins.suggestions.map((s) => s.type).toSet();
+    expect(types, containsAll([SuggestionType.addDish, SuggestionType.makeDrop]));
+
+    final add = ins.suggestions.firstWhere((s) => s.type == SuggestionType.addDish);
+    expect(add.payload.suggestedName, 'Kimchi Carbonara');
+    expect(add.payload.flavorTags, isNotEmpty);
+    expect(add.unmetShare, 1.0);
+    expect(add.headline, contains('trending'));
+
+    final drop = ins.suggestions.firstWhere((s) => s.type == SuggestionType.makeDrop);
+    expect(drop.payload.dishId, isNotNull);
+    expect(drop.payload.price, greaterThan(0));
+    expect(drop.payload.suggestedSlots, greaterThanOrEqualTo(10));
+    expect(drop.payload.suggestedStartsAt, isNotNull);
+    expect(drop.payload.suggestedEndsAt!.isAfter(drop.payload.suggestedStartsAt!), isTrue);
   });
 }

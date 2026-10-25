@@ -180,7 +180,7 @@ curl "http://localhost:8080/search/dishes?q=something%20sweet%20but%20also%20spi
 
 How well it works, what was tried and what did not help: [docs/search-quality-report.md](docs/search-quality-report.md).
 Searches are logged anonymously (what was typed, whether the menus could answer it, which result was tapped) as the base for
-trending-craving suggestions to restaurants: [docs/search-insights.md](docs/search-insights.md).
+trending-craving suggestions to restaurants (an Insights tab for owners, "Trending cravings" chips for customers): [docs/search-insights.md](docs/search-insights.md).
 In short, on the demo catalog with automatically tagged dishes the first result is relevant far more often than with
 keywords alone (MRR 0.90 vs 0.82), and good owner tags matter most (recall 0.73 to 0.89). The catalog and queries are
 synthetic, so read it as proof the pipeline works, not as a benchmark.

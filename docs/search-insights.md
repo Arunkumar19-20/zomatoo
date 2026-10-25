@@ -210,3 +210,67 @@ pass them to the service, which is why the service already takes the allowed res
 `TrendMatcherTest` (9), `SuggestionServiceIntegrationTest` (11: fusion goes to Italian kitchens only, drop versus stock guidance, impressions and taps counted from real searches,
 weekly cap per owner across restaurants and a new week lifting it, best-scoring kept, dismiss and cool-down, cross-restaurant protection, snooze and revival, acting, expiry,
 admin-only), `SuggestionSimulationRealModelTest` (real model). Full backend suite: 236 passing.
+
+---
+
+# Phase 4: what owners and customers see
+
+Phase 3's suggestions and Phase 2's trends are now on screen: an Insights tab for owners and "Trending cravings" chips for customers.
+
+## Customers: Trending cravings (`GET /search/trending`, public)
+
+Chips under the search bar. A chip appears only if the phrase is rising **and** at least one available dish matches it right now, so tapping a chip never shows an empty list
+(the Korean x Italian fusion that no menu serves is a signal for restaurants, not a chip). A chip disappears when the dish is switched off.
+Tapping runs the search for it. Chips hide while a search is showing.
+
+The response is `label`, `query`, `kind`, `dishCount` and nothing else: no searcher counts, growth or share of unmet searches. Only phrases that already cleared the trend job's bars
+(8+ searchers, 2x growth, 3+ days) can appear, so no chip reflects a handful of people. A contract test fixes the exact field set.
+
+## Owners: the Insights tab (`/owner/insights`)
+
+A fourth tab on the owner dashboard, "Insights (n)" with the count of waiting suggestions (loaded when the dashboard opens, not when the tab is tapped).
+Each suggestion is a card: type, restaurant (when the owner has several), the text from Phase 3, the counted facts, and three buttons.
+
+| Type | Main button | What happens |
+|---|---|---|
+| Add a dish | Add this dish | the normal add-dish form opens prefilled (name, description, flavor tags) for the suggestion's own restaurant; price is left for the owner; the suggestion closes only after the dish is saved |
+| Keep more ready | Got it | closes it |
+| Make it a Drop | Create this Drop | confirms title and slots (1 to 200), then creates the Drop |
+
+"Later" snoozes for a week, "Not for me" dismisses for a month. Below the cards, "Trending across Cravey" lists every rising phrase with searchers and growth, and marks the ones no menu serves yet.
+
+| Call | Notes |
+|---|---|
+| `GET /owner/insights` | the caller's restaurants, their open suggestions, all rising phrases |
+| `POST /owner/insights/{id}/dismiss`, `/snooze`, `/acted` | `acted` is what the app calls after the owner saves the suggested dish |
+| `POST /owner/insights/{id}/drop` `{title?, totalSlots?}` | creates the suggested Drop and closes the suggestion |
+
+### Who is the caller (closing the Phase 3 open point, for this feature)
+
+The caller's restaurants are looked up on the server from the signed-in email, through the owner record with the same email. A request never names a restaurant, so it cannot name one it does not own.
+An admin sees all. An account with no owner record gets empty lists, not an error. Customers and signed-out callers are refused (403 and 401). Acting on another owner's suggestion, or an id that does not exist,
+gets the same 404, so ids cannot be probed.
+
+`POST .../drop` takes the restaurant, dish, price and window from the stored suggestion, never from the request; only title and slots can be changed, and slots are bounded. The Drop is created through the existing `DropService`.
+The general gap is **not** closed: `POST /drops` and the menu-item endpoints still let any OWNER act on any restaurant id. That is a wider change to existing endpoints and is left for its own piece of work.
+
+### Found and fixed while building it
+
+- An expired or missing owner token on `/owner/...` redirected to a Google login instead of answering 401, because the 401 rule is an allowlist of API path prefixes. `/owner` is now on it (this also covers the existing `/owners` API).
+- A 404 on dismiss or snooze (already gone) keeps the card removed instead of bringing back a dead card; any other failure restores it with the reason.
+
+## Checked live (Postgres, real backend, Flutter web, simulated traffic)
+
+- Customer home screen: chip "Birria Taco" under the search bar; tapping it searched "birria taco" and Casa Fuego's Beef Birria Tacos came first. The fusion was not offered.
+- Owner (the seeded local test owner, who owns all nine demo restaurants): "Insights (3)"; cards for Bella Napoli and Cravey Kitchen (add a dish) and Casa Fuego (Drop).
+  Add this dish opened the form prefilled with Bella Napoli's own menu sections; after entering a price and saving, the card closed, the count went to 2, and search then found "Kimchi Carbonara" first.
+  Create this Drop made Drop 4 for Casa Fuego with dish 68, 399, 10 slots, tomorrow 18:00 to 21:00; both suggestions show ACTED in the database.
+- The app's "Quick Demo Sign-In" is a client-side demo session with its own email, linked to no owner record here, so it correctly shows an empty list with the market view.
+- Contract fixtures `test/fixtures/api_trending.json` and `api_owner_insights.json` are captured from this run.
+
+## Tests
+
+Backend `OwnerInsightsIntegrationTest` (11: each owner sees only their own, no-restaurant owner and admin, customers and visitors refused, cross-owner dismiss/snooze/acted/drop all 404 and untouched,
+dismiss/snooze/acted, drop uses the suggestion's restaurant and dish and closes it, bounds and wrong type refused, chips show only orderable phrases and no numbers, tapping a chip always finds the dish,
+chip vanishes when the dish is off, cap and ordering). Flutter: `insights_state_test` (12), `insights_widgets_test` (12), a prefill test in `add_dish_dialog_test`, two contract tests on the live fixtures.
+Full suites: backend 247, Flutter 147.
