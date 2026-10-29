@@ -27,6 +27,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String? _couponError;
   bool _applyingCoupon = false;
   List<Coupon> _activeCoupons = [];
+  final Set<String> _selectedInstructions = {};
+  double _tipAmount = 0.0;
 
   @override
   void initState() {
@@ -253,6 +255,115 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       ),
                       const SizedBox(height: 20),
 
+                      // Delivery Instructions (Zomato/Swiggy style)
+                      Row(
+                        children: [
+                          const Icon(Icons.note_alt_outlined, size: 18, color: AppTheme.primaryColor),
+                          const SizedBox(width: 8),
+                          Text(
+                            "Delivery Instructions",
+                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            _buildInstructionChip("🚪 Leave at door", "Leave at door"),
+                            _buildInstructionChip("🔕 Don't ring bell", "Don't ring bell"),
+                            _buildInstructionChip("📞 Avoid calling", "Avoid calling"),
+                            _buildInstructionChip("🐾 Pet at home", "Pet at home"),
+                            _buildInstructionChip("📍 Call on arrival", "Call on arrival"),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Tip Delivery Partner Section
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.grey.shade100),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.03),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.amber.shade50,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.volunteer_activism_rounded, color: Colors.amber, size: 18),
+                                ),
+                                const SizedBox(width: 10),
+                                const Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        "Tip your delivery partner",
+                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.textDark),
+                                      ),
+                                      Text(
+                                        "100% of the tip goes directly to Rahul Singh 🛵",
+                                        style: TextStyle(color: Colors.grey, fontSize: 11),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                _buildTipChip(20),
+                                const SizedBox(width: 8),
+                                _buildTipChip(30),
+                                const SizedBox(width: 8),
+                                _buildTipChip(50),
+                                const SizedBox(width: 8),
+                                _buildTipChip(100),
+                                if (_tipAmount > 0) ...[
+                                  const SizedBox(width: 8),
+                                  GestureDetector(
+                                    onTap: () {
+                                      setState(() => _tipAmount = 0);
+                                      cart.setTipAmount(0);
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey.shade100,
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: const Icon(Icons.close_rounded, size: 16, color: Colors.grey),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
                       // Payment Method Section
                       Text(
                         "Payment Method",
@@ -269,9 +380,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         child: ListView(
                           scrollDirection: Axis.horizontal,
                           children: [
-                            _buildPaymentOptionCard("Card", Icons.credit_card_rounded, cart),
-                            _buildPaymentOptionCard("Wallet", Icons.account_balance_wallet_rounded, cart),
-                            _buildPaymentOptionCard("Cash", Icons.payments_rounded, cart),
+                            _buildPaymentOptionCard("Google Pay (UPI)", Icons.account_balance_wallet_rounded, cart),
+                            _buildPaymentOptionCard("PhonePe", Icons.phone_android_rounded, cart),
+                            _buildPaymentOptionCard("Paytm", Icons.qr_code_2_rounded, cart),
+                            _buildPaymentOptionCard("Credit / Debit Card", Icons.credit_card_rounded, cart),
+                            _buildPaymentOptionCard("Cash on Delivery", Icons.payments_rounded, cart),
                           ],
                         ),
                       ),
@@ -485,9 +598,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         ),
                         child: Column(
                           children: [
-                            _buildSummaryRow("Subtotal", cart.subtotal),
+                            _buildSummaryRow("Item Total", cart.subtotal),
                             _buildSummaryRow("Delivery Fee", cart.deliveryFee),
-                            _buildSummaryRow("Service Fee", cart.serviceFee),
+                            _buildSummaryRow("Platform Fee", 5.0),
+                            _buildSummaryRow("GST and Restaurant Charges", cart.subtotal * 0.05),
+                            if (_tipAmount > 0)
+                              _buildSummaryRow("Delivery Partner Tip", _tipAmount),
                             if (_couponDiscount > 0)
                               _buildSummaryRow("Promo Discount", -_couponDiscount),
                             const SizedBox(height: 8),
@@ -497,15 +613,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 const Text(
-                                  "Total",
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppTheme.textDark),
+                                  "To Pay",
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.textDark),
                                 ),
                                 Text(
-                                  "₹${(cart.total - _couponDiscount).clamp(0, double.infinity).toStringAsFixed(2)}",
+                                  "₹${(cart.subtotal + cart.deliveryFee + 5.0 + (cart.subtotal * 0.05) + _tipAmount - _couponDiscount).clamp(0, double.infinity).toStringAsFixed(2)}",
                                   style: const TextStyle(
                                     color: AppTheme.primaryColor,
                                     fontWeight: FontWeight.bold,
-                                    fontSize: 18,
+                                    fontSize: 19,
                                   ),
                                 ),
                               ],
@@ -606,6 +722,76 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           Text(label, style: TextStyle(color: Colors.grey.shade500, fontSize: 13, fontWeight: FontWeight.w600)),
           Text("₹${amount.toStringAsFixed(2)}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.textDark)),
         ],
+      ),
+    );
+  }
+
+  Widget _buildInstructionChip(String emojiLabel, String tag) {
+    final isSelected = _selectedInstructions.contains(tag);
+    final cart = context.read<CartState>();
+    return Padding(
+      padding: const EdgeInsets.only(right: 8.0),
+      child: FilterChip(
+        label: Text(emojiLabel),
+        selected: isSelected,
+        selectedColor: AppTheme.primaryColor.withValues(alpha: 0.15),
+        checkmarkColor: AppTheme.primaryColor,
+        labelStyle: TextStyle(
+          color: isSelected ? AppTheme.primaryColor : AppTheme.textDark,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+          fontSize: 12,
+        ),
+        backgroundColor: Colors.white,
+        side: BorderSide(
+          color: isSelected ? AppTheme.primaryColor : Colors.grey.shade300,
+          width: isSelected ? 1.5 : 1.0,
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        onSelected: (selected) {
+          setState(() {
+            if (selected) {
+              _selectedInstructions.add(tag);
+            } else {
+              _selectedInstructions.remove(tag);
+            }
+          });
+          cart.setDeliveryInstructions(_selectedInstructions.join(', '));
+        },
+      ),
+    );
+  }
+
+  Widget _buildTipChip(int amount) {
+    final isSelected = _tipAmount == amount.toDouble();
+    final cart = context.read<CartState>();
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _tipAmount = isSelected ? 0.0 : amount.toDouble();
+          });
+          cart.setTipAmount(_tipAmount);
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected ? AppTheme.primaryColor : Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected ? AppTheme.primaryColor : Colors.grey.shade300,
+              width: isSelected ? 1.5 : 1,
+            ),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            "₹$amount",
+            style: TextStyle(
+              color: isSelected ? Colors.white : AppTheme.textDark,
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+            ),
+          ),
+        ),
       ),
     );
   }

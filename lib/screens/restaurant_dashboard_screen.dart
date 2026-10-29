@@ -6,6 +6,7 @@ import '../Services/restaurant_service.dart';
 import '../Services/menu_service.dart';
 import '../Services/order_service.dart';
 import '../models/models.dart';
+import '../models/cart_state.dart';
 import '../widgets/scale_tap.dart';
 import '../widgets/role_switcher_dialog.dart';
 
@@ -84,7 +85,7 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
       orderList.sort((a, b) => (b.orderId ?? 0).compareTo(a.orderId ?? 0));
 
       final myItems = myRestaurant?.id != null
-          ? items.where((i) => i.restaurantId == myRestaurant!.id).toList()
+          ? items.where((i) => i.restaurantId == myRestaurant!.id || (i.restaurantId == null && i.categoryName == null)).toList()
           : items;
 
       if (mounted) {
@@ -104,6 +105,10 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
   void _updateOrderStatus(int orderId, String newStatus) async {
     try {
       await OrderService().updateStatus(orderId, newStatus);
+      // Synchronize with customer order tracking in real time
+      if (mounted) {
+        context.read<CartState>().updateFromBackendStatus(newStatus);
+      }
       _loadDatabaseDetails();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -173,17 +178,119 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
     } catch (_) {}
   }
 
-  void _showAddMenuItemDialog() {
+  void _deleteDish(MenuItem item) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(Icons.delete_forever_rounded, color: Colors.red.shade700, size: 24),
+            ),
+            const SizedBox(width: 12),
+            const Text('Delete Dish', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to delete "${item.name}"? This will permanently remove it from your menu and database.',
+          style: TextStyle(color: Colors.grey.shade700, fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text('Cancel', style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w600)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade700,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || item.id == null) return;
+
+    try {
+      await MenuService().deleteItem(item.id!);
+      if (mounted) {
+        setState(() {
+          _menuItems.removeWhere((i) => i.id == item.id);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.black87,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            content: Text('${item.name} removed from menu 🗑️'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.red.shade700,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            content: Text('Failed to delete dish: $e'),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
+  }
+
+  void _showAddMenuItemDialog() async {
+    // Fetch categories for this restaurant so the new dish gets linked properly
+    List<MenuCategory> categories = [];
+    if (_restaurant?.id != null) {
+      try {
+        categories = await MenuService().getCategoriesByRestaurant(_restaurant!.id!);
+      } catch (_) {}
+    }
+    // Fallback: fetch all categories if restaurant-specific fetch fails
+    if (categories.isEmpty) {
+      try {
+        categories = await MenuService().getAllCategories();
+      } catch (_) {}
+    }
+    // Auto-create category if none exists so items always link properly to this restaurant
+    if (categories.isEmpty && _restaurant?.id != null) {
+      try {
+        final defCat = await MenuService().createCategory(
+          _restaurant!.id!,
+          MenuCategory(name: 'Main Menu', displayOrder: 1),
+        );
+        categories = [defCat];
+      } catch (_) {}
+    }
+
+    if (!mounted) return;
+
     final nameCtrl = TextEditingController();
     final priceCtrl = TextEditingController();
     final descCtrl = TextEditingController();
     bool isVeg = true;
+    int? selectedCategoryId = categories.isNotEmpty ? categories.first.id : null;
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (context, setDlgState) => AlertDialog(
+        builder: (dlgCtx, setDlgState) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
           title: const Row(
             children: [
               Icon(Icons.restaurant_menu_rounded, color: _orange),
@@ -191,60 +298,117 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
               Text('Add Dish to DB', style: TextStyle(fontWeight: FontWeight.bold)),
             ],
           ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Dish Name *',
-                    hintText: 'e.g. Paneer Butter Masala',
-                    prefixIcon: Icon(Icons.fastfood_rounded),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: priceCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                    labelText: 'Price (₹) *',
-                    hintText: 'e.g. 240',
-                    prefixIcon: Icon(Icons.currency_rupee_rounded),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: descCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Description',
-                    hintText: 'Rich creamy tomato gravy with cottage cheese',
-                    prefixIcon: Icon(Icons.description_rounded),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    const Text('Food Type:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                    const SizedBox(width: 10),
-                    ChoiceChip(
-                      avatar: const Icon(Icons.circle, color: Colors.green, size: 12),
-                      label: const Text('Veg'),
-                      selected: isVeg,
-                      selectedColor: Colors.green.withValues(alpha: 0.15),
-                      onSelected: (_) => setDlgState(() => isVeg = true),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Category Dropdown
+                  if (categories.isNotEmpty)
+                    DropdownButtonFormField<int>(
+                      value: selectedCategoryId,
+                      decoration: const InputDecoration(
+                        labelText: 'Category *',
+                        prefixIcon: Icon(Icons.category_rounded),
+                      ),
+                      items: categories
+                          .map((c) => DropdownMenuItem<int>(
+                                value: c.id,
+                                child: Text(c.name),
+                              ))
+                          .toList(),
+                      onChanged: (val) => setDlgState(() => selectedCategoryId = val),
                     ),
-                    const SizedBox(width: 8),
-                    ChoiceChip(
-                      avatar: const Icon(Icons.circle, color: Colors.red, size: 12),
-                      label: const Text('Non-Veg'),
-                      selected: !isVeg,
-                      selectedColor: Colors.red.withValues(alpha: 0.15),
-                      onSelected: (_) => setDlgState(() => isVeg = false),
+                  if (categories.isNotEmpty) const SizedBox(height: 12),
+                  TextField(
+                    controller: nameCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Dish Name *',
+                      hintText: 'e.g. Paneer Butter Masala',
+                      prefixIcon: Icon(Icons.fastfood_rounded),
                     ),
-                  ],
-                ),
-              ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: priceCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(
+                      labelText: 'Price (₹) *',
+                      hintText: 'e.g. 240',
+                      prefixIcon: Icon(Icons.currency_rupee_rounded),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: descCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Description',
+                      hintText: 'Rich creamy tomato gravy with cottage cheese',
+                      prefixIcon: Icon(Icons.description_rounded),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  const Text('Food Type *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.textDark)),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: InkWell(
+                          onTap: () => setDlgState(() => isVeg = true),
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: isVeg ? Colors.green.withValues(alpha: 0.12) : Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isVeg ? Colors.green : Colors.grey.shade300,
+                                width: isVeg ? 1.5 : 1,
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.circle, color: Colors.green, size: 12),
+                                SizedBox(width: 6),
+                                Text('Veg', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: InkWell(
+                          onTap: () => setDlgState(() => isVeg = false),
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: !isVeg ? Colors.red.withValues(alpha: 0.12) : Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: !isVeg ? Colors.red : Colors.grey.shade300,
+                                width: !isVeg ? 1.5 : 1,
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.circle, color: Colors.red, size: 12),
+                                SizedBox(width: 6),
+                                Text('Non-Veg', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
           actions: [
@@ -269,6 +433,8 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
                     isVeg: isVeg,
                     isAvailable: true,
                     imageUrl: 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=400&fit=crop&q=80',
+                    restaurantId: _restaurant?.id,
+                    categoryId: selectedCategoryId,
                   );
 
                   Navigator.of(ctx).pop();
@@ -276,12 +442,36 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
 
                   try {
                     final menuSvc = MenuService();
-                    final saved = await menuSvc.saveItem(newDish);
+                    final saved = await menuSvc.saveItem(newDish, categoryId: selectedCategoryId);
                     setState(() {
+                      _menuItems.removeWhere((item) => item.id == saved.id);
                       _menuItems.insert(0, saved);
                       _loading = false;
                     });
-                  } catch (_) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          behavior: SnackBarBehavior.floating,
+                          backgroundColor: _orange,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          content: Text('${newDish.name} added to database ✅'),
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    debugPrint('[ADD DISH ERROR] $e');
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          behavior: SnackBarBehavior.floating,
+                          backgroundColor: Colors.red.shade700,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          content: Text('Failed to add dish: $e'),
+                          duration: const Duration(seconds: 4),
+                        ),
+                      );
+                    }
                     _loadDatabaseDetails();
                   }
                 }
@@ -560,7 +750,58 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
 
   // ─── 1. LIVE ORDERS TAB ─────────────────────────────────────────────────────
   Widget _buildLiveOrdersTab() {
-    final activeOrders = _orders.where((o) => o.status != 'DELIVERED' && o.status != 'CANCELLED').toList();
+    // Watch CartState for real-time lifecycle synchronization
+    final cart = context.watch<CartState>();
+    final List<OrderModel> effectiveOrders = List<OrderModel>.from(_orders);
+
+    String cartStatusString = 'PLACED';
+    if (cart.currentStatus == OrderStatus.preparing) {
+      cartStatusString = 'PREPARING';
+    } else if (cart.currentStatus == OrderStatus.readyForPickup) {
+      cartStatusString = 'READY';
+    } else if (cart.currentStatus == OrderStatus.partnerAssigned) {
+      cartStatusString = 'PARTNER_ASSIGNED';
+    } else if (cart.currentStatus == OrderStatus.onTheWay) {
+      cartStatusString = 'OUT_FOR_DELIVERY';
+    } else if (cart.currentStatus == OrderStatus.delivered) {
+      cartStatusString = 'DELIVERED';
+    }
+
+    if (cart.hasActiveOrder) {
+      final targetId = cart.backendOrderId ?? 101;
+      final matchIndex = effectiveOrders.indexWhere((o) =>
+          o.orderId == targetId ||
+          (cart.backendOrderId == null && (o.orderId == 101 || effectiveOrders.length == 1)));
+      if (matchIndex != -1) {
+        effectiveOrders[matchIndex] = OrderModel(
+          orderId: effectiveOrders[matchIndex].orderId,
+          customerId: effectiveOrders[matchIndex].customerId,
+          restaurantId: effectiveOrders[matchIndex].restaurantId,
+          totalAmount: effectiveOrders[matchIndex].totalAmount > 0
+              ? effectiveOrders[matchIndex].totalAmount
+              : cart.recentOrderTotal,
+          status: cartStatusString,
+          orderDate: effectiveOrders[matchIndex].orderDate,
+        );
+      } else {
+        effectiveOrders.insert(
+          0,
+          OrderModel(
+            orderId: targetId,
+            customerId: 1,
+            restaurantId: _restaurant?.id ?? 1,
+            totalAmount: cart.recentOrderTotal > 0 ? cart.recentOrderTotal : 480.0,
+            status: cartStatusString,
+            orderDate: DateTime.now().toIso8601String(),
+          ),
+        );
+      }
+    }
+
+    final activeOrders = effectiveOrders.where((o) {
+      final s = (o.status ?? '').toUpperCase();
+      return !s.contains('DELIVERED') && !s.contains('CANCELLED');
+    }).toList();
 
     return ListView(
       padding: const EdgeInsets.all(16.0),
@@ -636,7 +877,7 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
         ),
         const SizedBox(height: 10),
 
-        if (_orders.isEmpty)
+        if (effectiveOrders.isEmpty)
           Container(
             padding: const EdgeInsets.all(32),
             decoration: BoxDecoration(
@@ -664,17 +905,38 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
             ),
           )
         else
-          ..._orders.map((o) {
-            final status = o.status ?? 'PLACED';
-            final isDelivered = status.contains('DELIVERED');
-            final isReady = status == 'READY';
-            final isPreparing = status == 'PREPARING';
-            final isPlaced = status == 'PLACED';
+          ...effectiveOrders.map((o) {
+            final status = (o.status ?? 'PLACED').toUpperCase();
+            final isDelivered = status.contains('DELIVERED') ||
+                (cart.hasActiveOrder &&
+                    cart.currentStatus == OrderStatus.delivered &&
+                    (o.orderId == cart.backendOrderId ||
+                        (cart.backendOrderId == null && (o.orderId == 101 || effectiveOrders.length == 1))));
+            final isReady = !isDelivered && (status == 'READY' || status == 'PARTNER_ASSIGNED');
+            final isPreparing = !isDelivered && status == 'PREPARING';
+            final isPlaced = !isDelivered && status == 'PLACED';
+            final isOutForDelivery = !isDelivered && (status == 'OUT_FOR_DELIVERY' || status == 'ON_THE_WAY');
 
             Color statusColor = const Color(0xFFE65100);
-            if (isDelivered) statusColor = const Color(0xFF2E7D32);
-            if (isReady) statusColor = const Color(0xFF00897B);
-            if (isPreparing) statusColor = const Color(0xFF1565C0);
+            if (isDelivered) {
+              statusColor = const Color(0xFF2E7D32);
+            } else if (isOutForDelivery) {
+              statusColor = const Color(0xFF00897B);
+            } else if (isReady) {
+              statusColor = const Color(0xFF00897B);
+            } else if (isPreparing) {
+              statusColor = const Color(0xFF1565C0);
+            }
+
+            final isBroadcastWaiting = !isDelivered &&
+                (cart.currentStatus == OrderStatus.readyForPickup ||
+                    (isReady &&
+                        cart.currentStatus != OrderStatus.partnerAssigned &&
+                        cart.currentStatus != OrderStatus.onTheWay &&
+                        cart.currentStatus != OrderStatus.delivered));
+            final isPartnerClaimed = !isDelivered &&
+                (cart.currentStatus == OrderStatus.partnerAssigned ||
+                    cart.currentStatus == OrderStatus.onTheWay);
 
             return Container(
               margin: const EdgeInsets.only(bottom: 12.0),
@@ -714,7 +976,11 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
                                 color: statusColor.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: Icon(Icons.receipt_rounded, color: statusColor, size: 16),
+                              child: Icon(
+                                isDelivered ? Icons.check_circle_rounded : Icons.receipt_rounded,
+                                color: statusColor,
+                                size: 16,
+                              ),
                             ),
                             const SizedBox(width: 8),
                             Text(
@@ -730,9 +996,26 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(color: statusColor.withValues(alpha: 0.3)),
                           ),
-                          child: Text(
-                            status,
-                            style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 11),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (isDelivered) ...[
+                                const Icon(Icons.check_circle_rounded, size: 13, color: Color(0xFF2E7D32)),
+                                const SizedBox(width: 4),
+                              ],
+                              Text(
+                                isDelivered
+                                    ? "DELIVERED ✓"
+                                    : isBroadcastWaiting
+                                        ? "BROADCASTED"
+                                        : isPartnerClaimed && isReady
+                                            ? "RIDER ASSIGNED"
+                                            : isOutForDelivery
+                                                ? "OUT FOR DELIVERY"
+                                                : status,
+                                style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 11),
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -768,16 +1051,99 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
                           ],
                         ),
                         const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            const Icon(Icons.two_wheeler_rounded, size: 16, color: Colors.teal),
-                            const SizedBox(width: 6),
-                            Text(
-                              "Delivery Fleet: Assigned to nearest rider",
-                              style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
+                        if (isDelivered)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE8F5E9),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFFA5D6A7)),
                             ),
-                          ],
-                        ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(5),
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFF2E7D32),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.check_rounded, size: 14, color: Colors.white),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        "Food Delivered Successfully! 🎉",
+                                        style: TextStyle(
+                                          color: Color(0xFF1B5E20),
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        "Handover to customer completed by ${cart.riderName.isNotEmpty ? cart.riderName : 'Fleet Partner'} (OTP verified).",
+                                        style: const TextStyle(
+                                          color: Color(0xFF2E7D32),
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else if (isBroadcastWaiting)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFF3E0),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFFFFB74D)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.sensors_rounded, size: 15, color: Color(0xFFE65100)),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    "Dropped to Delivery Fleet • First rider to accept will claim",
+                                    style: TextStyle(color: Colors.orange.shade900, fontSize: 11, fontWeight: FontWeight.w600),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else if (isPartnerClaimed || isOutForDelivery)
+                          Row(
+                            children: [
+                              const Icon(Icons.two_wheeler_rounded, size: 16, color: Colors.teal),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  isOutForDelivery
+                                      ? "Out for Delivery: ${cart.riderName} • ${cart.riderVehicle}"
+                                      : "Claimed Rider: ${cart.riderName} • ${cart.riderVehicle}",
+                                  style: const TextStyle(color: Color(0xFF00695C), fontSize: 12, fontWeight: FontWeight.bold),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          )
+                        else
+                          Row(
+                            children: [
+                              const Icon(Icons.soup_kitchen_rounded, size: 16, color: Color(0xFF1565C0)),
+                              const SizedBox(width: 6),
+                              Text(
+                                "Kitchen Phase: Chef preparing dishes",
+                                style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
+                              ),
+                            ],
+                          ),
                         const Divider(height: 20),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -803,29 +1169,66 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
                                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                 ),
-                                icon: const Icon(Icons.check_circle_rounded, size: 14),
-                                label: const Text("Mark Ready for Pickup", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                icon: const Icon(Icons.campaign_rounded, size: 14),
+                                label: const Text("Dish Prepared • Drop to Fleet 📡", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                                 onPressed: () => _updateOrderStatus(o.orderId ?? 1, 'READY'),
                               )
                             else if (isReady)
-                              ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF00897B),
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                ),
-                                icon: const Icon(Icons.two_wheeler_rounded, size: 14),
-                                label: const Text("Handover to Rider", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                                onPressed: () => _updateOrderStatus(o.orderId ?? 1, 'OUT_FOR_DELIVERY'),
-                              )
+                              if (isBroadcastWaiting)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange.shade50,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: Colors.orange.shade300),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      SizedBox(
+                                        width: 12,
+                                        height: 12,
+                                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.orange.shade800),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        "Awaiting Rider Claim...",
+                                        style: TextStyle(color: Colors.orange.shade900, fontSize: 11, fontWeight: FontWeight.bold),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              else
+                                ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF00897B),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                  icon: const Icon(Icons.two_wheeler_rounded, size: 14),
+                                  label: Text("Handover to ${cart.riderName}", style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                  onPressed: () => _updateOrderStatus(o.orderId ?? 1, 'OUT_FOR_DELIVERY'),
+                                )
                             else if (isDelivered)
-                              const Row(
-                                children: [
-                                  Icon(Icons.check_circle, color: Color(0xFF2E7D32), size: 16),
-                                  SizedBox(width: 4),
-                                  Text("Delivered ✓", style: TextStyle(color: Color(0xFF2E7D32), fontWeight: FontWeight.bold, fontSize: 12)),
-                                ],
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF2E7D32).withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: const Color(0xFF2E7D32).withValues(alpha: 0.3)),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.check_circle_rounded, color: Color(0xFF2E7D32), size: 15),
+                                    SizedBox(width: 5),
+                                    Text(
+                                      "Delivered ✓",
+                                      style: TextStyle(color: Color(0xFF2E7D32), fontWeight: FontWeight.bold, fontSize: 12),
+                                    ),
+                                  ],
+                                ),
                               )
                             else
                               Text(
@@ -1017,24 +1420,44 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
                           ],
                         ),
                       ),
+                      const SizedBox(width: 8),
                       Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Switch.adaptive(
-                            value: isAvailable,
-                            activeColor: Colors.green,
-                            onChanged: (val) {
-                              if (item.id != null) {
-                                _toggleItemAvailability(item.id!, index, val);
-                              }
-                            },
-                          ),
-                          Text(
-                            isAvailable ? "In Stock" : "Out of Stock",
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: isAvailable ? Colors.green.shade800 : Colors.red.shade700,
-                              fontWeight: FontWeight.bold,
+                          InkWell(
+                            onTap: item.id == null ? null : () => _deleteDish(item),
+                            borderRadius: BorderRadius.circular(8),
+                            child: Padding(
+                              padding: const EdgeInsets.all(4),
+                              child: Icon(Icons.delete_outline_rounded, color: Colors.red.shade400, size: 20),
                             ),
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                isAvailable ? "In Stock" : "Out of Stock",
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: isAvailable ? Colors.green.shade800 : Colors.red.shade700,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Transform.scale(
+                                scale: 0.75,
+                                child: Switch.adaptive(
+                                  value: isAvailable,
+                                  activeColor: Colors.green,
+                                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  onChanged: (val) {
+                                    if (item.id != null) {
+                                      _toggleItemAvailability(item.id!, index, val);
+                                    }
+                                  },
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),

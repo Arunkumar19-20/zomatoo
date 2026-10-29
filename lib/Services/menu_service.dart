@@ -2,6 +2,7 @@
 // Mirrors: MenuCategoryController (/categories) and MenuItemController (/menu-items)
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'api_client.dart';
 import '../models/models.dart';
 
@@ -81,11 +82,58 @@ class MenuService {
 
   // ---- Menu items ----
 
-  Future<MenuItem> saveItem(MenuItem item) async {
+  Future<MenuItem> saveItem(MenuItem item, {int? categoryId}) async {
     try {
-      final res = await _dio.post('/menu-items', data: item.toJson());
-      return MenuItem.fromJson(res.data);
+      final targetCatId = categoryId ?? item.categoryId;
+      final body = <String, dynamic>{
+        if (item.id != null) 'id': item.id,
+        'name': item.name,
+        'description': item.description,
+        'price': item.price,
+        'isVeg': item.isVeg,
+        'isAvailable': item.isAvailable,
+        'imageUrl': item.imageUrl,
+        if (targetCatId != null) 'category': {'id': targetCatId},
+      };
+
+      debugPrint('[MENU_SVC] POST /menu-items body=$body');
+      final res = await _dio.post('/menu-items', data: body);
+      debugPrint('[MENU_SVC] POST /menu-items status=${res.statusCode} response=${res.data}');
+
+      final savedItem = MenuItem.fromJson(res.data);
+
+      if (savedItem.id != null) {
+        try {
+          final fresh = await getItemById(savedItem.id!);
+          return MenuItem(
+            id: fresh.id,
+            name: fresh.name,
+            description: fresh.description,
+            price: fresh.price,
+            isVeg: fresh.isVeg,
+            isAvailable: fresh.isAvailable,
+            imageUrl: fresh.imageUrl,
+            restaurantId: fresh.restaurantId ?? item.restaurantId,
+            categoryId: fresh.categoryId ?? targetCatId,
+            categoryName: fresh.categoryName ?? item.categoryName,
+          );
+        } catch (_) {}
+      }
+
+      return MenuItem(
+        id: savedItem.id,
+        name: savedItem.name,
+        description: savedItem.description,
+        price: savedItem.price,
+        isVeg: savedItem.isVeg,
+        isAvailable: savedItem.isAvailable,
+        imageUrl: savedItem.imageUrl,
+        restaurantId: savedItem.restaurantId ?? item.restaurantId,
+        categoryId: savedItem.categoryId ?? targetCatId,
+        categoryName: savedItem.categoryName ?? item.categoryName,
+      );
     } on DioException catch (e) {
+      debugPrint('[MENU_SVC] POST /menu-items FAILED: status=${e.response?.statusCode} data=${e.response?.data} msg=${e.message}');
       throw ApiException.fromDioException(e);
     }
   }

@@ -96,11 +96,16 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
       groupedMenu[item.category]!.add(item);
     }
 
+    final cart = context.watch<CartState>();
+    final cartCount = cart.totalItemCount;
+
     return Scaffold(
       backgroundColor: AppTheme.scaffoldBackground,
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      body: Stack(
+        children: [
+          SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Restaurant Banner Image with Overlay Buttons
             Stack(
@@ -482,10 +487,19 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 80),
+            SizedBox(height: cartCount > 0 ? 100 : 80),
           ],
         ),
       ),
+      if (cartCount > 0)
+        Positioned(
+          left: 16,
+          right: 16,
+          bottom: 12,
+          child: _buildFloatingCartBanner(cart),
+        ),
+    ],
+  ),
       
       // Pinned Bottom Nav Bar (matching screenshot detail)
       bottomNavigationBar: BottomNavigationBar(
@@ -668,47 +682,202 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
               ),
               const SizedBox(width: 8),
 
-              // Stepper
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.grey.shade200),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.remove, color: AppTheme.primaryColor, size: 16),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                      onPressed: () {
-                        cart.removeItem(item);
-                      },
-                    ),
-                    Text(
-                      "$quantity",
-                      style: const TextStyle(
-                        color: AppTheme.textDark,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
+              // ADD button or Interactive Stepper
+              quantity == 0
+                  ? ScaleTap(
+                      onTap: () => _handleAddToCart(context, cart, item, restaurant),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppTheme.primaryColor, width: 1.5),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppTheme.primaryColor.withValues(alpha: 0.15),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.add_rounded, size: 16, color: AppTheme.primaryColor),
+                            SizedBox(width: 2),
+                            Text(
+                              "ADD",
+                              style: TextStyle(
+                                color: AppTheme.primaryColor,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 13,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : Container(
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryColor,
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppTheme.primaryColor.withValues(alpha: 0.25),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          InkWell(
+                            onTap: () => cart.removeItem(item),
+                            borderRadius: const BorderRadius.horizontal(left: Radius.circular(10)),
+                            child: const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                              child: Icon(Icons.remove, color: Colors.white, size: 16),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 6),
+                            child: Text(
+                              "$quantity",
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                          InkWell(
+                            onTap: () => _handleAddToCart(context, cart, item, restaurant),
+                            borderRadius: const BorderRadius.horizontal(right: Radius.circular(10)),
+                            child: const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                              child: Icon(Icons.add, color: Colors.white, size: 16),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.add, color: AppTheme.primaryColor, size: 16),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                      onPressed: () {
-                        cart.addItem(item, restaurant);
-                      },
-                    ),
-                  ],
-                ),
-              ),
             ],
           ),
         );
       },
+    );
+  }
+
+  void _handleAddToCart(BuildContext context, CartState cart, FoodItem item, Restaurant restaurant) {
+    if (cart.hasDifferentRestaurant(restaurant)) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text("Replace cart items?", style: TextStyle(fontWeight: FontWeight.bold)),
+          content: Text(
+            "Your cart contains items from '${cart.activeRestaurant?.name}'. Discard them and add items from '${restaurant.name}'?",
+            style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                cart.addItem(item, restaurant);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    behavior: SnackBarBehavior.floating,
+                    backgroundColor: Colors.black87,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    content: Text("Cart updated with ${item.name} 🛒"),
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              },
+              child: const Text("Replace"),
+            ),
+          ],
+        ),
+      );
+    } else {
+      cart.addItem(item, restaurant);
+    }
+  }
+
+  Widget _buildFloatingCartBanner(CartState cart) {
+    return ScaleTap(
+      onTap: () => Navigator.of(context).pushNamed('/cart'),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFFD84315), Color(0xFFE65100), Color(0xFFFFA726)],
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: AppTheme.primaryColor.withValues(alpha: 0.35),
+              blurRadius: 14,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  "${cart.totalItemCount} ITEM${cart.totalItemCount > 1 ? 'S' : ''} ADDED",
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                Text(
+                  "₹${cart.total.toStringAsFixed(0)} plus taxes",
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const Row(
+              children: [
+                Text(
+                  "View Cart",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                SizedBox(width: 4),
+                Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 16),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 

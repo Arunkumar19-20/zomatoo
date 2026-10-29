@@ -274,7 +274,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     _buildRestaurantsFeed(),
 
                     // Bottom padding for cart banner and nav bar
-                    SizedBox(height: cartCount > 0 ? 100 : 40),
+                    SizedBox(height: (cartCount > 0 || cartState.hasActiveOrder) ? 100 : 40),
                   ],
                 ),
               ),
@@ -287,6 +287,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 right: 16,
                 bottom: 12,
                 child: _buildFloatingCartBanner(cartState),
+              )
+            else if (cartState.hasActiveOrder)
+              Positioned(
+                left: 16,
+                right: 16,
+                bottom: 12,
+                child: _buildFloatingActiveOrderBanner(cartState),
               ),
           ],
         ),
@@ -791,6 +798,162 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 SizedBox(width: 4),
                 Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 16),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─── FLOATING ACTIVE ORDER BANNER (Zomato/Swiggy style) ───────────────────
+  Widget _buildFloatingActiveOrderBanner(CartState cartState) {
+    final status = cartState.currentStatus;
+    final isDelivered = status == OrderStatus.delivered;
+    final isOnTheWay = status == OrderStatus.onTheWay;
+    final isPartnerAssigned = status == OrderStatus.partnerAssigned;
+    final isPreparing = status == OrderStatus.preparing;
+    final restName = cartState.recentOrderRestaurant?.name ?? "Cravey Kitchen";
+
+    String statusText;
+    IconData statusIcon;
+    Color statusColor;
+
+    if (isDelivered) {
+      statusText = "Order Delivered! Tap to view";
+      statusIcon = Icons.check_circle_rounded;
+      statusColor = const Color(0xFF2E7D32);
+    } else if (isOnTheWay) {
+      statusText = "Out for delivery • ${cartState.remainingDistanceKm.toStringAsFixed(1)} km away";
+      statusIcon = Icons.delivery_dining_rounded;
+      statusColor = const Color(0xFFE65100);
+    } else if (isPartnerAssigned) {
+      statusText = "Food ready • Rahul Singh assigned";
+      statusIcon = Icons.two_wheeler_rounded;
+      statusColor = const Color(0xFF00897B);
+    } else if (isPreparing) {
+      statusText = "Restaurant cooking your food...";
+      statusIcon = Icons.soup_kitchen_rounded;
+      statusColor = const Color(0xFF1565C0);
+    } else {
+      statusText = "Order placed • Waiting for kitchen";
+      statusIcon = Icons.receipt_long_rounded;
+      statusColor = const Color(0xFFD84315);
+    }
+
+    return ScaleTap(
+      onTap: () => Navigator.of(context).pushNamed('/tracking'),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E293B),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.3),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: statusColor.withValues(alpha: 0.25),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(statusIcon, color: Colors.white, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          restName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          "OTP: ${cartState.deliveryOtp}",
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    statusText,
+                    style: TextStyle(
+                      color: isDelivered ? Colors.greenAccent : Colors.orange.shade200,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _orange,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Row(
+                    children: [
+                      Text(
+                        "Track",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                      SizedBox(width: 3),
+                      Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 14),
+                    ],
+                  ),
+                ),
+                if (isDelivered) ...[
+                  const SizedBox(width: 6),
+                  GestureDetector(
+                    onTap: () => cartState.dismissActiveOrder(),
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.close_rounded, size: 14, color: Colors.white70),
+                    ),
+                  ),
+                ],
               ],
             ),
           ],

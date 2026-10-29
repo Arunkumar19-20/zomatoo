@@ -6,6 +6,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'Services/app_bootstrap.dart';
+import 'models/cart_state.dart';
 import 'screens/splash_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/delivery_dashboard_screen.dart';
@@ -18,6 +19,7 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: session),
+        ChangeNotifierProvider(create: (_) => CartState()),
       ],
       child: const CraveyDeliveryApp(),
     ),

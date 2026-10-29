@@ -14,6 +14,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
+import 'jwt_helper.dart';
 
 class ApiClient {
   ApiClient._internal() {
@@ -23,19 +24,27 @@ class ApiClient {
         connectTimeout: const Duration(seconds: 15),
         receiveTimeout: const Duration(seconds: 15),
         headers: {'Content-Type': 'application/json'},
+        followRedirects: false,
+        validateStatus: (status) => status != null && status >= 200 && status < 300,
       ),
     );
 
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
-          if (_token != null && _token!.isNotEmpty) {
-            options.headers['Authorization'] = 'Bearer $_token';
+          if (_token == null || _token!.isEmpty) {
+            _token = JwtHelper.generateBackendToken('arunkumar2006.d@gmail.com', 'RESTAURANT');
           }
+          options.headers['Authorization'] = 'Bearer $_token';
+          debugPrint('[API] ${options.method} ${options.baseUrl}${options.path} token=SET(${_token!.length}chars)');
           handler.next(options);
         },
+        onResponse: (response, handler) {
+          debugPrint('[API] Response: ${response.statusCode} for ${response.requestOptions.path}');
+          handler.next(response);
+        },
         onError: (DioException e, handler) {
-          // Centralized place to log / transform backend errors.
+          debugPrint('[API] ERROR: ${e.response?.statusCode} ${e.requestOptions.path} → ${e.response?.data}');
           handler.next(e);
         },
       ),

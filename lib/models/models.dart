@@ -95,6 +95,7 @@ class MenuItem {
   final bool? isAvailable;
   final String? imageUrl;
   final int? restaurantId;
+  final int? categoryId;
   final String? categoryName;
 
   MenuItem({
@@ -106,14 +107,17 @@ class MenuItem {
     this.isAvailable,
     this.imageUrl,
     this.restaurantId,
+    this.categoryId,
     this.categoryName,
   });
 
   factory MenuItem.fromJson(Map<String, dynamic> j) {
     int? restId;
+    int? catId;
     String? catName;
     if (j['category'] is Map<String, dynamic>) {
       final cat = j['category'] as Map<String, dynamic>;
+      catId = cat['id'] as int?;
       catName = cat['name'] ?? cat['categoryName'];
       if (cat['restaurant'] is Map<String, dynamic>) {
         restId = (cat['restaurant'] as Map<String, dynamic>)['id'] as int?;
@@ -123,6 +127,10 @@ class MenuItem {
     } else if (j['categoryName'] is String) {
       catName = j['categoryName'] as String;
     }
+    catId ??= (j['categoryId'] as int?);
+    restId ??= (j['restaurantId'] as int?) ??
+        (j['restaurant'] is Map ? (j['restaurant'] as Map)['id'] as int? : null);
+
     return MenuItem(
       id: j['id'] ?? j['itemId'],
       name: j['name'] ?? j['itemName'] ?? '',
@@ -132,6 +140,7 @@ class MenuItem {
       isAvailable: j['isAvailable'] ?? j['available'] ?? true,
       imageUrl: j['imageUrl'] ?? j['image_url'],
       restaurantId: restId,
+      categoryId: catId,
       categoryName: catName,
     );
   }
@@ -144,6 +153,9 @@ class MenuItem {
         'isVeg': isVeg,
         'isAvailable': isAvailable,
         'imageUrl': imageUrl,
+        if (categoryId != null) 'category': {'id': categoryId},
+        if (restaurantId != null) 'restaurantId': restaurantId,
+        if (categoryName != null) 'categoryName': categoryName,
       };
 }
 

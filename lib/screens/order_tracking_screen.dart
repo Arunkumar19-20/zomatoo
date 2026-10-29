@@ -84,10 +84,14 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTi
   /// Get courier position based on order status.
   LatLng _getCourierPosition(OrderStatus status) {
     double progress;
-    if (status == OrderStatus.preparing) {
+    if (status == OrderStatus.placed) {
+      progress = 0.0;
+    } else if (status == OrderStatus.preparing) {
       progress = 0.02 + 0.02 * sin(_bikeController.value * 2 * pi);
+    } else if (status == OrderStatus.partnerAssigned) {
+      progress = 0.12 + 0.03 * sin(_bikeController.value * 2 * pi);
     } else if (status == OrderStatus.onTheWay) {
-      progress = 0.05 + 0.90 * _bikeController.value;
+      progress = 0.18 + 0.78 * _bikeController.value;
     } else {
       progress = 1.0;
     }
@@ -299,9 +303,12 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTi
         ? "Order #${cart.backendOrderId}"
         : "Order #${DateTime.now().millisecondsSinceEpoch % 100000}";
 
-    // Status calculations
+    // Status calculations for 6-stage lifecycle
     final status = cart.currentStatus;
+    final isPlaced = status == OrderStatus.placed;
     final isPreparing = status == OrderStatus.preparing;
+    final isReadyForPickup = status == OrderStatus.readyForPickup;
+    final isPartnerAssigned = status == OrderStatus.partnerAssigned;
     final isOnTheWay = status == OrderStatus.onTheWay;
     final isDelivered = status == OrderStatus.delivered;
 
@@ -312,15 +319,27 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTi
     if (isDelivered) {
       timeText = "Delivered!";
       headingText = "Order Delivered 🎉";
-      descriptionText = "Enjoy your food! Your order has been successfully delivered.";
+      descriptionText = "Enjoy your food! Your order has been delivered and verified with OTP ${cart.deliveryOtp}.";
     } else if (isOnTheWay) {
-      timeText = "12 mins";
-      headingText = "Order on the way";
-      descriptionText = "Our delivery partner is speeding towards your location.";
+      timeText = "10 mins";
+      headingText = "Out for Delivery 🛵";
+      descriptionText = "${cart.riderName} picked up your hot food and is riding towards your address.";
+    } else if (isPartnerAssigned) {
+      timeText = "15 mins";
+      headingText = "Partner Assigned 🛵";
+      descriptionText = "${cart.riderName} claimed your order! Heading to $restaurantName for pickup.";
+    } else if (isReadyForPickup) {
+      timeText = "20 mins";
+      headingText = "Food Ready • Finding Partner 📡";
+      descriptionText = "Dishes are hot & ready! Broadcasted to delivery fleet — awaiting first partner to accept.";
+    } else if (isPreparing) {
+      timeText = "24 mins";
+      headingText = "Kitchen is Cooking 👨‍🍳";
+      descriptionText = "$restaurantName accepted your order and chefs are actively preparing your dishes.";
     } else {
-      timeText = "25 mins";
-      headingText = "Preparing your order";
-      descriptionText = "$restaurantName is busy preparing your delicious food!";
+      timeText = "30 mins";
+      headingText = "Order Placed 📝";
+      descriptionText = "Sent to $restaurantName. Awaiting kitchen acceptance & cooking.";
     }
 
     return Scaffold(
@@ -340,8 +359,16 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTi
         children: [
           // Real OpenStreetMap view
           Positioned.fill(
-            bottom: 280,
+            bottom: 260,
             child: _buildMap(status),
+          ),
+
+          // Floating Live Telemetry & Quick Advance Bar at top
+          Positioned(
+            top: 12,
+            left: 16,
+            right: 16,
+            child: _buildLiveStatusBar(context, cart),
           ),
 
           // Status Stepper & Summary Card pinned at bottom
@@ -356,7 +383,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTi
               ),
               child: Container(
                 constraints: BoxConstraints(
-                  maxHeight: MediaQuery.of(context).size.height * 0.6,
+                  maxHeight: MediaQuery.of(context).size.height * 0.65,
                 ),
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -377,7 +404,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTi
                   children: [
                     // Pull handler
                     Container(
-                      margin: const EdgeInsets.only(top: 10, bottom: 12),
+                      margin: const EdgeInsets.only(top: 10, bottom: 10),
                       width: 40,
                       height: 5,
                       decoration: BoxDecoration(
@@ -443,9 +470,45 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTi
                         ],
                       ),
                     ),
-                    const SizedBox(height: 12),
+
+                    // Delivery instructions chip if specified by user
+                    if (cart.deliveryInstructions.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.orange.shade200),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.note_alt_rounded, size: 14, color: AppTheme.primaryColor),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  "Note: ${cart.deliveryInstructions}",
+                                  style: const TextStyle(color: AppTheme.primaryColor, fontSize: 11, fontWeight: FontWeight.w600),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+
+                    const SizedBox(height: 8),
+
+                    // Delivery Partner Card (Rider & OTP)
+                    _buildDeliveryPartnerCard(context, cart),
+
+                    const SizedBox(height: 8),
                     const Divider(color: AppTheme.dividerColor, height: 1),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
 
                     // Stepper
                     Flexible(
@@ -453,10 +516,12 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTi
                         padding: const EdgeInsets.symmetric(horizontal: 20.0),
                         child: Column(
                           children: [
-                            _buildStep(context, "Order Placed", "We've received your order and details", true, false, Icons.check_rounded),
-                            _buildStep(context, "Preparing Food", "The kitchen is cooking your food", isPreparing || isOnTheWay || isDelivered, isPreparing, Icons.cookie_outlined),
-                            _buildStep(context, "On The Way", "Delivery driver has picked up your food", isOnTheWay || isDelivered, isOnTheWay, Icons.delivery_dining_rounded),
-                            _buildStep(context, "Delivered", "Enjoy your meal!", isDelivered, isDelivered, Icons.home_rounded),
+                            _buildStep(context, "Order Placed", "Order confirmed & sent to kitchen", true, isPlaced, Icons.check_circle_rounded),
+                            _buildStep(context, "Kitchen Accepted & Cooking", "$restaurantName chefs preparing your meal", isPreparing || isReadyForPickup || isPartnerAssigned || isOnTheWay || isDelivered, isPreparing, Icons.soup_kitchen_rounded),
+                            _buildStep(context, "Food Ready & Broadcasted", "Dishes packed • Broadcasted to nearby delivery fleet", isReadyForPickup || isPartnerAssigned || isOnTheWay || isDelivered, isReadyForPickup, Icons.podcasts_rounded),
+                            _buildStep(context, "Delivery Partner Assigned", "Claimed by ${cart.riderName} • En route to kitchen", isPartnerAssigned || isOnTheWay || isDelivered, isPartnerAssigned, Icons.two_wheeler_rounded),
+                            _buildStep(context, "Out for Delivery", "${cart.riderName} picked up food and is riding to you", isOnTheWay || isDelivered, isOnTheWay, Icons.delivery_dining_rounded),
+                            _buildStep(context, "Order Delivered", "Verified with OTP ${cart.deliveryOtp} • Enjoy your meal!", isDelivered, isDelivered, Icons.home_rounded),
                           ],
                         ),
                       ),
@@ -574,6 +639,647 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTi
               ],
             ),
             const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLiveStatusBar(BuildContext context, CartState cart) {
+    String stepLabel;
+    Color dotColor;
+    if (cart.currentStatus == OrderStatus.delivered) {
+      stepLabel = "Delivered to Doorstep";
+      dotColor = Colors.green;
+    } else if (cart.currentStatus == OrderStatus.onTheWay) {
+      stepLabel = "Out for Delivery (${cart.liveSpeedKmH.toStringAsFixed(0)} km/h)";
+      dotColor = Colors.orange;
+    } else if (cart.currentStatus == OrderStatus.partnerAssigned) {
+      stepLabel = "Rider Assigned (${cart.remainingDistanceKm.toStringAsFixed(1)} km away)";
+      dotColor = Colors.teal;
+    } else if (cart.currentStatus == OrderStatus.preparing) {
+      stepLabel = "Kitchen Cooking Dish";
+      dotColor = Colors.blue;
+    } else {
+      stepLabel = "Order Placed • Sent to Kitchen";
+      dotColor = Colors.amber.shade700;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        border: Border.all(color: Colors.orange.shade100),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryColor.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.alt_route_rounded,
+              color: AppTheme.primaryColor,
+              size: 18,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: BoxDecoration(
+                        color: dotColor,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    Flexible(
+                      child: Text(
+                        stepLabel,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                          color: AppTheme.textDark,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  cart.currentStatus == OrderStatus.delivered
+                      ? "Order Completed • OTP Verified"
+                      : "Multi-Role Realtime Sync Active",
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          ScaleTap(
+            onTap: () => _showRoleActionsModal(context, cart),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.tune_rounded, color: AppTheme.primaryColor, size: 14),
+                  SizedBox(width: 4),
+                  Text(
+                    "Actions",
+                    style: TextStyle(
+                      color: AppTheme.primaryColor,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          ScaleTap(
+            onTap: () {
+              cart.advanceSimulationStep();
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryColor,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.fast_forward_rounded, color: Colors.white, size: 14),
+                  SizedBox(width: 4),
+                  Text(
+                    "Step",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDeliveryPartnerCard(BuildContext context, CartState cart) {
+    if (cart.currentStatus == OrderStatus.placed) {
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.orange.shade50,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.orange.shade200),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade100,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.storefront_rounded, color: AppTheme.primaryColor, size: 20),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "1. Order Placed at Restaurant",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.textDark),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    "Kitchen is accepting your order. Cooking will start shortly.",
+                    style: TextStyle(color: Colors.black54, fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (cart.currentStatus == OrderStatus.preparing) {
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.blue.shade50,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.blue.shade200),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade100,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.soup_kitchen_rounded, color: Colors.blue, size: 20),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "2. Kitchen Cooking Food",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.textDark),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    "Chefs are preparing your dishes. Order will be broadcasted to delivery fleet once ready.",
+                    style: TextStyle(color: Colors.black54, fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (cart.currentStatus == OrderStatus.readyForPickup) {
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.amber.shade50,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.amber.shade300),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.amber.shade100,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.podcasts_rounded, color: Colors.amber, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "3. Broadcasted to Delivery Fleet 📡",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.textDark),
+                  ),
+                  const SizedBox(height: 2),
+                  const Text(
+                    "Food is ready! Broadcasted to riders nearby. First delivery partner to accept will deliver.",
+                    style: TextStyle(color: Colors.black54, fontSize: 11),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.shade200,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text("Awaiting partner claim", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                      ),
+                      const SizedBox(width: 8),
+                      Text("OTP: ${cart.deliveryOtp}", style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.primaryColor)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9FAFB),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              // Partner Avatar
+              Stack(
+                children: [
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundColor: Colors.orange.shade100,
+                    child: const Icon(Icons.person_rounded, color: AppTheme.primaryColor, size: 24),
+                  ),
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: const BoxDecoration(
+                        color: Colors.green,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.sports_motorsports_rounded, color: Colors.white, size: 9),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 10),
+              // Partner Info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          cart.riderName,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.textDark),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.shade100,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.star_rounded, size: 11, color: Colors.amber),
+                              const SizedBox(width: 2),
+                              Text(
+                                "${cart.riderRating}",
+                                style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.black87),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      cart.currentStatus == OrderStatus.partnerAssigned
+                          ? "Claimed Order • Reaching kitchen for pickup"
+                          : cart.riderVehicle,
+                      style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              // OTP Badge (Swiggy / Zomato style)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.35)),
+                ),
+                child: Column(
+                  children: [
+                    const Text(
+                      "DELIVERY OTP",
+                      style: TextStyle(fontSize: 8, fontWeight: FontWeight.w700, color: Colors.grey, letterSpacing: 0.4),
+                    ),
+                    Text(
+                      cart.deliveryOtp,
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: AppTheme.primaryColor, letterSpacing: 1.0),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Action buttons: Call & Message
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _showCallRiderDialog(context, cart),
+                  icon: const Icon(Icons.phone_in_talk_rounded, size: 13, color: AppTheme.primaryColor),
+                  label: Text("Call ${cart.riderName.split(' ').first}", style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primaryColor)),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: AppTheme.primaryColor.withValues(alpha: 0.3)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    backgroundColor: Colors.white,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _showQuickMessageDialog(context),
+                  icon: const Icon(Icons.chat_bubble_outline_rounded, size: 13, color: Colors.grey),
+                  label: const Text("Message", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87)),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: Colors.grey.shade300),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    backgroundColor: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showRoleActionsModal(BuildContext context, CartState cart) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Row(
+              children: [
+                Icon(Icons.alt_route_rounded, color: AppTheme.primaryColor),
+                SizedBox(width: 8),
+                Text(
+                  "Real-World Multi-Role Actions",
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppTheme.textDark),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              "Experience the flow from Kitchen to Broadcast Fleet to Customer:",
+              style: TextStyle(color: Colors.grey, fontSize: 12),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: Colors.blue.shade50, shape: BoxShape.circle),
+                child: const Icon(Icons.soup_kitchen_rounded, color: Colors.blue, size: 20),
+              ),
+              title: const Text("1. Restaurant: Accept & Cook Dish", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              subtitle: const Text("Kitchen confirms order & begins cooking", style: TextStyle(fontSize: 11)),
+              trailing: ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
+                onPressed: () {
+                  cart.updateOrderStatus(OrderStatus.preparing);
+                  Navigator.of(ctx).pop();
+                },
+                child: const Text("Trigger"),
+              ),
+            ),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: Colors.amber.shade50, shape: BoxShape.circle),
+                child: const Icon(Icons.podcasts_rounded, color: Colors.amber, size: 20),
+              ),
+              title: const Text("2. Restaurant: Dish Prepared • Broadcast", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              subtitle: const Text("Broadcasts to fleet site; first rider to accept delivers", style: TextStyle(fontSize: 11)),
+              trailing: ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.amber.shade800, foregroundColor: Colors.white),
+                onPressed: () {
+                  cart.updateOrderStatus(OrderStatus.readyForPickup);
+                  Navigator.of(ctx).pop();
+                },
+                child: const Text("Broadcast"),
+              ),
+            ),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: Colors.teal.shade50, shape: BoxShape.circle),
+                child: const Icon(Icons.two_wheeler_rounded, color: Colors.teal, size: 20),
+              ),
+              title: const Text("3. Delivery Partner: Accept Broadcast", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              subtitle: const Text("Rahul claims delivery (first rider to tap accept)", style: TextStyle(fontSize: 11)),
+              trailing: ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
+                onPressed: () {
+                  cart.acceptOrderAsPartner(partnerName: "Rahul Singh");
+                  Navigator.of(ctx).pop();
+                },
+                child: const Text("Accept"),
+              ),
+            ),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: Colors.orange.shade50, shape: BoxShape.circle),
+                child: const Icon(Icons.delivery_dining_rounded, color: AppTheme.primaryColor, size: 20),
+              ),
+              title: const Text("4. Delivery Partner: Pick Up Food", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              subtitle: const Text("Rider collects dish and begins ride to customer", style: TextStyle(fontSize: 11)),
+              trailing: ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryColor, foregroundColor: Colors.white),
+                onPressed: () {
+                  cart.updateOrderStatus(OrderStatus.onTheWay);
+                  Navigator.of(ctx).pop();
+                },
+                child: const Text("Pick Up"),
+              ),
+            ),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: Colors.green.shade50, shape: BoxShape.circle),
+                child: const Icon(Icons.check_circle_rounded, color: Colors.green, size: 20),
+              ),
+              title: const Text("5. Delivery Partner: Complete with OTP", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              subtitle: Text("Verified with Customer OTP: ${cart.deliveryOtp}", style: const TextStyle(fontSize: 11)),
+              trailing: ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+                onPressed: () {
+                  cart.updateOrderStatus(OrderStatus.delivered);
+                  Navigator.of(ctx).pop();
+                },
+                child: const Text("Complete"),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showCallRiderDialog(BuildContext context, CartState cart) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(Icons.phone_in_talk_rounded, color: AppTheme.primaryColor),
+            const SizedBox(width: 8),
+            Text("Call ${cart.riderName}"),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Dialing ${cart.riderPhone}...", style: const TextStyle(fontSize: 14)),
+            const SizedBox(height: 8),
+            const Text(
+              "Number masked for safety. Your delivery partner is on the way.",
+              style: TextStyle(color: Colors.grey, fontSize: 12),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text("End Call"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showQuickMessageDialog(BuildContext context) {
+    final quickNotes = [
+      "Please leave at the door 🚪",
+      "Don't ring the doorbell 🔕",
+      "I'll come downstairs to pick it up 🚶",
+      "Please call when you reach the gate 📞",
+    ];
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "Quick Instructions to Delivery Partner",
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.textDark),
+            ),
+            const SizedBox(height: 12),
+            ...quickNotes.map((msg) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.chat_bubble_outline_rounded, color: AppTheme.primaryColor, size: 20),
+                  title: Text(msg, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                  trailing: const Icon(Icons.send_rounded, size: 18, color: AppTheme.primaryColor),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text("Sent to Rahul: \"$msg\""),
+                        backgroundColor: AppTheme.primaryColor,
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  },
+                )),
+            const SizedBox(height: 8),
           ],
         ),
       ),
