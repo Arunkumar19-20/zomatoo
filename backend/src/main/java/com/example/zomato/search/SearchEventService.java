@@ -38,7 +38,7 @@ public class SearchEventService {
     private static final Logger log = LoggerFactory.getLogger(SearchEventService.class);
     private static final Duration TYPING_WINDOW = Duration.ofSeconds(20);
     private static final Duration CLICK_WINDOW = Duration.ofHours(6);
-    private static final Set<String> ACTIONS = Set.of(SearchClick.OPEN, SearchClick.ADD_TO_CART);
+    private static final Set<String> ACTIONS = Set.of(SearchClick.OPEN, SearchClick.ADD_TO_CART, SearchClick.RESERVE);
 
     private final SearchEventRepository events;
     private final SearchClickRepository clicks;

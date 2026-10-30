@@ -26,9 +26,11 @@ public class SearchController {
     private final RateLimitingService rateLimiter;
     private final SearchEventService log;
     private final TrendingService trending;
+    private final com.example.zomato.repository.DropRepository drops;
 
     public SearchController(HybridSearchService search, SearchProperties props, RateLimitingService rateLimiter, SearchEventService log,
-                            TrendingService trending) {
+                            TrendingService trending, com.example.zomato.repository.DropRepository drops) {
+        this.drops = drops;
         this.trending = trending;
         this.search = search;
         this.props = props;
@@ -70,6 +72,7 @@ public class SearchController {
                     d.tags().keySet().stream().map(Flavor::id).sorted().toList(), h.matchedTags(),
                     Math.round(h.score() * 1000) / 1000.0, h.reasons(), d.cuisine());
         }).toList();
+        hits = withLiveDrops(hits);
         String searchId = null;
         try {
             searchId = log.record(query, r, k, new SearchEventService.Context(clientId, http.getRemoteAddr(), area, "1".equals(doNotTrack))).orElse(null);
@@ -80,6 +83,28 @@ public class SearchController {
         return new DishSearchResponse(query, r.mode(), r.parsed().facets().stream().map(f -> f.text()).toList(),
                 r.parsed().flavors().stream().map(Flavor::id).sorted().toList(), r.parsed().vegOnly(), r.parsed().maxPrice(),
                 r.total(), r.tookMs(), hits, searchId);
+    }
+
+    /** Marks results whose dish has a Drop live right now with a slot left (the earliest-ending one when there are several). */
+    private List<DishHit> withLiveDrops(List<DishHit> hits) {
+        if (hits.isEmpty()) return hits;
+        try {
+            java.util.Map<Integer, com.example.zomato.entity.Drop> byItem = new java.util.HashMap<>();
+            for (com.example.zomato.entity.Drop d : drops.liveForItems(hits.stream().map(DishHit::itemId).toList(), java.time.LocalDateTime.now())) {
+                byItem.putIfAbsent(d.getMenuItemId(), d);
+            }
+            if (byItem.isEmpty()) return hits;
+            return hits.stream().map(h -> {
+                com.example.zomato.entity.Drop d = byItem.get(h.itemId());
+                if (d == null) return h;
+                return new DishHit(h.itemId(), h.name(), h.description(), h.price(), h.veg(), h.imageUrl(), h.restaurantId(), h.restaurantName(), h.restaurantOpen(),
+                        h.spiceLevel(), h.servingTemp(), h.tags(), h.matchedTags(), h.score(), h.reasons(), h.cuisine(),
+                        new DishSearchResponse.LiveDrop(d.getId(), d.getTitle(), d.getPrice(), Math.max(0, d.getTotalSlots() - d.getReservedSlots()), d.getEndsAt()));
+            }).toList();
+        } catch (RuntimeException e) {
+            // a Drop badge is a nicety; never let it break a search
+            return hits;
+        }
     }
 
     /** Rising cravings someone can order today, for the chips under the search bar. Public; shows phrases only, never counts or people. */

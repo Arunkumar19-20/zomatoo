@@ -102,4 +102,20 @@ public interface DropReservationRepository extends JpaRepository<DropReservation
     long countByDrop_IdAndStatusIn(int dropId, Collection<ReservationStatus> statuses);
 
     long countByDrop_IdAndStatus(int dropId, ReservationStatus status);
+
+    /** Remembers the search phrase on a still-held reservation of this customer. Returns rows updated (0 or 1). */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("update DropReservation r set r.searchAttribution = :phrase, r.searchAttributionAt = :at " +
+           "where r.id = :id and lower(r.customerEmail) = lower(:email) and r.status = com.example.zomato.entity.ReservationStatus.HELD")
+    int setAttribution(@Param("id") int id, @Param("email") String email, @Param("phrase") String phrase, @Param("at") LocalDateTime at);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("update DropReservation r set r.searchAttribution = null, r.searchAttributionAt = null where r.id = :id")
+    int clearAttribution(@Param("id") int id);
+
+    /** Forgets the search phrase on reservations older than the window. */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("update DropReservation r set r.searchAttribution = null, r.searchAttributionAt = null " +
+           "where r.searchAttribution is not null and r.searchAttributionAt < :cutoff")
+    int clearAttributionOlderThan(@Param("cutoff") LocalDateTime cutoff);
 }

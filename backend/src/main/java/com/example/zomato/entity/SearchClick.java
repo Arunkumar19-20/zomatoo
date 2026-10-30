@@ -11,6 +11,7 @@ public class SearchClick {
 
     public static final String OPEN = "OPEN";
     public static final String ADD_TO_CART = "ADD_TO_CART";
+    public static final String RESERVE = "RESERVE";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

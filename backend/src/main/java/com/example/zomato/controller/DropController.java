@@ -22,8 +22,11 @@ public class DropController {
     private final DropService service;
     private final com.example.zomato.security.RateLimitingService rateLimitingService;
     private final com.example.zomato.security.OwnershipService ownership;
+    private final com.example.zomato.search.OrderAttributionService attribution;
 
-    public DropController(DropService service, com.example.zomato.security.RateLimitingService rateLimitingService, com.example.zomato.security.OwnershipService ownership) {
+    public DropController(DropService service, com.example.zomato.security.RateLimitingService rateLimitingService, com.example.zomato.security.OwnershipService ownership,
+                          com.example.zomato.search.OrderAttributionService attribution) {
+        this.attribution = attribution;
         this.ownership = ownership;
         this.service = service;
         this.rateLimitingService = rateLimitingService;
@@ -59,12 +62,23 @@ public class DropController {
     }
 
     /** Authentication.getName() is assumed to be the user's email, as in your order endpoints. */
+    /** Optional: the search the customer found this Drop through, so a delivered order can be counted as one that search brought in. */
+    public record ReserveRequest(String searchId, Integer searchRank) {}
+
     @PostMapping("/{id}/reserve")
-    public ResponseEntity<ReservationResponseDTO> reserve(@PathVariable int id, Authentication auth) {
+    public ResponseEntity<ReservationResponseDTO> reserve(@PathVariable int id, Authentication auth,
+                                                          @RequestBody(required = false) ReserveRequest body,
+                                                          @RequestHeader(value = "X-Search-Client", required = false) String clientId,
+                                                          @RequestHeader(value = "DNT", required = false) String doNotTrack,
+                                                          jakarta.servlet.http.HttpServletRequest http) {
         if (!rateLimitingService.tryConsumeReserve(auth.getName())) {
             throw new com.example.zomato.exception.DropApiException(HttpStatus.TOO_MANY_REQUESTS, "RATE_LIMIT_EXCEEDED", "Rate limit exceeded. Please try again later.");
         }
         DropService.ReserveResult result = service.reserveWithResult(id, auth.getName());
+        if (body != null && body.searchId() != null && !body.searchId().isBlank()) {
+            attribution.attributeReservation(id, result.reservation().reservationId(), auth.getName(), body.searchId(), body.searchRank(),
+                    new com.example.zomato.search.SearchEventService.Context(clientId, http.getRemoteAddr(), null, "1".equals(doNotTrack)));
+        }
         return ResponseEntity.status(result.created() ? HttpStatus.CREATED : HttpStatus.OK)
                 .body(result.reservation());
     }

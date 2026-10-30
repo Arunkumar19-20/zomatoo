@@ -1,6 +1,8 @@
 package com.example.zomato.search;
 
 import com.example.zomato.entity.CartItem;
+import com.example.zomato.entity.Drop;
+import com.example.zomato.entity.DropReservation;
 import com.example.zomato.entity.Order;
 import com.example.zomato.entity.OrderAttributionPending;
 import com.example.zomato.entity.PaymentStatus;
@@ -8,6 +10,8 @@ import com.example.zomato.entity.SearchAttributionDaily;
 import com.example.zomato.entity.SearchClick;
 import com.example.zomato.entity.SearchEvent;
 import com.example.zomato.repository.CartItemRepository;
+import com.example.zomato.repository.DropRepository;
+import com.example.zomato.repository.DropReservationRepository;
 import com.example.zomato.repository.OrderAttributionPendingRepository;
 import com.example.zomato.repository.OrderRepository;
 import com.example.zomato.repository.SearchAttributionDailyRepository;
@@ -64,9 +68,14 @@ public class OrderAttributionService {
     private final OrderRepository orders;
     private final CartItemRepository cartItems;
     private final SearchProperties props;
+    private final DropRepository drops;
+    private final DropReservationRepository reservations;
 
     public OrderAttributionService(SearchEventService events, SearchEventRepository eventRows, OrderAttributionPendingRepository pending,
-                                   SearchAttributionDailyRepository daily, OrderRepository orders, CartItemRepository cartItems, SearchProperties props) {
+                                   SearchAttributionDailyRepository daily, OrderRepository orders, CartItemRepository cartItems, SearchProperties props,
+                                   DropRepository drops, DropReservationRepository reservations) {
+        this.drops = drops;
+        this.reservations = reservations;
         this.events = events;
         this.eventRows = eventRows;
         this.pending = pending;
@@ -84,9 +93,13 @@ public class OrderAttributionService {
      */
     @Transactional
     public Optional<String> phraseForCartAdd(String searchId, int itemId, Integer rank, SearchEventService.Context ctx) {
+        return phraseFor(searchId, itemId, rank, SearchClick.ADD_TO_CART, ctx);
+    }
+
+    private Optional<String> phraseFor(String searchId, int itemId, Integer rank, String action, SearchEventService.Context ctx) {
         if (searchId == null || searchId.isBlank() || !props.logEnabled() || ctx.doNotTrack()) return Optional.empty();
         try {
-            SearchEventService.ClickResult r = events.recordClick(searchId, itemId, rank == null ? 1 : rank, SearchClick.ADD_TO_CART, ctx);
+            SearchEventService.ClickResult r = events.recordClick(searchId, itemId, rank == null ? 1 : rank, action, ctx);
             if (!r.accepted()) return Optional.empty();
             return eventRows.findByPublicId(searchId).map(e -> PhraseMiner.mine(e.getNormalizedQuery(), e.getFlavors())).map(PhraseMiner.Phrase::key);
         } catch (RuntimeException e) {
@@ -95,7 +108,40 @@ public class OrderAttributionService {
         }
     }
 
+    /**
+     * A customer reserved a Drop for a dish they found by searching. Same checks as a cart add (the search showed that dish to this searcher, recently,
+     * and they did not ask not to be tracked); only the phrase is kept, on the reservation, for at most 24 hours. Nothing happens for a Drop that is not
+     * for a menu dish, because search only shows dishes. Never fails the reservation.
+     */
+    @Transactional
+    public void attributeReservation(int dropId, int reservationId, String email, String searchId, Integer rank, SearchEventService.Context ctx) {
+        try {
+            Drop drop = drops.findById(dropId).orElse(null);
+            if (drop == null || drop.getMenuItemId() == null) return;
+            phraseFor(searchId, drop.getMenuItemId(), rank, SearchClick.RESERVE, ctx)
+                    .ifPresent(phrase -> reservations.setAttribution(reservationId, email, phrase, LocalDateTime.now()));
+        } catch (RuntimeException e) {
+            log.warn("Could not attribute Drop reservation: {}", e.toString());
+        }
+    }
+
     // ------------------------------------------------------------------ 2. checkout
+
+    /**
+     * Called when a Drop reservation becomes an order: keeps the phrase the reservation carried, until the order is settled, then forgets it from the
+     * reservation. The order counts like any other once it is delivered and paid, under the dish the Drop is for.
+     */
+    @Transactional
+    public void holdForDropOrder(Order order, DropReservation reservation, Drop drop) {
+        if (order == null || order.getRestaurant() == null || reservation == null || drop == null) return;
+        String phrase = reservation.getSearchAttribution();
+        LocalDateTime at = reservation.getSearchAttributionAt();
+        if (phrase == null || at == null || drop.getMenuItemId() == null) return;
+        if (!at.isBefore(LocalDateTime.now().minus(CART_WINDOW))) {
+            pending.save(new OrderAttributionPending(order.getOrderId(), order.getRestaurant().getId(), drop.getMenuItemId(), phrase, 1, drop.getPrice()));
+        }
+        reservations.clearAttribution(reservation.getId());
+    }
 
     /** Called when an order is created from a cart: keeps the phrases of cart items that came from search, until the order is settled. */
     @Transactional
@@ -176,7 +222,8 @@ public class OrderAttributionService {
     @Transactional
     public void nightlyPurge() {
         try {
-            int carts = cartItems.clearAttributionOlderThan(LocalDateTime.now().minus(CART_WINDOW));
+            int carts = cartItems.clearAttributionOlderThan(LocalDateTime.now().minus(CART_WINDOW))
+                    + reservations.clearAttributionOlderThan(LocalDateTime.now().minus(CART_WINDOW));
             int old = daily.deleteOlderThan(LocalDate.now().minusDays(KEEP_DAYS));
             if (carts + old > 0) log.info("Search attribution purge: cleared {} cart items, deleted {} old daily rows", carts, old);
         } catch (RuntimeException e) {

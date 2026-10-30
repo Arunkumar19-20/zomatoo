@@ -209,6 +209,9 @@ public class OrderService {
         savedOrder.setOrderItems(itemsList);
         Order finalOrder = orderRepo.save(savedOrder);
 
+        // a Drop found through search is counted like any other order from search once delivered and paid
+        attribution.holdForDropOrder(finalOrder, reservation, drop);
+
         // Link reservation to the order and extend hold window
         dropService.attachOrder(reservationId, finalOrder.getOrderId(), userEmail);
 

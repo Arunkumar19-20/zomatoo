@@ -1171,6 +1171,21 @@ paths:
           required: true
           schema:
             type: integer
+      requestBody:
+        required: false
+        description: |
+          Optional. When the customer found the Drop by searching, the search id and the rank of the result they tapped. Only the search phrase is kept,
+          on the reservation, for at most 24 hours, and only when that search really showed this Drop's dish to the same searcher (and the request does
+          not carry `DNT: 1`). Once the order is delivered and paid it is counted in aggregate, like an order from the cart. Never affects the reservation.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                searchId:
+                  type: string
+                searchRank:
+                  type: integer
       responses:
         '200':
           description: Existing active hold returned (idempotent reserve)
@@ -1808,6 +1823,22 @@ components:
                 type: string
                 nullable: true
                 description: The restaurant's cuisine as its owner wrote it, e.g. "Italian, American, Comfort Food"
+              liveDrop:
+                type: object
+                nullable: true
+                description: A Drop for this dish that is live right now and has a slot left (the one ending first); absent or null otherwise
+                properties:
+                  dropId:
+                    type: integer
+                  title:
+                    type: string
+                  price:
+                    type: number
+                  slotsLeft:
+                    type: integer
+                  endsAt:
+                    type: string
+                    format: date-time
 
     ReservationResponseDTO:
       type: object

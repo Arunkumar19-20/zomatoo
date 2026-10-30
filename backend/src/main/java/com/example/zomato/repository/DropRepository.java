@@ -22,4 +22,8 @@ public interface DropRepository extends JpaRepository<Drop, Integer> {
     @Query("update Drop d set d.reservedSlots = d.reservedSlots - 1 " +
            "where d.id = :id and d.reservedSlots > 0")
     int releaseSlot(@Param("id") int id);
+
+    /** Drops that are live right now, still have a slot, and are for one of these dishes. */
+    @Query("select d from Drop d where d.menuItemId in :itemIds and d.startsAt <= :now and d.endsAt > :now and d.reservedSlots < d.totalSlots order by d.endsAt asc")
+    List<Drop> liveForItems(@Param("itemIds") java.util.Collection<Integer> itemIds, @Param("now") LocalDateTime now);
 }
