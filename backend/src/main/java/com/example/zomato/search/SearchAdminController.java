@@ -27,11 +27,13 @@ public class SearchAdminController {
     private final SuggestionService suggestions;
     private final OrderAttributionService attribution;
     private final DemandGapService demandGaps;
+    private final OwnerDigestService digest;
 
     public SearchAdminController(SearchIndexService index, SeedDishLoader seeds, SearchEventService events, TrendService trends,
                                  SearchLogSimulator simulator, SearchProperties props, SuggestionService suggestions, OrderAttributionService attribution,
-                                 DemandGapService demandGaps) {
+                                 DemandGapService demandGaps, OwnerDigestService digest) {
         this.attribution = attribution;
+        this.digest = digest;
         this.demandGaps = demandGaps;
         this.index = index;
         this.seeds = seeds;
@@ -40,6 +42,12 @@ public class SearchAdminController {
         this.simulator = simulator;
         this.props = props;
         this.suggestions = suggestions;
+    }
+
+    /** Sends this week's owner digests now (it also runs nightly; each owner gets at most one every 7 days). */
+    @PostMapping("/digest/generate")
+    public OwnerDigestService.Summary generateDigests() {
+        return digest.generate(java.time.LocalDate.now());
     }
 
     /**

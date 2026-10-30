@@ -988,6 +988,42 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  /admin/search/digest/generate:
+    post:
+      summary: Send this week's owner digests now (Admin only)
+      description: >
+        Also runs nightly after the trend and suggestion jobs. Each restaurant owner with a user account (matched by email) gets at most one
+        in-app notification of type WEEKLY_DIGEST every 7 days, and none in a week with nothing to say: no new suggestions, nothing rising
+        near them or everywhere, no orders from search. The text is under 250 characters and only points to the Insights tab.
+      tags: [Search]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Counts only
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  runDate:
+                    type: string
+                    format: date
+                  owners:
+                    type: integer
+                  sent:
+                    type: integer
+                  alreadySentThisWeek:
+                    type: integer
+                  nothingToSay:
+                    type: integer
+                  noAccount:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
   /admin/search/status:
     get:
       summary: Search index status (Admin only)

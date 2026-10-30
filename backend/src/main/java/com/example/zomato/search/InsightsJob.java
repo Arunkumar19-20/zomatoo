@@ -15,10 +15,12 @@ public class InsightsJob {
 
     private final TrendService trends;
     private final SuggestionService suggestions;
+    private final OwnerDigestService digest;
 
-    public InsightsJob(TrendService trends, SuggestionService suggestions) {
+    public InsightsJob(TrendService trends, SuggestionService suggestions, OwnerDigestService digest) {
         this.trends = trends;
         this.suggestions = suggestions;
+        this.digest = digest;
     }
 
     @Scheduled(cron = "${search.trends.cron:0 10 3 * * *}")
@@ -37,6 +39,14 @@ public class InsightsJob {
                     s.candidates(), s.created(), s.refreshed(), s.skippedByCap());
         } catch (RuntimeException e) {
             log.error("Owner suggestion job failed: {}", e.getMessage(), e);
+            return;
+        }
+        try {
+            OwnerDigestService.Summary d = digest.generate(today);
+            log.info("Owner digests {}: {} owners, {} sent, {} had a digest this week, {} had nothing to say, {} without an account", d.runDate(), d.owners(),
+                    d.sent(), d.alreadySentThisWeek(), d.nothingToSay(), d.noAccount());
+        } catch (RuntimeException e) {
+            log.error("Owner digest job failed: {}", e.getMessage(), e);
         }
     }
 }

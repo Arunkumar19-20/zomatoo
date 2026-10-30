@@ -12,4 +12,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Inte
     List<Notification> findByUser_UserId(Integer userId);
 
     List<Notification> findByUser_UserIdAndIsRead(Integer userId, boolean isRead);
+
+    /** Has this user been sent this kind of notification since the given time? */
+    boolean existsByUser_UserIdAndTypeAndTimestampAfter(Integer userId, String type, java.util.Date since);
 }
