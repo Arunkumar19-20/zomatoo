@@ -3,6 +3,7 @@
 
 import 'package:dio/dio.dart';
 import 'api_client.dart';
+import 'search_area.dart';
 import '../models/insights_models.dart';
 import '../repositories/insights_repository.dart';
 
@@ -15,7 +16,8 @@ class InsightsService implements TrendingRepository, OwnerInsightsRepository {
   @override
   Future<List<TrendingChip>> trending({int limit = 6}) async {
     try {
-      final res = await _dio.get('/search/trending', queryParameters: {'limit': limit});
+      final area = SearchArea.current;
+      final res = await _dio.get('/search/trending', queryParameters: {'limit': limit, if (area != null) 'area': area});
       return (res.data as List).map((e) => TrendingChip.fromJson(e as Map<String, dynamic>)).toList();
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);

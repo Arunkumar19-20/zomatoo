@@ -1,10 +1,14 @@
 import 'package:flutter/foundation.dart';
 import '../repositories/insights_repository.dart';
+import '../services/search_area.dart';
 import 'insights_models.dart';
 
 /// The "Trending cravings" chips. They are a nicety, so a failure shows nothing rather than an error.
 class TrendingState extends ChangeNotifier {
-  TrendingState({required TrendingRepository repository, this.limit = 6}) : _repo = repository;
+  TrendingState({required TrendingRepository repository, this.limit = 6}) : _repo = repository {
+    // another city, another chips: look again when the customer changes it
+    SearchArea.areaNotifier.addListener(_areaChanged);
+  }
 
   final TrendingRepository _repo;
   final int limit;
@@ -34,8 +38,13 @@ class TrendingState extends ChangeNotifier {
     }
   }
 
+  void _areaChanged() {
+    if (_loaded) refresh();
+  }
+
   @override
   void dispose() {
+    SearchArea.areaNotifier.removeListener(_areaChanged);
     _disposed = true;
     super.dispose();
   }

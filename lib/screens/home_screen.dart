@@ -927,6 +927,7 @@ class _HomeScreenState extends State<HomeScreen> {
             }),
             const SizedBox(height: 4),
             const SearchPrivacyTile(),
+            const SearchAreaTile(),
             const SizedBox(height: 4),
             _profileItem(ctx, Icons.swap_horiz_rounded, 'Switch Role', Colors.blue.shade600, () {
               Navigator.of(ctx).pop();

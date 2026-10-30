@@ -40,6 +40,7 @@ import 'services/dish_search_service.dart';
 import 'repositories/dish_search_repository.dart';
 import 'models/dish_search_state.dart';
 import 'services/insights_service.dart';
+import 'services/search_area.dart';
 import 'services/demand_gap_service.dart';
 import 'repositories/demand_gap_repository.dart';
 import 'services/search_privacy.dart';
@@ -73,6 +74,7 @@ void main() async {
 
   await session.restoreSession();
   await SearchPrivacy.load();
+  await SearchArea.load();
 
   runApp(
     MultiProvider(

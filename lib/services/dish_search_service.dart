@@ -6,6 +6,7 @@ import 'api_client.dart';
 import '../models/dish_search_models.dart';
 import '../repositories/dish_search_repository.dart';
 import 'search_client_id.dart';
+import 'search_area.dart';
 import 'search_privacy.dart';
 
 class DishSearchService implements DishSearchRepository, MenuTagRepository {
@@ -24,6 +25,7 @@ class DishSearchService implements DishSearchRepository, MenuTagRepository {
             if (veg != null) 'veg': veg,
             if (maxPrice != null) 'maxPrice': maxPrice,
             if (type != null) 'type': type,
+            if (SearchArea.current != null) 'area': SearchArea.current,
           },
           // opted out: ask not to be tracked and do not even send the anonymous id
           options: Options(headers: SearchPrivacy.optedOut ? {'DNT': '1'} : {'X-Search-Client': await SearchClientId.get()}));

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../services/search_area.dart';
 import '../../services/search_privacy.dart';
 import '../../theme/app_theme.dart';
 
@@ -75,6 +76,52 @@ class SearchPrivacyNotice extends StatelessWidget {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+/// "Your area" in the profile: a city name used to show what is popular near the customer. Optional; tapping it opens a small form.
+class SearchAreaTile extends StatelessWidget {
+  const SearchAreaTile({super.key});
+
+  Future<void> _edit(BuildContext context) async {
+    final controller = TextEditingController(text: SearchArea.areaNotifier.value ?? '');
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Your area'),
+        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Your city, so we can show what is popular near you. Only the city name is used, never your address or position.', style: TextStyle(fontSize: 12.5)),
+          const SizedBox(height: 10),
+          TextField(key: const ValueKey('search-area-field'), controller: controller, autofocus: true, maxLength: SearchArea.maxLength, decoration: const InputDecoration(hintText: 'e.g. Oakland')),
+        ]),
+        actions: [
+          if (SearchArea.areaNotifier.value != null) TextButton(key: const ValueKey('search-area-clear'), onPressed: () => Navigator.of(ctx).pop(''), child: const Text('Clear')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
+          ElevatedButton(key: const ValueKey('search-area-save'), onPressed: () => Navigator.of(ctx).pop(controller.text), child: const Text('Save')),
+        ],
+      ),
+    );
+    if (result != null) await SearchArea.set(result);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<String?>(
+      valueListenable: SearchArea.areaNotifier,
+      builder: (context, area, _) => ListTile(
+        key: const ValueKey('search-area-tile'),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(10)),
+          child: Icon(Icons.place_outlined, color: Colors.blue.shade700, size: 20),
+        ),
+        title: const Text('Your area', style: TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: Text(area ?? 'Not set: you see what is rising everywhere.', style: const TextStyle(fontSize: 12)),
+        trailing: const Icon(Icons.chevron_right_rounded),
+        onTap: () => _edit(context),
       ),
     );
   }
