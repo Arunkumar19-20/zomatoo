@@ -671,6 +671,14 @@ paths:
           schema:
             type: string
             enum: [dish, craving]
+        - name: area
+          in: query
+          description: |
+            The city the customer says they are in (optional). Kept with the anonymous search record, lowercased, and used only to
+            work out what is rising in that city. Ignored when the request carries `DNT: 1`.
+          schema:
+            type: string
+            maxLength: 80
       responses:
         '200':
           content:
@@ -685,6 +693,46 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '429':
           $ref: '#/components/responses/TooManyRequests'
+
+  /search/trending:
+    get:
+      summary: Rising cravings someone can order today, for the chips under the search bar (public)
+      description: |
+        Phrases that cleared the nightly trend job's bars and that at least one open menu serves. Shows phrases only, never counts or people.
+        With `area`, what is rising among searches from that city comes first, then what is rising everywhere; an area with nothing of
+        its own gets the usual list.
+      tags: [Search]
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 6
+            maximum: 12
+        - name: area
+          in: query
+          schema:
+            type: string
+            maxLength: 80
+      responses:
+        '200':
+          description: Chips
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    label:
+                      type: string
+                    query:
+                      type: string
+                    kind:
+                      type: string
+                      enum: [FUSION, FLAVOR, DISH]
+                    dishCount:
+                      type: integer
 
   /menu-items/flavor-tags:
     get:

@@ -84,8 +84,9 @@ public class SearchController {
 
     /** Rising cravings someone can order today, for the chips under the search bar. Public; shows phrases only, never counts or people. */
     @GetMapping("/trending")
-    public List<TrendingService.Chip> trending(@RequestParam(value = "limit", defaultValue = "6") int limit) {
-        return trending.chips(limit);
+    public List<TrendingService.Chip> trending(@RequestParam(value = "limit", defaultValue = "6") int limit,
+                                               @RequestParam(value = "area", required = false) String area) {
+        return trending.chips(limit, area);
     }
 
     public record ClickRequest(int itemId, int rank, String action) {}

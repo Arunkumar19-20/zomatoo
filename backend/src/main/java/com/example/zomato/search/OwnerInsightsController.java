@@ -39,7 +39,8 @@ public class OwnerInsightsController {
     public record RestaurantRef(int id, String name) {}
 
     /** A phrase rising across all searches, shown to owners with the numbers customers do not see. */
-    public record RisingPhrase(String label, String kind, int recentSearchers, double growth, double unmetShare, List<String> exampleSearches) {}
+    /** {@code area} is null for a phrase rising across everyone, otherwise the city where it is rising among people searching from there. */
+    public record RisingPhrase(String label, String kind, int recentSearchers, double growth, double unmetShare, List<String> exampleSearches, String area) {}
 
     /** Delivered orders that search brought in over the last [days] days, counted without ever knowing who ordered. */
     public record SearchOrders(int days, long orders, long units, long revenue, List<PhraseLine> topPhrases) {}
@@ -78,9 +79,19 @@ public class OwnerInsightsController {
     public Insights insights(Authentication auth) {
         List<Restaurant> mine = myRestaurants(auth);
         Set<Integer> ids = mine.stream().map(Restaurant::getId).collect(Collectors.toSet());
-        List<RisingPhrase> rising = trends.latest("RISING").stream()
+        List<RisingPhrase> rising = new java.util.ArrayList<>();
+        // what is rising where this owner's restaurants are, then what is rising everywhere
+        java.util.Set<String> cities = mine.stream().map(r -> r.getLocation() == null ? null : TrendService.normalizeArea(r.getLocation().getCity()))
+                .filter(java.util.Objects::nonNull).collect(Collectors.toCollection(java.util.TreeSet::new));
+        java.util.Set<String> shownLocally = new java.util.HashSet<>();
+        for (String city : cities) {
+            trends.latest("RISING", city).stream().sorted(Comparator.comparingDouble(TrendService.TrendView::growth).reversed()).forEach(t -> {
+                if (shownLocally.add(t.key())) rising.add(new RisingPhrase(t.label(), t.kind(), t.recentSearchers(), t.growth(), t.unmetShare(), t.samples(), city));
+            });
+        }
+        trends.latest("RISING").stream().filter(t -> !shownLocally.contains(t.key()))
                 .sorted(Comparator.comparingDouble(TrendService.TrendView::growth).reversed())
-                .map(t -> new RisingPhrase(t.label(), t.kind(), t.recentSearchers(), t.growth(), t.unmetShare(), t.samples())).toList();
+                .forEach(t -> rising.add(new RisingPhrase(t.label(), t.kind(), t.recentSearchers(), t.growth(), t.unmetShare(), t.samples(), null)));
         return new Insights(mine.stream().map(r -> new RestaurantRef(r.getId(), r.getName())).toList(), suggestions.openFor(ids), rising, searchOrders(ids));
     }
 

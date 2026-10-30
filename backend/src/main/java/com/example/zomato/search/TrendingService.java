@@ -37,10 +37,22 @@ public class TrendingService {
 
     @Transactional(readOnly = true)
     public List<Chip> chips(int limit) {
+        return chips(limit, null);
+    }
+
+    /** With an area, what is rising among people searching from there comes first, then what is rising everywhere. */
+    @Transactional(readOnly = true)
+    public List<Chip> chips(int limit, String area) {
         int max = Math.max(1, Math.min(limit, MAX_CHIPS));
         Map<Integer, List<DishDoc>> menus = index.allDocs().stream().collect(Collectors.groupingBy(DishDoc::restaurantId));
         List<Chip> out = new ArrayList<>();
-        for (TrendView t : trends.latest("RISING").stream().sorted(Comparator.comparingDouble(TrendView::growth).reversed()).toList()) {
+        List<TrendView> candidates = new ArrayList<>();
+        if (TrendService.normalizeArea(area) != null) {
+            candidates.addAll(trends.latest("RISING", area).stream().sorted(Comparator.comparingDouble(TrendView::growth).reversed()).toList());
+        }
+        java.util.Set<String> local = candidates.stream().map(TrendView::key).collect(Collectors.toSet());
+        trends.latest("RISING").stream().filter(t -> !local.contains(t.key())).sorted(Comparator.comparingDouble(TrendView::growth).reversed()).forEach(candidates::add);
+        for (TrendView t : candidates) {
             int dishes = 0;
             for (List<DishDoc> menu : menus.values()) {
                 var m = TrendMatcher.assess(t, menu);

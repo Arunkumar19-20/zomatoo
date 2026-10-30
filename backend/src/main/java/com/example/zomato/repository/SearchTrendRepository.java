@@ -15,9 +15,15 @@ public interface SearchTrendRepository extends JpaRepository<SearchTrend, Long> 
     @Query("select max(t.runDate) from SearchTrend t")
     LocalDate latestRunDate();
 
-    List<SearchTrend> findByRunDateOrderByRecentSearchersDesc(LocalDate runDate);
+    /** The trend across everyone (area is null). */
+    List<SearchTrend> findByRunDateAndAreaIsNullOrderByRecentSearchersDesc(LocalDate runDate);
 
-    List<SearchTrend> findByRunDateAndStatusOrderByGrowthDesc(LocalDate runDate, String status);
+    List<SearchTrend> findByRunDateAndAreaIsNullAndStatusOrderByGrowthDesc(LocalDate runDate, String status);
+
+    /** The trend among searches from one area. */
+    List<SearchTrend> findByRunDateAndAreaOrderByRecentSearchersDesc(LocalDate runDate, String area);
+
+    List<SearchTrend> findByRunDateAndAreaAndStatusOrderByGrowthDesc(LocalDate runDate, String area, String status);
 
     @Transactional
     @Modifying

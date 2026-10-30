@@ -75,10 +75,10 @@ public class SearchAdminController {
         return trends.run(asOf == null ? java.time.LocalDate.now() : asOf);
     }
 
-    /** The latest trend snapshot; {@code status} narrows it (RISING, STEADY, FALLING, FLUKE). */
+    /** The latest trend snapshot; {@code status} narrows it (RISING, STEADY, FALLING, FLUKE) and {@code area} shows one area's own trends. */
     @GetMapping("/trends")
-    public java.util.List<TrendService.TrendView> trends(@RequestParam(required = false) String status) {
-        return trends.latest(status);
+    public java.util.List<TrendService.TrendView> trends(@RequestParam(required = false) String status, @RequestParam(required = false) String area) {
+        return trends.latest(status, area);
     }
 
     /** Demo only: fills the log with fake traffic that has known trends planted in it. */

@@ -171,6 +171,8 @@ public class SearchLogSimulator {
         e.setMaxPrice(r.parsed().maxPrice());
         e.setMode(r.mode());
         e.setSessionKey(session);
+        // most simulated searchers are in the seeded restaurants' city, the rest in a neighbouring one, so per-area trends have something to split
+        e.setArea(Math.floorMod(session.hashCode(), 10) < 7 ? "san francisco" : "oakland");
         e.setRequestedK(10);
         e.setTotalMatches(r.total());
         e.setRelevantCount(d.relevantCount());

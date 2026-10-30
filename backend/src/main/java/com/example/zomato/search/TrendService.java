@@ -48,11 +48,18 @@ public class TrendService {
         this.props = props;
     }
 
-    public record RunSummary(LocalDate asOf, int searchesRead, int searchesWithoutPhrase, int phrases, int wordingsCombined, Map<String, Integer> byStatus) {}
+    public record RunSummary(LocalDate asOf, int searchesRead, int searchesWithoutPhrase, int phrases, int wordingsCombined, Map<String, Integer> byStatus,
+                             int areas, int areasWithTrends) {}
 
     public record TrendView(LocalDate runDate, String status, String kind, String label, String key, List<String> cuisines, String reason,
                             int recentSearchers, int baselineSearchers, double growth, int activeDays, double topDayShare, double unmetShare,
-                            List<String> samples) {}
+                            List<String> samples, String area) {
+
+        public TrendView(LocalDate runDate, String status, String kind, String label, String key, List<String> cuisines, String reason,
+                         int recentSearchers, int baselineSearchers, double growth, int activeDays, double topDayShare, double unmetShare, List<String> samples) {
+            this(runDate, status, kind, label, key, cuisines, reason, recentSearchers, baselineSearchers, growth, activeDays, topDayShare, unmetShare, samples, null);
+        }
+    }
 
     private static final class Acc {
         Phrase phrase;
@@ -76,13 +83,44 @@ public class TrendService {
         }
     }
 
+    private record Assessed(List<SearchTrend> rows, EnumMap<Status, Integer> counts, int read, int skipped, int phrases, int combined) {}
+
     @Transactional
     public RunSummary run(LocalDate asOf) {
         TrendDetector.Params params = props.trendParams();
         LocalDate recentFrom = asOf.minusDays(params.recentDays() - 1L);
         LocalDateTime since = recentFrom.minusDays(params.baselineDays()).atStartOfDay();
         List<Object[]> rows = events.trendInputsSince(since, props.simEnabled());
+        LocalDateTime now = LocalDateTime.now();
 
+        Assessed global = assess(rows, asOf, params, null, now);
+        List<SearchTrend> out = new ArrayList<>(global.rows());
+
+        // the same judgement over each area's own searches; an area only gets rows once enough of its own people searched the phrase
+        Map<String, List<Object[]>> byArea = new TreeMap<>();
+        for (Object[] r : rows) {
+            String area = r.length > 5 ? (String) r[5] : null;
+            if (area != null && !area.isBlank()) byArea.computeIfAbsent(area, k -> new ArrayList<>()).add(r);
+        }
+        int areasWithTrends = 0;
+        for (Map.Entry<String, List<Object[]>> e : byArea.entrySet()) {
+            List<SearchTrend> areaRows = assess(e.getValue(), asOf, params, e.getKey(), now).rows();
+            if (!areaRows.isEmpty()) areasWithTrends++;
+            out.addAll(areaRows);
+        }
+
+        trends.deleteByDay(asOf);
+        trends.saveAll(out);
+        trends.deleteOlderThan(asOf.minusDays(KEEP_DAYS));
+
+        Map<String, Integer> byStatus = new LinkedHashMap<>();
+        for (Status st : Status.values()) byStatus.put(st.name(), global.counts().getOrDefault(st, 0));
+        return new RunSummary(asOf, global.read(), global.skipped(), global.phrases(), global.combined(), byStatus, byArea.size(), areasWithTrends);
+    }
+
+    /** Judges every phrase in {@code rows} (all searches, or one area's) and returns the rows worth keeping; {@code area} null means everyone. */
+    private Assessed assess(List<Object[]> rows, LocalDate asOf, TrendDetector.Params params, String area, LocalDateTime now) {
+        LocalDate recentFrom = asOf.minusDays(params.recentDays() - 1L);
         Map<String, Acc> byKey = new LinkedHashMap<>();
         Map<String, Phrase> mined = new HashMap<>();
         int read = 0, skipped = 0;
@@ -114,22 +152,19 @@ public class TrendService {
 
         EnumMap<Status, Integer> counts = new EnumMap<>(Status.class);
         List<SearchTrend> out = new ArrayList<>();
-        LocalDateTime now = LocalDateTime.now();
         for (Acc a : byKey.values()) {
             Series s = new Series(a.phrase.key(), a.phrase.kind(), label(a), a.phrase.cuisines(),
                     a.searchers.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().size())),
                     a.recentSearches, a.recentUnmet, topForms(a, 4));
             Trend t = TrendDetector.assess(s, asOf, params);
             counts.merge(t.status(), 1, Integer::sum);
-            if (t.status() != Status.TOO_SMALL) out.add(toRow(t, asOf, now));
+            if (t.status() != Status.TOO_SMALL) {
+                SearchTrend row = toRow(t, asOf, now);
+                row.setArea(area);
+                out.add(row);
+            }
         }
-        trends.deleteByDay(asOf);
-        trends.saveAll(out);
-        trends.deleteOlderThan(asOf.minusDays(KEEP_DAYS));
-
-        Map<String, Integer> byStatus = new LinkedHashMap<>();
-        for (Status st : Status.values()) byStatus.put(st.name(), counts.getOrDefault(st, 0));
-        return new RunSummary(asOf, read, skipped, byKey.size(), combined, byStatus);
+        return new Assessed(out, counts, read, skipped, byKey.size(), combined);
     }
 
     private static String label(Acc a) {
@@ -177,24 +212,43 @@ public class TrendService {
     /** Rising phrases in the snapshot taken on one day. */
     @Transactional(readOnly = true)
     public List<TrendView> rising(LocalDate day) {
-        return trends.findByRunDateAndStatusOrderByGrowthDesc(day, Status.RISING.name()).stream().map(TrendService::view).toList();
+        return trends.findByRunDateAndAreaIsNullAndStatusOrderByGrowthDesc(day, Status.RISING.name()).stream().map(TrendService::view).toList();
     }
 
-    /** The latest snapshot, optionally one status only (for example RISING). */
+    /** The latest snapshot across everyone, optionally one status only (for example RISING). */
     @Transactional(readOnly = true)
     public List<TrendView> latest(String status) {
+        return latest(status, null);
+    }
+
+    /** The latest snapshot among searches from one area (null or blank: across everyone). Areas compare case-insensitively. */
+    @Transactional(readOnly = true)
+    public List<TrendView> latest(String status, String area) {
         LocalDate day = trends.latestRunDate();
         if (day == null) return List.of();
-        List<SearchTrend> rows = status == null || status.isBlank()
-                ? trends.findByRunDateOrderByRecentSearchersDesc(day)
-                : trends.findByRunDateAndStatusOrderByGrowthDesc(day, status.trim().toUpperCase(Locale.ROOT));
+        String a = normalizeArea(area);
+        boolean any = status == null || status.isBlank();
+        String st = any ? null : status.trim().toUpperCase(Locale.ROOT);
+        List<SearchTrend> rows;
+        if (a == null) {
+            rows = any ? trends.findByRunDateAndAreaIsNullOrderByRecentSearchersDesc(day) : trends.findByRunDateAndAreaIsNullAndStatusOrderByGrowthDesc(day, st);
+        } else {
+            rows = any ? trends.findByRunDateAndAreaOrderByRecentSearchersDesc(day, a) : trends.findByRunDateAndAreaAndStatusOrderByGrowthDesc(day, a, st);
+        }
         return rows.stream().map(TrendService::view).toList();
+    }
+
+    /** The form areas are stored in: trimmed and lowercase; blank means none. */
+    public static String normalizeArea(String area) {
+        if (area == null || area.isBlank()) return null;
+        String a = area.trim().toLowerCase(Locale.ROOT);
+        return a.length() > 80 ? a.substring(0, 80) : a;
     }
 
     static TrendView view(SearchTrend t) {
         return new TrendView(t.getRunDate(), t.getStatus(), t.getKind(), t.getLabel(), t.getPhraseKey(),
                 t.getCuisines() == null || t.getCuisines().isBlank() ? List.of() : List.of(t.getCuisines().split(",")), t.getReason(),
                 t.getRecentSearchers(), t.getBaselineSearchers(), t.getGrowth(), t.getActiveDays(), t.getTopDayShare(), t.getUnmetShare(),
-                t.getSamples() == null || t.getSamples().isBlank() ? List.of() : List.of(t.getSamples().split("\\|")));
+                t.getSamples() == null || t.getSamples().isBlank() ? List.of() : List.of(t.getSamples().split("\\|")), t.getArea());
     }
 }

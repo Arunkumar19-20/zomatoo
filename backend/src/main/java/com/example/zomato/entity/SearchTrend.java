@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
  * Holds phrases and counts only, never a searcher or a raw query log row.
  */
 @Entity
-@Table(name = "search_trend", indexes = @Index(name = "idx_search_trend_run", columnList = "run_date, status"))
+@Table(name = "search_trend", indexes = @Index(name = "idx_search_trend_run", columnList = "run_date, status, area"))
 public class SearchTrend {
 
     @Id
@@ -63,6 +63,10 @@ public class SearchTrend {
     @Column(name = "samples", length = 400)
     private String samples;
 
+    /** Lowercased city the searches came from; null for the trend across everyone. */
+    @Column(name = "area", length = 80)
+    private String area;
+
     @Column(name = "computed_at", nullable = false)
     private LocalDateTime computedAt = LocalDateTime.now();
 
@@ -95,6 +99,8 @@ public class SearchTrend {
     public void setUnmetShare(double unmetShare) { this.unmetShare = unmetShare; }
     public String getSamples() { return samples; }
     public void setSamples(String samples) { this.samples = samples; }
+    public String getArea() { return area; }
+    public void setArea(String area) { this.area = area; }
     public LocalDateTime getComputedAt() { return computedAt; }
     public void setComputedAt(LocalDateTime computedAt) { this.computedAt = computedAt; }
 }
