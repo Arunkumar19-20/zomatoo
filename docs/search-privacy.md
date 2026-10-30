@@ -36,3 +36,9 @@ Search, trending and ordering work exactly the same. The choice is stored on you
 
 The server honours the standard `DNT: 1` header on `/search/dishes`, `/search/events/{id}/click` and `/cart/items`, and `search.log.enabled=false` turns logging off for everyone.
 The app's switch is `SearchPrivacy` (`lib/services/search_privacy.dart`). See `docs/search-insights.md` for the data model and retention.
+
+## Your area and Drops
+
+- **Your area** (optional, profile): a city name you type, used only to show what is popular near you. It is sent with searches and the trending request, lowercased, and kept with the anonymous search record. It is never an address or a position, and it is not sent when you turn counting off.
+- **Reserving a Drop from search results** can send the search it came from. Only the search phrase is kept on the reservation, for at most 24 hours; once the order is delivered and paid it becomes a count with no order or customer id. Do Not Track, another searcher, or a search that did not show the Drop's dish attribute nothing.
+

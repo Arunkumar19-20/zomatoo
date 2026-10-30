@@ -325,3 +325,57 @@ Backend `OrderAttributionIntegrationTest` (10: delivered order becomes an anonym
 cancelled/refunded/stale discarded, 24 h window and nightly purge, settling twice counts once, no trace without a search, admin-only settle) and `AttributionEstimateIntegrationTest` (5: real estimate with counted orders and its arithmetic, no estimate and an honest message without,
 never for add-a-dish, owners see only their own restaurants' orders, simulated counts invisible when simulation is off). Flutter: `search_attribution_test` (11: the registry and its expiry, a tap remembers the search, the cart add sends the context only when it should and not twice),
 estimate and banner widget tests, parsing tests, and the contract test now pins the live fixture's estimate and search orders. Full suites: backend 262, Flutter 163.
+
+---
+
+# Beyond the five phases: what was added next
+
+Seven follow-ups, each with its own commit and tests. Counts below are from the last full run (backend 350 tests, 0 failures).
+
+## The admin's demand-gaps view (`GET /admin/search/demand-gaps?days=14&min=5`, admin only)
+
+Takes the searches that found nothing, folds different wordings into one phrase (the same `PhraseMiner` as the trend job), counts searcher-days, and groups the phrases by cuisine next to how many restaurants declare that cuisine.
+
+- `NO_RESTAURANT`: nobody serves the cuisine. A hole in the supply (Korean, in the simulated traffic).
+- `DISH_GAP`: the cuisine is served but these dishes or combinations are not found.
+- `NO_CUISINE`: cravings that name no cuisine (a flavor, a dish with no origin).
+- A fusion such as "kimchi carbonara" is listed under each of its cuisines, with the other one named.
+
+Nothing rests on one person: phrases fewer than `min` searcher-days looked for are left out, `min` can never be lowered below 3, one person searching twenty times is one searcher-day, and no searcher key is returned. Phrases that appear on one day only are shown with "All on one day: may be a one-off" next to them. The admin dashboard has a new **Demand** tab (7, 14 or 30 days).
+Tests: backend `DemandGapIntegrationTest` (13), Flutter `demand_gaps_test` (9, including a contract test against a live response).
+
+## Trends per area
+
+Searches already carried an optional lowercase city (`area`). The nightly job now also judges each area's own searches, with the same bars, and stores the rows with an `area` column (null = everyone). An area only gets rows for a phrase once enough of its own people searched it, so a tiny town gets none.
+
+- `GET /search/trending?area=` puts what is rising in that area first, then what is rising everywhere. An area with nothing of its own sees the usual chips.
+- The owner's Insights list marks phrases rising in the city of the owner's restaurants (`area` on each rising phrase), listed once, as local.
+- `GET /admin/search/trends?area=` shows one area's snapshot. Area names match without regard to case or spaces.
+- The simulator splits its traffic between two cities so there is something to split. Tests: backend `AreaTrendsIntegrationTest` (7).
+- **The app does not know the customer's city yet.** The server side is done and tested. The Flutter side (a "Your area" tile in the profile, sent with searches only when counting is on) is written but was not run: see "Not verified" below.
+
+## Owner weekly digest
+
+One short in-app notification (type `WEEKLY_DIGEST`) per owner per 7 days: new suggestions waiting, what is rising near them (or everywhere), and orders search brought in over the last week. A week with nothing to say sends nothing; an owner with no user account (matched by email) is counted and skipped. The text is under 250 characters and only points to the Insights tab. Runs nightly after the suggestion job; `POST /admin/search/digest/generate` (admin) runs it now.
+Tests: backend `OwnerDigestIntegrationTest` (9).
+
+## Drops reserved from search results
+
+- Results carry `liveDrop` (id, title, price, slots left, end time) for a dish that has a Drop live right now with a slot left.
+- `POST /drops/{id}/reserve` takes an optional `{searchId, searchRank}`. If that search really showed the Drop's dish to the same searcher, recently, and the request is not Do Not Track, **only the phrase** is kept on the reservation, for at most 24 hours (it is never in a response). Checkout turns it into a pending row; it settles when the order is delivered and paid, like an order from the cart, and the nightly purge forgets any left over.
+- A Drop that is not for a menu dish cannot be attributed (search only shows dishes). A failure here never affects the reservation.
+- The Flutter side (a badge on the result card, the reserve call carrying the search id) is **not built**.
+Tests: backend `DropAttributionIntegrationTest` (11).
+
+## Dish photos and ownership checks
+
+Owners can upload dish photos (`docs/dish-photos.md`), and every endpoint that changes a restaurant, menu or Drop now checks the caller owns it (`OwnershipService`, `OwnershipIntegrationTest`). Customers can turn search counting off, and the area is never sent when they do (`docs/search-privacy.md`).
+
+## Checked live (real backend and Postgres-compatible schema, simulated traffic, curl)
+
+Simulate 35 days, run trends, generate suggestions, read the admin, owner and customer views, send the digest, then play two orders through. Result: exactly the two planted risers (Korean×Italian fusion, birria tacos) and the one planted fluke; 3 suggestions (2 add-dish, 1 Drop); both areas got trends; the fusion nobody can make is a demand gap and correctly gets no customer chip; the owner saw suggestions for the right restaurants and rising phrases marked with their city; the digest was sent once and the second run said "already sent this week"; a cart order and a Drop order from search each held a pending row, were refused "delivered" until they went through the status steps in order, and then settled together (the owner's search-orders total rose by exactly those two). **This run used the in-memory H2 database, not Postgres**: Docker was not available.
+
+## Not verified
+
+- The Flutter SDK was not available for the last part of the work, so these were **not run**: the "Your area" setting (`lib/services/search_area.dart`, the profile tile, the `area` query parameter) and everything on the Flutter side of the items above beyond the Demand tab. They are uncommitted in the working tree so they are not mistaken for tested work.
+- The Demand tab was never seen in a browser; its widget tests pass.
