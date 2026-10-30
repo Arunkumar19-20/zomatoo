@@ -366,7 +366,7 @@ Two more scripts help with demos and checks: `pay_order.sh <orderId> <amount> pa
 
 ### Demo Accounts & Role Access
 
-Cravey includes pre-seeded demo accounts for instant testing of all platform workflows:
+Cravey can seed demo accounts for instant testing of all platform workflows. **They exist only when you ask for them**: run with the `demo` or `dev` profile, or set `SEED_DEMO_ACCOUNTS=true`. The default is off, because these accounts have a password that is printed in this file. (`driver@cravey.com` is not created by the seeder.)
 
 | Role | Demo Email | Password | Access Capabilities |
 | :--- | :--- | :--- | :--- |
@@ -467,3 +467,12 @@ Contributions are enthusiastically welcomed! Please review our [Contributing Gui
 ## License
 
 This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
+
+---
+
+### Before you deploy
+
+- Set `JWT_SECRET` to a long random value. Without it the app signs tokens with a key that is in this repository, so anyone could make a token for any account. Run production with `SPRING_PROFILES_ACTIVE=prod`: that profile refuses to start on the default key. Other profiles only log a warning.
+- Leave `SEED_DEMO_ACCOUNTS` unset (off) and do not use the `demo` or `dev` profiles on a database real people use: they create accounts with known credentials.
+- The app's **Quick Demo Sign-In** buttons mint their own tokens with the repository's default key (`lib/services/jwt_helper.dart`), so they only work against a backend that uses that key. That is intended for demos; do not ship a build whose backend accepts it.
+

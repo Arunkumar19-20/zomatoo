@@ -50,9 +50,21 @@ public class DataInitializer implements CommandLineRunner {
         this.jdbcTemplate = jdbcTemplate;
     }
 
+    @org.springframework.beans.factory.annotation.Value("${seed.demo-accounts:false}")
+    private boolean seedDemoAccounts;
+
+    /** Sample data and accounts with a known password belong to the demo and dev profiles (or an explicit SEED_DEMO_ACCOUNTS=true), never to a real database by default. */
+    boolean seedingEnabled() {
+        return seedDemoAccounts || environment.acceptsProfiles(org.springframework.core.env.Profiles.of("demo", "dev"));
+    }
+
     @Override
     @Transactional
     public void run(String... args) {
+        if (!seedingEnabled()) {
+            logger.info("Sample data and demo accounts are off (profiles demo/dev, or SEED_DEMO_ACCOUNTS=true, turn them on).");
+            return;
+        }
         logger.info("[DEV] Initializing seed data...");
 
         // 1. Admin account
@@ -61,7 +73,7 @@ public class DataInitializer implements CommandLineRunner {
             admin.setPassword(passwordEncoder.encode("Password123!"));
             admin.setEmailVerified(true);
             userRepository.save(admin);
-            logger.info("[DEV] Seeded admin user: admin@cravey.com / Password123!");
+            logger.info("[DEV] Seeded admin user admin@cravey.com");
         }
 
         // 2. Restaurant Owner account
@@ -74,7 +86,7 @@ public class DataInitializer implements CommandLineRunner {
 
             owner = new RestaurantOwner("Restaurant Owner", "owner@cravey.com", "+1-555-0199");
             owner = restaurantOwnerRepository.save(owner);
-            logger.info("[DEV] Seeded owner user: owner@cravey.com / Password123!");
+            logger.info("[DEV] Seeded owner user owner@cravey.com");
         } else {
             owner = restaurantOwnerRepository.findAll().stream()
                     .filter(o -> "owner@cravey.com".equalsIgnoreCase(o.getEmail()))
@@ -95,7 +107,7 @@ public class DataInitializer implements CommandLineRunner {
             customer.setAddress("123 Foodie Lane, Gourmet City");
             customer.setUserId(savedCustomer.getUserId());
             customerRepository.save(customer);
-            logger.info("[DEV] Seeded customer user: customer@cravey.com / Password123!");
+            logger.info("[DEV] Seeded customer user customer@cravey.com");
         }
 
         // 3b. The people the app's "Quick Demo Sign-In" signs in as, so the demo button works against a fresh database

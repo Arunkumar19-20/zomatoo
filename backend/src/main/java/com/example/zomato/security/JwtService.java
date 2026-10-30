@@ -16,6 +16,22 @@ public class JwtService {
     @Value("${jwt.secret}")
     private String secret;
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private org.springframework.core.env.Environment environment;
+
+    /** The fallback in application.yml. Anyone who has read the repository knows it, so it can sign tokens for any account. */
+    static final String KNOWN_DEFAULT_SECRET = "change-this-to-a-secure-random-string-at-least-256-bits-long";
+
+    @jakarta.annotation.PostConstruct
+    void verifySecret() {
+        if (!KNOWN_DEFAULT_SECRET.equals(secret)) return;
+        if (environment != null && environment.acceptsProfiles(org.springframework.core.env.Profiles.of("prod", "production"))) {
+            throw new IllegalStateException("JWT_SECRET is not set: refusing to start the prod profile with the signing key published in the repository.");
+        }
+        org.slf4j.LoggerFactory.getLogger(JwtService.class)
+                .warn("Signing tokens with the default JWT secret from the repository. Fine for local development; set JWT_SECRET anywhere else (the prod profile refuses to start without it).");
+    }
+
     @Value("${jwt.access-token-validity-seconds:900}")
     private long accessTokenValiditySeconds;
 

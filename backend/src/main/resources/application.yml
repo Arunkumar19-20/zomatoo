@@ -40,8 +40,14 @@ server:
       internal-proxies: 10\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}|192\\.168\\.\\d{1,3}\\.\\d{1,3}|169\\.254\\.\\d{1,3}\\.\\d{1,3}|127\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}|172\\.(1[6-9]|2[0-9]|3[0-1])\\.\\d{1,3}\\.\\d{1,3}|0:0:0:0:0:0:0:1|::1
 
 jwt:
+  # Always set JWT_SECRET outside local development. With the 'prod' profile active the app refuses to start on this fallback.
   secret: ${JWT_SECRET:change-this-to-a-secure-random-string-at-least-256-bits-long}
   access-token-validity-seconds: ${JWT_ACCESS_TOKEN_VALIDITY_SECONDS:900}
+
+# Sample restaurants, drops and the accounts with a known password (admin@/owner@/customer@cravey.com, Password123!). Off unless the
+# 'demo' or 'dev' profile is active or SEED_DEMO_ACCOUNTS=true: never switch it on for a database real people use.
+seed:
+  demo-accounts: ${SEED_DEMO_ACCOUNTS:false}
 
 app:
   order:
